@@ -19,3 +19,9 @@
 - P2c merged into main at [`94ca38e`](https://github.com/nexvary/Nexvary-NRI/commit/94ca38effbced353605869d4656e344789e19d9d).
 - Added a private evidence matrix with source snapshots, human review and versioned JSON export. 30/30 Node tests passed. Browser verification covered claim creation, provenance linkage and review in both locales.
 - Next milestone: per-use qualitative L-READY assessment. Team reviewer permissions remain pending.
+
+## 2026-11-26 · P3 L-READY
+
+- P2d merged into main at [`580b089`](https://github.com/nexvary/Nexvary-NRI/commit/580b08919aa40924dee093842c6b6a12bf49a610).
+- Added per-use qualitative assessments with immutable revision snapshots, reviewed sources, recorded gaps and explicit safety and authorization blockers.
+- 32/32 Node tests passed. Browser acceptance exercised a blocked assessment in Arabic desktop and English mobile. Economic feasibility and sensitivity analysis follow.

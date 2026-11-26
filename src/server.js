@@ -47,7 +47,7 @@ export function createApp(store = openWorkspaceStore(), {
     };
 
     if (route) {
-      const section = ['references', 'reference-projects'].includes(route.kind) ? 'references' : route.kind.startsWith('evidence') ? 'evidence' : 'research';
+      const section = ['references', 'reference-projects'].includes(route.kind) ? 'references' : route.kind.startsWith('evidence') ? 'evidence' : route.kind.startsWith('readiness') ? 'l-ready' : 'research';
       const reply = (status, page, headers, body) => {
         const privateHeaders = { 'Cache-Control': 'no-store', ...headers };
         if (page) sendPage(status, section, page, privateHeaders);
@@ -69,6 +69,10 @@ export function createApp(store = openWorkspaceStore(), {
     const view = searchParams.get('view') ?? 'dashboard';
     if (pathname === '/' && view === 'research') {
       redirect(workspacePath(lang));
+      return;
+    }
+    if (pathname === '/' && view === 'l-ready') {
+      redirect(`/workspace/readiness-projects?lang=${lang}`);
       return;
     }
     if (pathname === '/' && view === 'evidence') {
