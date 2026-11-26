@@ -1,5 +1,13 @@
 # Development status
 
+## P2d · Claim-source evidence and review · 2026-11-26
+
+Private projects now support claim statements, links to saved source snapshots, study type, limitations, supporting/conflicting/inconclusive relationships and an owner review decision with rationale. Evidence snapshots survive removal of the originating reference check. The owner can download a versioned JSON evidence matrix.
+
+- 30/30 Node tests pass, including v4 migration, duplicate-link prevention, review integrity, project separation and unauthorized export denial.
+- Qt WebEngine verified claim creation, source linkage and review against a live Crossref reference with illustrative claim text. Captures: [Arabic desktop](qa/p2d/evidence-ar-desktop.webp) · [English mobile](qa/p2d/evidence-en-mobile.webp).
+- Team reviewers, review revisions and report-studio output remain pending.
+
 ## P2c · Public ORCID and Zenodo identifiers · 2026-11-26
 
 Adds public ORCID iD and published Zenodo record lookups to the private project reference workspace. Public name, publisher-supplied record metadata, source URL and retrieval time stay with the project. ORCID identity ownership is unverified. Zenodo supports version DOIs issued by Zenodo. Agency resolution, arbitrary DOIs on Zenodo, verified ORCID account linking and public researcher profiles remain open.
@@ -74,7 +82,7 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | NRI-02 | Partial | Personal project CRUD, project PDF versions, project DOI records and access denial are verified. Rich manuscript records, authors, tags, search, notes, tasks, collaboration and publication status remain. |
 | NRI-03 | Partial | Project-bound PDF upload, metadata, encrypted persistence, version downloads and deletion are verified. Other formats, browsing by collection, search, reading, annotation, citation import/export and deduplication remain. |
 | NRI-04 | Partial | Crossref and OpenAlex DOI lookups, dated per-provider source links, correction/retraction metadata, per-provider local cache, rate limits and unknown/failure outcomes are verified. Side-by-side provider comparison view implemented. Agency resolution, additional providers, claim-to-source mapping and evidence review remain. |
-| NRI-05 | Not started | Claim modeling, evidence review and exports remain. |
+| NRI-05 | Partial | Claims, dated source snapshots, study type, limitations, conflicting evidence, owner review and JSON export are verified. Team reviewer roles and review revisions remain. |
 | NRI-06 | Partial | Tested six ordered dimensions and framework wording. Qualitative assessment, evidence history, reviewers and safety/authorization blocking remain. |
 | NRI-07 | Not started | Economic models, scenarios and exports remain. |
 | NRI-08 | Not started | Providers, consent, verification, limits and usage accounting remain. |

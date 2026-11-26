@@ -13,3 +13,9 @@
 - P2b merged into main at [`2dce2b4`](https://github.com/nexvary/Nexvary-NRI/commit/2dce2b495a0674e1ab2f6ce35d23bee394c290ed).
 - P2c adds provider-specific input validation, fixed public endpoints, bounded lookup and dated private project snapshots. Unknown provider values are rejected before making any external request. ORCID lookup and OAuth account linking are separate acceptance requirements.
 - `npm test`: 29/29. Live browser acceptance passed with both providers, independent removal, and Arabic desktop and English mobile captures. Next milestone is claim-to-source mapping and human evidence review.
+
+## 2026-11-26 · P2d evidence intelligence
+
+- P2c merged into main at [`94ca38e`](https://github.com/nexvary/Nexvary-NRI/commit/94ca38effbced353605869d4656e344789e19d9d).
+- Added a private evidence matrix with source snapshots, human review and versioned JSON export. 30/30 Node tests passed. Browser verification covered claim creation, provenance linkage and review in both locales.
+- Next milestone: per-use qualitative L-READY assessment. Team reviewer permissions remain pending.

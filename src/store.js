@@ -4,10 +4,11 @@ import { dirname, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { bindDocumentKey } from './document-crypto.js';
 import { documentSchema, documentStore } from './document-store.js';
+import { evidenceSchema, evidenceStore } from './evidence-store.js';
 import { referenceSchema, referenceMigrationV4, referenceStore } from './reference-store.js';
 
 export const sessionLifetime = 8 * 60 * 60;
-const schemaVersion = 4;
+const schemaVersion = 5;
 const schema = `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -54,7 +55,7 @@ function initialize(db, path) {
     if (version < 2) db.exec(documentSchema);
     if (version < 3) db.exec(referenceSchema + 'PRAGMA user_version = 3;');
     if (version === 3) db.exec(referenceMigrationV4);
-    if (version < 4 && version !== 3) db.exec('PRAGMA user_version = 4;');
+    if (version < 5) db.exec(evidenceSchema);
     return bindDocumentKey(db, path);
   });
 }
@@ -76,9 +77,11 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
   const db = new DatabaseSync(path, { enableForeignKeyConstraints: true, timeout: 3000 });
   let documents;
   let references;
+  let evidence;
   try {
     documents = documentStore(db, initialize(db, path), now, transact);
     references = referenceStore(db, now, transact);
+    evidence = evidenceStore(db, now, transact);
   } catch (error) {
     db.close();
     throw error;
@@ -102,6 +105,7 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
   return {
     documents,
     references,
+    evidence,
     close() {
       db.close();
     },

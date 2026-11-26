@@ -218,7 +218,7 @@ test('migrates a P1b database and persists reference snapshots and the local cac
     const document = store.documents.create(owner, project, { name: 'fixture.pdf', bytes: Buffer.from('test bytes') });
     store.close();
     const raw = new DatabaseSync(path);
-    raw.exec('DROP TABLE project_references; DROP TABLE reference_cache; PRAGMA user_version = 2;');
+    raw.exec('DROP TABLE evidence_items; DROP TABLE claims; DROP TABLE project_references; DROP TABLE reference_cache; PRAGMA user_version = 2;');
     raw.close();
     store = openWorkspaceStore(path, now);
     const record = { doi: unknown, provider: 'crossref', status: 'not-found', checkedAt: fixtureTime, metadata: null };
@@ -465,7 +465,7 @@ test('migrates a P2a database (version 3) to version 4 and preserves existing re
     raw.exec('PRAGMA user_version = 3;');
     raw.close();
 
-    // Open with new code - should migrate to version 4
+    // Open with current code and preserve the version 3 reference rows
     const store = openWorkspaceStore(dbPath, now);
     try {
       const records = store.references.list('acct1', 'proj1');
