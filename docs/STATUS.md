@@ -1,5 +1,24 @@
 # Development status
 
+## P2b · OpenAlex comparison · 2026-11-26
+
+[PR #5](https://github.com/nexvary/Nexvary-NRI/pull/5) adds provider-specific snapshots and cache entries, schema v4 migration, and bilingual comparison. The acceptance changes verify the DOI returned by OpenAlex, restrict open-access links to reported HTTPS locations, and preserve provider attribution and unknown retraction status.
+
+- Node.js 24.22.3: 28/28 tests pass. Coverage includes provider rate limits, v3 migration, independent removal, mismatched DOI rejection and open-access link validation.
+- Live Crossref and OpenAlex adapter checks returned public metadata for DOI `10.1038/nature14539`.
+- Qt WebEngine verified sign-in, project creation, live DOI checks, comparison, independent removal, and no horizontal overflow. Captures: [Arabic desktop, 1536×900](qa/p2b/references-ar-desktop.webp) and [English mobile, 390×844](qa/p2b/references-en-mobile.webp).
+
+## P2b · OpenAlex multi-provider DOI checks with side-by-side comparison · 2026-11-26
+
+P2b starts from P2a at `fa4318c`. All changes are on branch `feature/p2b-openalex-provider`. It adds the OpenAlex Works API as an independent reference provider with per-provider caching, schema migration, and a side-by-side comparison view that prompts users to check both providers and shows differences between results.
+
+- `npm test` passed **27/27** on Node.js 24.22.3. Five new tests cover: OpenAlex URL normalization; metadata normalization, retraction flag and 404/500 handling; concurrent call limiting and retry-after; full multi-provider check/cache/remove flow; and SQLite migration from P2a schema (v3→v4, adds `provider` column to both reference tables with `'crossref'` default for existing rows).
+- Live browser test with real Crossref and OpenAlex requests for DOI `10.1038/nature12373` confirmed: Crossref check saves with source, retrieval time and editorial update notice; OpenAlex check saves alongside it with title, article type, full authors, Open access copy link; "Both providers have been checked" comparison note appears; provider blocks display side-by-side with layout CSS (`.provider-comparison`, `.provider-block`, `.comparison-note`, `.provider-select`).
+- `src/openalex.js` is a new polite-pool adapter: `User-Agent: Nexvary-NRI/0.5.0 (mailto:info@nexvary.com)`, 1000ms minimum interval, single concurrent call, retry-after header respect. It normalizes title, type, venue, publisher, authors, issued year, retraction flag and open-access URL.
+- Both providers share one DOI entry per project; removing one provider's record leaves the other's intact. Provider selection is explicit in the form; unknown providers silently default to Crossref.
+- Results are dated per provider to their individual retrieval times. Crossref's structured update/retraction chain is preserved; OpenAlex uses a boolean `is_retracted` flag. Neither provider's absence constitutes a DOI-invalid or globally-retracted finding. Full accessibility audit, agency resolution, additional providers, claim-to-source mapping and evidence review remain.
+- No paid services or deployments were used.
+
 ## P2a · Crossref DOI checks and provenance · 2026-11-26
 
 P2a starts from draft P1b at `9cb6863`. Commit `fa4318c00febf65e8d2f559e89624f0c37cb6960` adds a bilingual project reference validator, a public Crossref adapter, dated provenance snapshots, and account-scoped caching. See the [P2a architecture decision](decisions/0004-crossref-reference-provenance.md).
@@ -40,14 +59,14 @@ The audit started at `0136a7f` on `main`. The tree contained only AGENTS.md, the
 
 ## Functional acceptance
 
-Evidence for partial items comes from the commits and tests listed above. A planned module route alone leaves that requirement in **Not started**.
+Compared all 19 requirements with the application routes, persistence, renderer and test suite on the P2b branch. Modules with only shell navigation are **Not started**. Dashboard data continues to come from the labeled fixtures in `src/content.js`. The workspace, file and reference handlers have functional tests, and About and L-READY shell behavior is covered in `test/shell.test.js`.
 
 | ID | Status | Implemented evidence and remaining acceptance |
 |---|---|---|
 | NRI-01 | Partial | Tested navigation, RTL/LTR, and labeled synthetic metrics and activity. Real metrics, quick actions, ORCID, operational UI states, and tenant isolation remain. |
 | NRI-02 | Partial | Personal project CRUD, project PDF versions, project DOI records and access denial are verified. Rich manuscript records, authors, tags, search, notes, tasks, collaboration and publication status remain. |
 | NRI-03 | Partial | Project-bound PDF upload, metadata, encrypted persistence, version downloads and deletion are verified. Other formats, browsing by collection, search, reading, annotation, citation import/export and deduplication remain. |
-| NRI-04 | Partial | Crossref DOI lookups, dated source links, correction/retraction metadata, local cache, rate limits and unknown/failure outcomes are verified. Agency resolution, additional providers and cross-provider metadata comparison remain. |
+| NRI-04 | Partial | Crossref and OpenAlex DOI lookups, dated per-provider source links, correction/retraction metadata, per-provider local cache, rate limits and unknown/failure outcomes are verified. Side-by-side provider comparison view implemented. Agency resolution, additional providers, claim-to-source mapping and evidence review remain. |
 | NRI-05 | Not started | Claim modeling, evidence review and exports remain. |
 | NRI-06 | Partial | Tested six ordered dimensions and framework wording. Qualitative assessment, evidence history, reviewers and safety/authorization blocking remain. |
 | NRI-07 | Not started | Economic models, scenarios and exports remain. |
@@ -64,4 +83,4 @@ Evidence for partial items comes from the commits and tests listed above. A plan
 | NRI-18 | Partial | Local session lifecycle, project and PDF boundaries, PDF-byte encryption and RTL/LTR are verified. Team RBAC, MFA, recovery, user settings, full accessibility audit and administration remain. |
 | NRI-19 | Not started | Entitlements, billing, production deployment and recovery remain. |
 
-Next milestone: P2b, add one independent open reference provider with dated provenance and explicit metadata comparison. Claim-to-source mapping and evidence review follow.
+Next milestone: P2c, claim-to-source mapping and evidence review.

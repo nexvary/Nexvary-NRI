@@ -54,9 +54,9 @@ function projectFields(form) {
   };
 }
 
-export function createWorkspaceHandler(store, crossref) {
+export function createWorkspaceHandler(store, crossref, openalex) {
   const handleDocuments = createDocumentHandler(store);
-  const handleReferences = createReferenceHandler(store, crossref);
+  const handleReferences = createReferenceHandler(store, crossref, openalex);
   let windowStarted = 0;
   let attempts = 0;
   let inFlight = 0;

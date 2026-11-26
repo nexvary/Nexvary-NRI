@@ -4,10 +4,10 @@ import { dirname, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { bindDocumentKey } from './document-crypto.js';
 import { documentSchema, documentStore } from './document-store.js';
-import { referenceSchema, referenceStore } from './reference-store.js';
+import { referenceSchema, referenceMigrationV4, referenceStore } from './reference-store.js';
 
 export const sessionLifetime = 8 * 60 * 60;
-const schemaVersion = 3;
+const schemaVersion = 4;
 const schema = `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -53,6 +53,8 @@ function initialize(db, path) {
     if (version === 0) db.exec(schema);
     if (version < 2) db.exec(documentSchema);
     if (version < 3) db.exec(referenceSchema + 'PRAGMA user_version = 3;');
+    if (version === 3) db.exec(referenceMigrationV4);
+    if (version < 4 && version !== 3) db.exec('PRAGMA user_version = 4;');
     return bindDocumentKey(db, path);
   });
 }

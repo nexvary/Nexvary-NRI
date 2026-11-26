@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { createCrossrefClient } from './crossref.js';
+import { createOpenAlexClient } from './openalex.js';
 import { modules } from './content.js';
 import { render } from './render.js';
 import { openWorkspaceStore, workspaceDatabasePath } from './store.js';
@@ -16,8 +17,11 @@ const securityHeaders = {
   'Referrer-Policy': 'same-origin',
 };
 
-export function createApp(store = openWorkspaceStore(), { crossref = createCrossrefClient() } = {}) {
-  const workspace = createWorkspaceHandler(store, crossref);
+export function createApp(store = openWorkspaceStore(), {
+  crossref = createCrossrefClient(),
+  openalex = createOpenAlexClient(),
+} = {}) {
+  const workspace = createWorkspaceHandler(store, crossref, openalex);
 
   async function handle(request, response) {
     if (!request.url?.startsWith('/')) {

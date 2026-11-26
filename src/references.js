@@ -2,13 +2,16 @@ import { normalizeDoi } from './crossref.js';
 import { referencePage } from './reference-view.js';
 import { loginPath, projectReferencesPath, workspacePage } from './workspace-view.js';
 
+const allowedProviders = ['crossref', 'openalex'];
+
 export function resolveReferenceRoute(pathname) {
   if (pathname === '/workspace/reference-projects') return { kind: 'reference-projects' };
   const match = pathname.match(/^\/workspace\/projects\/([0-9a-f-]{36})\/references$/);
   if (match) return { kind: 'references', id: match[1] };
 }
 
-export function createReferenceHandler(store, crossref) {
+export function createReferenceHandler(store, crossref, openalex) {
+  const adapters = { crossref, openalex };
   return async function handle({ request, reply, redirect, route, lang, account, form, stillSignedIn }) {
     const { kind, id } = route;
     const owner = account.id;
@@ -23,8 +26,8 @@ export function createReferenceHandler(store, crossref) {
       missing();
       return;
     }
-    const show = (status, error, input, headers) => reply(status, referencePage(lang, {
-      id, project, error, input, records: store.references.list(owner, id),
+    const show = (status, error, input, provider, headers) => reply(status, referencePage(lang, {
+      id, project, error, input, provider, records: store.references.list(owner, id),
     }), headers);
 
     if (request.method !== 'POST') {
@@ -34,12 +37,14 @@ export function createReferenceHandler(store, crossref) {
     const input = (form.get('doi') ?? '').slice(0, 1101);
     const doi = normalizeDoi(input);
     if (!doi) {
-      show(422, 'invalid', input);
+      show(422, 'invalid', input, form.get('provider') ?? 'crossref');
       return;
     }
     const action = form.get('action') ?? 'check';
+    const selectedProvider = allowedProviders.includes(form.get('provider')) ? form.get('provider') : 'crossref';
+
     if (action === 'remove') {
-      store.references.remove(owner, id, doi);
+      store.references.remove(owner, id, doi, selectedProvider);
       redirect(projectReferencesPath(lang, id));
       return;
     }
@@ -48,21 +53,22 @@ export function createReferenceHandler(store, crossref) {
       return;
     }
 
-    const cached = store.references.cached(owner, doi);
-    const result = cached ?? await crossref(doi);
+    const adapter = adapters[selectedProvider];
+    const cached = store.references.cached(owner, doi, selectedProvider);
+    const result = cached ?? await adapter(doi);
     if (!stillSignedIn()) {
       redirect(loginPath(lang));
       return;
     }
     if (result.status === 'limited') {
-      show(429, 'limited', input, { 'Retry-After': String(result.retryAfter) });
+      show(429, `limited-${selectedProvider}`, input, selectedProvider, { 'Retry-After': String(result.retryAfter) });
       return;
     }
     if (result.status === 'unavailable') {
-      show(503, 'unavailable', input);
+      show(503, `unavailable-${selectedProvider}`, input, selectedProvider);
       return;
     }
-    if (!store.references.save(owner, id, { ...result, doi }, !cached)) {
+    if (!store.references.save(owner, id, { ...result, doi, provider: selectedProvider }, !cached)) {
       missing();
       return;
     }

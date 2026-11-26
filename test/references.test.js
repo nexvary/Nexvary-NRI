@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { test } from 'node:test';
-import { createCrossrefClient, crossrefUrl, normalizeDoi } from '../src/crossref.js';
+import { createCrossrefClient, crossrefUrl, normalizeDoi, resolverUrl } from '../src/crossref.js';
+import { createOpenAlexClient, openAlexUrl } from '../src/openalex.js';
 import { createApp } from '../src/server.js';
 import { openWorkspaceStore } from '../src/store.js';
 
@@ -219,13 +220,13 @@ test('migrates a P1b database and persists reference snapshots and the local cac
     raw.exec('DROP TABLE project_references; DROP TABLE reference_cache; PRAGMA user_version = 2;');
     raw.close();
     store = openWorkspaceStore(path, now);
-    const record = { doi: unknown, status: 'not-found', checkedAt: fixtureTime, metadata: null };
+    const record = { doi: unknown, provider: 'crossref', status: 'not-found', checkedAt: fixtureTime, metadata: null };
     assert.equal(store.references.save(owner, project, record, true), true);
     store.close();
     store = openWorkspaceStore(path, now);
     try {
       assert.deepEqual(store.references.list(owner, project), [record]);
-      assert.deepEqual(store.references.cached(owner, unknown), record);
+      assert.deepEqual(store.references.cached(owner, unknown, 'crossref'), record);
       assert.equal(store.documents.download(owner, project, document, 1).bytes.toString(), 'test bytes');
       assert.equal(store.deleteProject(owner, project), true);
       assert.deepEqual(store.references.list(owner, project), []);
@@ -235,4 +236,265 @@ test('migrates a P1b database and persists reference snapshots and the local cac
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+test('normalizes OpenAlex works API URL', () => {
+  assert.equal(openAlexUrl('10.5555/nri-test#one'), 'https://api.openalex.org/works/doi:10.5555/nri-test%23one');
+  assert.equal(openAlexUrl('10.5555/one/two'), 'https://api.openalex.org/works/doi:10.5555/one/two');
+});
+
+test('normalizes OpenAlex work metadata and handles retraction flag', async () => {
+  let now = fixtureTime;
+  const fixtureWork = {
+    id: 'https://openalex.org/W0000001',
+    doi: 'https://doi.org/10.5555/nri-test%23one',
+    title: 'OpenAlex Synthetic Title',
+    type: 'article',
+    publication_year: 2024,
+    is_retracted: false,
+    primary_location: {
+      source: { display_name: 'Test Journal', host_organization_name: 'Test Publisher' },
+      is_oa: true,
+      landing_page_url: 'https://example.org/landing',
+      pdf_url: null,
+    },
+    authorships: [
+      { author: { display_name: 'Alice Researcher' } },
+      { author: { display_name: 'Bob Scholar' } },
+    ],
+  };
+  const openalex = createOpenAlexClient({
+    now: () => now,
+    fetchRecord: async (url) => {
+      assert.equal(url, openAlexUrl('10.5555/nri-test#one'));
+      return Response.json(fixtureWork);
+    },
+  });
+  const result = await openalex('10.5555/nri-test#one');
+  assert.equal(result.status, 'found');
+  assert.equal(result.checkedAt, fixtureTime);
+  assert.equal(result.metadata.title, 'OpenAlex Synthetic Title');
+  assert.equal(result.metadata.type, 'article');
+  assert.equal(result.metadata.issued, '2024');
+  assert.equal(result.metadata.isRetracted, false);
+  assert.equal(result.metadata.authors[0], 'Alice Researcher');
+  assert.equal(result.metadata.venue, 'Test Journal');
+  assert.equal(result.metadata.publisher, 'Test Publisher');
+  assert.equal(result.metadata.openAccessUrl, 'https://example.org/landing');
+
+  now += 1001;
+  const retractedWork = { ...fixtureWork, is_retracted: true };
+  const openalex2 = createOpenAlexClient({
+    now: () => now,
+    fetchRecord: async () => Response.json(retractedWork),
+  });
+  const retracted = await openalex2('10.5555/nri-test#one');
+  assert.equal(retracted.metadata.isRetracted, true);
+
+  now += 1001;
+  const openalex3 = createOpenAlexClient({
+    now: () => now,
+    fetchRecord: async () => new Response(null, { status: 404 }),
+  });
+  assert.deepEqual(await openalex3('10.5555/nri-test#one'), { status: 'not-found', checkedAt: now, metadata: null });
+
+  now += 1001;
+  const openalex4 = createOpenAlexClient({
+    now: () => now,
+    fetchRecord: async () => new Response(null, { status: 500 }),
+  });
+  assert.deepEqual(await openalex4('10.5555/nri-test#one'), { status: 'unavailable' });
+});
+
+test('limits concurrent OpenAlex calls and respects retry-after', async () => {
+  let now = fixtureTime;
+  let calls = 0;
+  let release;
+  const openalex = createOpenAlexClient({
+    now: () => now,
+    fetchRecord: () => {
+      calls++;
+      return new Promise((resolve) => { release = resolve; });
+    },
+  });
+  const pending = openalex(doi);
+  assert.equal((await openalex(doi)).status, 'limited');
+  release(new Response(null, { status: 429, headers: { 'Retry-After': '20' } }));
+  assert.deepEqual(await pending, { status: 'limited', retryAfter: 20 });
+  assert.equal(calls, 1);
+});
+
+test('saves OpenAlex DOI results alongside Crossref and enables comparison', async () => {
+  let now = fixtureTime;
+  let crossrefCalls = 0;
+  let openalexCalls = 0;
+  const store = openWorkspaceStore(':memory:', () => now);
+  store.addAccount('owner@example.test', credentials);
+  const owner = store.credentials('owner@example.test').id;
+  const project = store.createProject(owner, { title: 'Comparison project', description: '' });
+  const ownerCookie = () => 'nri_session=' + store.newSession(owner);
+
+  const crossrefAdapter = createCrossrefClient({
+    now: () => now,
+    fetchRecord: async (url) => {
+      crossrefCalls++;
+      assert.equal(url, crossrefUrl(doi));
+      return Response.json({
+        status: 'ok', 'message-type': 'work',
+        message: { DOI: doi, title: ['Crossref Title'], type: 'journal-article', issued: { 'date-parts': [[2023]] } },
+      });
+    },
+  });
+
+  const openalexAdapter = createOpenAlexClient({
+    now: () => now,
+    fetchRecord: async (url) => {
+      openalexCalls++;
+      assert.equal(url, openAlexUrl(doi));
+      return Response.json({
+        id: 'https://openalex.org/W1',
+        doi: resolverUrl(doi),
+        title: 'OpenAlex Title',
+        type: 'article',
+        publication_year: 2023,
+        is_retracted: false,
+        primary_location: { source: { display_name: 'Test Journal', host_organization_name: null }, pdf_url: null, landing_page_url: null },
+        authorships: [],
+      });
+    },
+  });
+
+  const app = createApp(store, { crossref: crossrefAdapter, openalex: openalexAdapter });
+  try {
+    await new Promise((resolve, reject) => app.once('error', reject).listen(0, '127.0.0.1', resolve));
+    const origin = `http://127.0.0.1:${app.address().port}`;
+    let cookie = ownerCookie();
+    const path = (id) => `/workspace/projects/${id}/references?lang=en`;
+    const post = (target, fields, session = cookie) => fetch(origin + target, {
+      method: 'POST', redirect: 'manual',
+      headers: { Cookie: session, Origin: origin },
+      body: new URLSearchParams(fields),
+    });
+    const get = (target, session = cookie) => fetch(origin + target, {
+      redirect: 'manual', headers: session ? { Cookie: session } : {},
+    });
+
+    // Check via Crossref
+    const r1 = await post(path(project), { doi, action: 'check', provider: 'crossref' });
+    assert.equal(r1.status, 303);
+    assert.equal(crossrefCalls, 1);
+    assert.equal(openalexCalls, 0);
+
+    let html = await (await get(path(project))).text();
+    assert.match(html, /Crossref Title/);
+    assert.match(html, /Crossref/);
+    assert.doesNotMatch(html, /OpenAlex Title/);
+
+    // Both providers checked message should NOT appear yet (only crossref done)
+    assert.match(html, /Check this DOI against the second provider/);
+
+    // Check same DOI via OpenAlex
+    now += 1001;
+    const r2 = await post(path(project), { doi, action: 'check', provider: 'openalex' });
+    assert.equal(r2.status, 303);
+    assert.equal(openalexCalls, 1);
+
+    html = await (await get(path(project))).text();
+    assert.match(html, /Crossref Title/);
+    assert.match(html, /OpenAlex Title/);
+    // Both providers checked message should now appear
+    assert.match(html, /Both providers have been checked/);
+
+    // OpenAlex uses cache (same account)
+    now += 1001;
+    const r3 = await post(path(project), { doi, action: 'check', provider: 'openalex' });
+    assert.equal(r3.status, 303);
+    assert.equal(openalexCalls, 1); // no new call
+
+    // Remove just the OpenAlex record
+    now += 1001;
+    const r4 = await post(path(project), { doi, action: 'remove', provider: 'openalex' });
+    assert.equal(r4.status, 303);
+    html = await (await get(path(project))).text();
+    assert.match(html, /Crossref Title/);
+    assert.doesNotMatch(html, /OpenAlex Title/);
+
+    // Reject unknown provider
+    now += 1001;
+    const r5 = await post(path(project), { doi, action: 'check', provider: 'unknown-provider' });
+    // defaults to crossref, uses cache
+    assert.equal(r5.status, 303);
+    assert.equal(crossrefCalls, 1); // still cached
+
+  } finally {
+    await new Promise((resolve, reject) => app.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
+test('migrates a P2a database (version 3) to version 4 and preserves existing records', async () => {
+  const { mkdtemp, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { DatabaseSync } = await import('node:sqlite');
+  const directory = await mkdtemp(join(tmpdir(), 'nri-v3-migration-test-'));
+  const dbPath = join(directory, 'workspace.sqlite');
+  const now = () => fixtureTime;
+  try {
+    // Create a version 3 database (P2a schema without provider column)
+    const v3Schema = `
+      CREATE TABLE accounts (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, salt BLOB NOT NULL CHECK(length(salt) = 16), hash BLOB NOT NULL CHECK(length(hash) = 32)) STRICT;
+      CREATE TABLE sessions (token_hash TEXT PRIMARY KEY, account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE, expires_at INTEGER NOT NULL) STRICT;
+      CREATE TABLE projects (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE, title TEXT NOT NULL, description TEXT NOT NULL, updated_at INTEGER NOT NULL) STRICT;
+      CREATE INDEX projects_owner_updated ON projects(owner_id, updated_at DESC, id);
+      CREATE INDEX sessions_expiry ON sessions(expires_at);
+      CREATE TABLE document_key (id INTEGER PRIMARY KEY CHECK(id = 1), fingerprint TEXT NOT NULL) STRICT;
+      CREATE TABLE documents (id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE, title TEXT NOT NULL) STRICT;
+      CREATE INDEX documents_project ON documents(project_id, id);
+      CREATE TABLE document_versions (document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE, number INTEGER NOT NULL CHECK(number > 0), filename TEXT NOT NULL, created_at INTEGER NOT NULL, size INTEGER NOT NULL CHECK(size > 0), nonce BLOB NOT NULL UNIQUE CHECK(length(nonce) = 12), ciphertext BLOB NOT NULL CHECK(length(ciphertext) = size), tag BLOB NOT NULL CHECK(length(tag) = 16), PRIMARY KEY(document_id, number)) STRICT;
+      CREATE TABLE reference_cache (owner_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE, doi TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN ('found', 'not-found')), checked_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, metadata TEXT NOT NULL, PRIMARY KEY(owner_id, doi)) STRICT;
+      CREATE TABLE project_references (project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE, doi TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN ('found', 'not-found')), checked_at INTEGER NOT NULL, metadata TEXT NOT NULL, PRIMARY KEY(project_id, doi)) STRICT;
+    `;
+    const raw = new DatabaseSync(dbPath, { enableForeignKeyConstraints: false });
+    raw.exec(v3Schema);
+    // Insert a test account and project
+    raw.exec(`INSERT INTO accounts VALUES ('acct1', 'test@example.test', zeroblob(16), zeroblob(32));`);
+    raw.exec(`INSERT INTO projects VALUES ('proj1', 'acct1', 'Test Project', '', ${fixtureTime});`);
+    // Insert a reference record (old schema, no provider column)
+    raw.exec(`INSERT INTO project_references VALUES ('proj1', '10.5555/legacy', 'found', ${fixtureTime}, '{"title":"Legacy Title"}');`);
+    raw.exec(`INSERT INTO reference_cache VALUES ('acct1', '10.5555/legacy', 'found', ${fixtureTime}, ${fixtureTime + 86400000}, '{"title":"Legacy Title"}');`);
+    raw.exec('PRAGMA user_version = 3;');
+    raw.close();
+
+    // Open with new code - should migrate to version 4
+    const store = openWorkspaceStore(dbPath, now);
+    try {
+      const records = store.references.list('acct1', 'proj1');
+      assert.equal(records.length, 1);
+      assert.equal(records[0].doi, '10.5555/legacy');
+      assert.equal(records[0].provider, 'crossref'); // migrated default
+      assert.equal(records[0].status, 'found');
+      assert.equal(records[0].metadata.title, 'Legacy Title');
+
+      const cached = store.references.cached('acct1', '10.5555/legacy', 'crossref');
+      assert.ok(cached);
+      assert.equal(cached.provider, 'crossref');
+      assert.equal(cached.status, 'found');
+    } finally {
+      store.close();
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('rejects mismatched OpenAlex records and restricts links to reported open-access locations', async () => {
+  const doi = '10.5555/nri-test';
+  async function fetchWork(work) {
+    return createOpenAlexClient({ fetchRecord: async () => Response.json(work) })(doi);
+  }
+  assert.deepEqual(await fetchWork({ doi: '10.5555/other-work' }), { status: 'unavailable' });
+  const work = { doi, primary_location: { landing_page_url: 'https://example.org/paywalled' } };
+  assert.equal((await fetchWork(work)).metadata.openAccessUrl, '');
+  work.best_oa_location = { pdf_url: 'javascript:alert(1)', landing_page_url: 'https://example.org/repository' };
+  assert.equal((await fetchWork(work)).metadata.openAccessUrl, 'https://example.org/repository');
 });
