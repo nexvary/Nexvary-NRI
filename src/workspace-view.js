@@ -18,6 +18,7 @@ const labels = {
   empty: ['Your projects will appear here after you create one.', 'ستظهر مشاريعك هنا بعد إنشاء أول مشروع.'],
   confirmProject: ['Confirm deletion of this project and its files', 'أؤكد حذف المشروع وكل ملفاته'],
   documents: ['Private PDFs', 'ملفات PDF الخاصة'],
+  economics: ['Economic feasibility', 'الجدوى الاقتصادية'],
   readiness: ['L-READY assessment', 'تقييم L-READY'],
   evidence: ['Evidence intelligence', 'تحليل الأدلة'],
   references: ['Reference validator', 'التحقق من المراجع'],
@@ -162,6 +163,7 @@ export function workspacePage(lang, kind, options = {}) {
           <a class="action" href="${projectReferencesPath(lang, id)}">${t('references')}</a>
           <a class="action" href="/workspace/projects/${id}/evidence?lang=${lang}">${t('evidence')}</a>
           <a class="action" href="/workspace/projects/${id}/readiness?lang=${lang}">${t('readiness')}</a>
+          <a class="action" href="/workspace/projects/${id}/economics?lang=${lang}">${t('economics')}</a>
         </nav>
         ${editor}
         <form method="post" action="/workspace/projects/${id}/delete?lang=${lang}" class="delete-project">

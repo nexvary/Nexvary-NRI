@@ -25,3 +25,9 @@
 - P2d merged into main at [`580b089`](https://github.com/nexvary/Nexvary-NRI/commit/580b08919aa40924dee093842c6b6a12bf49a610).
 - Added per-use qualitative assessments with immutable revision snapshots, reviewed sources, recorded gaps and explicit safety and authorization blockers.
 - 32/32 Node tests passed. Browser acceptance exercised a blocked assessment in Arabic desktop and English mobile. Economic feasibility and sensitivity analysis follow.
+
+## 2026-11-26 · P4 economics
+
+- P3 merged into main at [`8bcef24`](https://github.com/nexvary/Nexvary-NRI/commit/8bcef2421881fb0aa4a95b9b9162fc8625fef269).
+- Added comparable hypothetical scenarios, break-even, one-variable sensitivities and a versioned JSON export.
+- 34/34 Node tests passed. Browser acceptance verified a saved scenario in Arabic desktop and English mobile. Scientific library and workspace come next.

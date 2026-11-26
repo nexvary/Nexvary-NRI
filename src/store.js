@@ -4,12 +4,13 @@ import { dirname, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { bindDocumentKey } from './document-crypto.js';
 import { documentSchema, documentStore } from './document-store.js';
+import { economicsSchema, economicsStore } from './economics.js';
 import { readinessSchema, readinessStore } from './readiness-store.js';
 import { evidenceSchema, evidenceStore } from './evidence-store.js';
 import { referenceSchema, referenceMigrationV4, referenceStore } from './reference-store.js';
 
 export const sessionLifetime = 8 * 60 * 60;
-const schemaVersion = 6;
+const schemaVersion = 7;
 const schema = `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -58,6 +59,7 @@ function initialize(db, path) {
     if (version === 3) db.exec(referenceMigrationV4);
     if (version < 5) db.exec(evidenceSchema);
     if (version < 6) db.exec(readinessSchema);
+    if (version < 7) db.exec(economicsSchema);
     return bindDocumentKey(db, path);
   });
 }
@@ -81,11 +83,13 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
   let references;
   let evidence;
   let readiness;
+  let economics;
   try {
     documents = documentStore(db, initialize(db, path), now, transact);
     references = referenceStore(db, now, transact);
     evidence = evidenceStore(db, now, transact);
     readiness = readinessStore(db, now);
+    economics = economicsStore(db, now);
   } catch (error) {
     db.close();
     throw error;
@@ -111,6 +115,7 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
     references,
     evidence,
     readiness,
+    economics,
     close() {
       db.close();
     },

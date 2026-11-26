@@ -1,5 +1,12 @@
 # Development status
 
+## P4 · Hypothetical economics and sensitivity · 2026-11-26
+
+Private projects support saved one-year operating scenarios, currency and output units, capacity and utilization assumptions, exact minor-unit calculations, break-even, and one-variable sensitivity to utilization and sale price. The JSON export includes assumptions, calculation version and results. Taxes, financing, capital expenditure and exchange-rate conversion remain outside this model.
+
+- 34/34 Node tests passed, including boundary cases, calculations, comparisons and private export.
+- Qt WebEngine verified a saved hypothetical scenario in both locales. Captures: [Arabic desktop](qa/p4/economics-ar-desktop.webp) · [English mobile](qa/p4/economics-en-mobile.webp).
+
 ## P3 · Qualitative L-READY assessment · 2026-11-26
 
 Added private assessments for a specific intended use, with six independent dimensions, four qualitative categories, reviewed source links, limitations, reviewer and immutable revisions. Safety and authorization blockers take precedence. No aggregate score is calculated.
@@ -92,7 +99,7 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | NRI-04 | Partial | Crossref and OpenAlex DOI lookups, dated per-provider source links, correction/retraction metadata, per-provider local cache, rate limits and unknown/failure outcomes are verified. Side-by-side provider comparison view implemented. Agency resolution, additional providers, claim-to-source mapping and evidence review remain. |
 | NRI-05 | Partial | Claims, dated source snapshots, study type, limitations, conflicting evidence, owner review and JSON export are verified. Team reviewer roles and review revisions remain. |
 | NRI-06 | Partial | Six ordered dimensions, four qualitative categories, project evidence links, revision history, reviewer and safety/authorization blockers are verified. Independent team reviewer roles remain. |
-| NRI-07 | Not started | Economic models, scenarios and exports remain. |
+| NRI-07 | Verified | One-year operating model with explicit assumptions, currency, units, capacity, sensitivity, scenario comparison and reproducible JSON export. |
 | NRI-08 | Not started | Providers, consent, verification, limits and usage accounting remain. |
 | NRI-09 | Not started | Profiles, discovery, moderation and private sharing remain. |
 | NRI-10 | Not started | Invitations, collaboration, notifications and access history remain. |
