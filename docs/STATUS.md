@@ -1,0 +1,2 @@
+# Development status
+2026-11-26: documentation foundation only. No application implementation, stack selection, deployment or tests yet. Next: P0 architecture decision, repository inspection, runnable shell and real screenshots. Visual reference is provisional. Repository was public at initialization; owner should decide visibility before proprietary implementation. Never publish secrets or private research.
