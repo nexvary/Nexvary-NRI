@@ -2,9 +2,11 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { closeSync, mkdirSync, openSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { bindDocumentKey } from './document-crypto.js';
+import { documentSchema, documentStore } from './document-store.js';
 
 export const sessionLifetime = 8 * 60 * 60;
-const schemaVersion = 1;
+const schemaVersion = 2;
 const schema = `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -31,17 +33,26 @@ const schema = `
   CREATE INDEX sessions_expiry ON sessions(expires_at);
 `;
 
-function migrate(db) {
+function transact(db, operation) {
   db.exec('BEGIN IMMEDIATE');
   try {
-    const { user_version: version } = db.prepare('PRAGMA user_version').get();
-    if (version > schemaVersion) throw new Error('The workspace database requires a newer NRI version.');
-    if (version === 0) db.exec(schema + 'PRAGMA user_version = 1;');
+    const result = operation();
     db.exec('COMMIT');
+    return result;
   } catch (error) {
     db.exec('ROLLBACK');
     throw error;
   }
+}
+
+function initialize(db, path) {
+  return transact(db, () => {
+    const { user_version: version } = db.prepare('PRAGMA user_version').get();
+    if (version > schemaVersion) throw new Error('The workspace database requires a newer NRI version.');
+    if (version === 0) db.exec(schema);
+    if (version < 2) db.exec(documentSchema + 'PRAGMA user_version = 2;');
+    return bindDocumentKey(db, path);
+  });
 }
 
 export function workspaceDatabasePath() {
@@ -59,8 +70,9 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
   }
 
   const db = new DatabaseSync(path, { enableForeignKeyConstraints: true, timeout: 3000 });
+  let documents;
   try {
-    migrate(db);
+    documents = documentStore(db, initialize(db, path), now, transact);
   } catch (error) {
     db.close();
     throw error;
@@ -82,6 +94,7 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
   const deleteProject = db.prepare('DELETE FROM projects WHERE owner_id = ? AND id = ?');
 
   return {
+    documents,
     close() {
       db.close();
     },

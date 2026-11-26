@@ -39,10 +39,10 @@ export function createApp(store = openWorkspaceStore()) {
     };
 
     if (route) {
-      const reply = (status, page, headers) => {
+      const reply = (status, page, headers, body) => {
         const privateHeaders = { 'Cache-Control': 'no-store', ...headers };
         if (page) sendPage(status, 'research', page, privateHeaders);
-        else response.writeHead(status, { ...securityHeaders, ...privateHeaders }).end();
+        else response.writeHead(status, { ...securityHeaders, ...privateHeaders }).end(request.method === 'HEAD' ? undefined : body);
       };
       await workspace({ request, reply, redirect, route, lang });
       return;

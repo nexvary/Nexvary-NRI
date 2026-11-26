@@ -1,3 +1,5 @@
+import { createDocumentHandler, resolveDocumentRoute } from './documents.js';
+import { readBoundedBody } from './request-body.js';
 import { normalizeAddress, verifyPassword } from './password.js';
 import { sessionLifetime } from './store.js';
 import { loginPath, workspacePage, workspacePath } from './workspace-view.js';
@@ -14,6 +16,7 @@ export function resolveWorkspaceRoute(pathname) {
   if (pathname === '/workspace') return { kind: 'index' };
   const match = pathname.match(/^\/workspace\/projects\/([0-9a-f-]{36})(\/delete)?$/);
   if (match) return { kind: match[2] ? 'delete' : 'project', id: match[1] };
+  return resolveDocumentRoute(pathname);
 }
 
 function acceptsPost(request) {
@@ -39,17 +42,8 @@ async function readForm(request) {
   if (request.headers['content-type']?.split(';', 1)[0].trim().toLowerCase()
     !== 'application/x-www-form-urlencoded') return { status: 415 };
 
-  const chunks = [];
-  let bytes = 0;
-  for await (const chunk of request.iterator({ destroyOnReturn: false })) {
-    bytes += chunk.length;
-    if (bytes > formLimit) {
-      request.resume();
-      return { status: 413 };
-    }
-    chunks.push(chunk);
-  }
-  return { fields: new URLSearchParams(Buffer.concat(chunks).toString('utf8')) };
+  const body = await readBoundedBody(request, formLimit);
+  return body ? { fields: new URLSearchParams(body.toString('utf8')) } : { status: 413 };
 }
 
 function projectFields(form) {
@@ -60,6 +54,7 @@ function projectFields(form) {
 }
 
 export function createWorkspaceHandler(store) {
+  const handleDocuments = createDocumentHandler(store);
   let windowStarted = 0;
   let attempts = 0;
   let inFlight = 0;
@@ -69,10 +64,12 @@ export function createWorkspaceHandler(store) {
     const show = (status, pageKind, options, headers) => {
       reply(status, workspacePage(lang, pageKind, options), headers);
     };
-    const postOnly = kind === 'delete' || kind === 'logout';
+    const postOnly = kind === 'delete' || kind === 'logout' || kind === 'delete-document';
+    const allowed = postOnly ? ['POST'] : ['GET', 'HEAD'];
+    if (!postOnly && kind !== 'download-document') allowed.push('POST');
     const method = request.method;
-    if ((!postOnly && !['GET', 'HEAD', 'POST'].includes(method)) || (postOnly && method !== 'POST')) {
-      reply(405, null, { Allow: postOnly ? 'POST' : 'GET, HEAD, POST' });
+    if (!allowed.includes(method)) {
+      reply(405, null, { Allow: allowed.join(', ') });
       return;
     }
 
@@ -83,7 +80,7 @@ export function createWorkspaceHandler(store) {
         reply(403);
         return;
       }
-      if (kind !== 'logout') {
+      if (!['logout', 'documents', 'document'].includes(kind)) {
         const { status, fields } = await readForm(request);
         if (status) {
           reply(status);
@@ -137,6 +134,18 @@ export function createWorkspaceHandler(store) {
     if (kind === 'logout') {
       store.revokeSession(token);
       redirect(loginPath(lang), { 'Set-Cookie': sessionCookie('', 0) });
+      return;
+    }
+
+    if (['documents', 'document', 'delete-document', 'download-document'].includes(kind)) {
+      if (kind === 'delete-document' && form.get('confirm') !== 'yes') {
+        reply(400);
+        return;
+      }
+      await handleDocuments({
+        request, reply, redirect, route, lang, account,
+        stillSignedIn: () => store.session(token)?.id === account.id,
+      });
       return;
     }
 
