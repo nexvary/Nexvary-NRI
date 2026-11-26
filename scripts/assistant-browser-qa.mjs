@@ -55,7 +55,7 @@ async function inspect(send, expression) {
   const { result, exceptionDetails } = await send('Runtime.evaluate', {
     expression, awaitPromise: true, returnByValue: true,
   });
-  if (exceptionDetails) throw new Error(exceptionDetails.text);
+  if (exceptionDetails) throw new Error(exceptionDetails.exception?.description ?? exceptionDetails.text);
   return result.value;
 }
 
@@ -110,7 +110,7 @@ try {
         field.form.requestSubmit();
         return Boolean(field.value);
       })()`), true);
-      await waitFor(() => inspect(send, 'document.body.innerText.includes("Illustrative reference snapshot")'));
+      await waitFor(() => inspect(send, 'Boolean(document.body?.innerText.includes("Illustrative reference snapshot"))'));
       const layout = await inspect(send, `document.fonts.ready.then(() => ({
         lang: document.documentElement.lang, direction: document.documentElement.dir,
         viewport: document.documentElement.clientWidth, page: document.documentElement.scrollWidth,
