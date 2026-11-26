@@ -1,0 +1,103 @@
+import { normalizeOrcid } from './public-identifiers.js';
+import { escapeHtml } from './workspace-view.js';
+
+const labels = {
+  network: ['Research network', 'شبكة الباحثين'],
+  collaboration: ['Collaboration requests', 'طلبات التعاون'],
+  guidance: ['Profiles are private until you enable discovery by signed-in researchers.', 'تظل الملفات الشخصية خاصة حتى تفعّل ظهورها للباحثين الذين سجّلوا الدخول.'],
+  requestScope: ['Accepting a request records mutual interest. Project permissions can be managed separately in a later release.', 'قبول الطلب يسجّل الاهتمام المتبادل. ستتاح إدارة صلاحيات المشاريع بصورة منفصلة في إصدار لاحق.'],
+  name: ['Display name', 'الاسم المعروض'],
+  interests: ['Research interests', 'الاهتمامات البحثية'],
+  orcid: ['ORCID iD (optional, self-reported)', 'معرّف ORCID اختياري يضيفه صاحبه'],
+  discoverable: ['Show my profile in the signed-in directory', 'اعرض ملفي في دليل الباحثين المسجلين'],
+  profile: ['Save profile', 'احفظ الملف الشخصي'],
+  search: ['Search by name or interests', 'ابحث بالاسم أو الاهتمامات'],
+  find: ['Search', 'ابحث'],
+  noResults: ['No discoverable researchers match.', 'لا يوجد باحثون متاحون يطابقون البحث.'],
+  follow: ['Follow', 'تابع'],
+  unfollow: ['Unfollow', 'ألغِ المتابعة'],
+  request: ['Request collaboration', 'اطلب التعاون'],
+  pending: ['Pending', 'قيد الانتظار'],
+  accepted: ['Accepted', 'مقبول'],
+  declined: ['Declined', 'مرفوض'],
+  accept: ['Accept', 'اقبل'],
+  decline: ['Decline', 'ارفض'],
+  block: ['Block', 'احظر'],
+  unblock: ['Unblock', 'ألغِ الحظر'],
+  blocked: ['Blocked accounts', 'الحسابات المحظورة'],
+  hidden: ['Hidden profile', 'ملف شخصي مخفي'],
+  noRequests: ['No collaboration requests received.', 'لا توجد طلبات تعاون واردة.'],
+  invalid: ['The action could not be saved. Check your profile, selection and request limits.', 'تعذّر حفظ الإجراء. تحقق من ملفك والاختيار وحدود الطلبات.'],
+};
+
+export function createNetworkHandler(store) {
+  return ({ request, reply, redirect, route, lang, account, form }) => {
+    const t = (key) => labels[key][lang === 'ar' ? 1 : 0];
+    const { kind } = route;
+    const owner = account.id;
+    const path = '/workspace/' + kind;
+    const href = (page) => '/workspace/' + page + '?lang=' + lang;
+    let invalid = false;
+    if (request.method === 'POST') {
+      const action = form.get('intent') ?? '';
+      let saved = false;
+      if (action === 'profile' && kind === 'network') {
+        const name = (form.get('name') ?? '').trim();
+        const interests = (form.get('interests') ?? '').trim();
+        const providedOrcid = (form.get('orcid') ?? '').trim();
+        const orcid = providedOrcid ? normalizeOrcid(providedOrcid) : '';
+        saved = name.length > 0 && name.length <= 100 && interests.length <= 600 && orcid !== null
+          && store.network.save(owner, { name, interests, orcid, discoverable: form.get('discoverable') === 'yes' });
+      } else {
+        const peer = form.get('peer') ?? '';
+        saved = /^[0-9a-f-]{36}$/.test(peer) && store.network.interact(owner, peer, action);
+      }
+      if (saved) {
+        redirect(href(kind));
+        return;
+      }
+      invalid = true;
+    }
+    const controls = (peer, actions) => `<form class="project-tools" method="post" action="${href(kind)}">
+      <input type="hidden" name="peer" value="${peer}">
+      ${actions.map((action) => `<button class="action${action === 'block' ? ' danger' : ''}" name="intent" value="${action}">${t(action)}</button>`).join('')}
+    </form>`;
+    const profile = store.network.profile(owner);
+    const finder = new URL('http://localhost' + request.url).searchParams.get('q')?.trim().slice(0, 120) ?? '';
+    const researchers = kind === 'network' ? store.network.discover(owner, finder) : [];
+    const requests = kind === 'collaboration' ? store.network.incoming(owner) : [];
+    const blocked = kind === 'network' ? store.network.blocked(owner) : [];
+    const content = kind === 'network' ? `
+      <p>${t('guidance')}</p><form class="workspace-form" method="post" action="${href(kind)}">
+        <input type="hidden" name="intent" value="profile">
+        <label>${t('name')}<input name="name" maxlength="100" required value="${escapeHtml(profile?.name ?? '')}"></label>
+        <label>${t('interests')}<textarea name="interests" maxlength="600">${escapeHtml(profile?.interests ?? '')}</textarea></label>
+        <label>${t('orcid')}<input name="orcid" maxlength="80" dir="ltr" value="${escapeHtml(profile?.orcid ?? '')}"></label>
+        <label><input type="checkbox" name="discoverable" value="yes"${profile?.discoverable ? ' checked' : ''}> ${t('discoverable')}</label>
+        <button class="action">${t('profile')}</button></form>
+      <form class="workspace-form" method="get" action="${path}">
+        <input type="hidden" name="lang" value="${lang}">
+        <label>${t('search')}<input name="q" maxlength="120" value="${escapeHtml(finder)}"></label>
+        <button class="action">${t('find')}</button></form>
+      ${researchers.length ? `<ul class="project-list">${researchers.map((reviewer) => `<li class="provider-block">
+        <h2 dir="auto">${escapeHtml(reviewer.name)}</h2><p dir="auto">${escapeHtml(reviewer.interests)}</p>
+        ${reviewer.orcid ? `<a dir="ltr" href="https://orcid.org/${reviewer.orcid}">ORCID ${reviewer.orcid}</a>` : ''}
+        ${reviewer.request ? `<p>${t(reviewer.request)}</p>` : ''}
+        ${profile?.discoverable ? controls(reviewer.id, [reviewer.following ? 'unfollow' : 'follow', ...(!reviewer.request ? ['request'] : []), 'block']) : ''}
+      </li>`).join('')}</ul>` : `<p>${t('noResults')}</p>`}
+      ${blocked.length ? `<h2>${t('blocked')}</h2><ul>${blocked.map((peer) =>
+        `<li><bdi>${escapeHtml(peer.name || t('hidden'))}</bdi>${controls(peer.id, ['unblock'])}</li>`).join('')}</ul>` : ''}
+    ` : `<p>${t('requestScope')}</p>
+      ${requests.length ? `<ul class="project-list">${requests.map((request) => `<li class="provider-block">
+        <h2 dir="auto">${escapeHtml(request.name)}</h2><p>${t(request.state)}</p>
+        ${request.state === 'pending' ? controls(request.id, ['accept', 'decline']) : ''}
+      </li>`).join('')}</ul>` : `<p>${t('noRequests')}</p>`}
+    `;
+    reply(invalid ? 422 : 200, {
+      title: t(kind), path,
+      html: `<section class="surface panel detail workspace-page"><h1>${t(kind)}</h1>
+        <nav class="project-tools"><a href="${href(kind === 'network' ? 'collaboration' : 'network')}">${t(kind === 'network' ? 'collaboration' : 'network')}</a></nav>
+        ${invalid ? `<p class="form-error" role="alert">${t('invalid')}</p>` : ''}${content}</section>`,
+    });
+  };
+}
