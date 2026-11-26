@@ -1,2 +1,7 @@
 # Visual direction
-Provisional design pending owner approval. Read docs/design/dashboard-reference.svg visually before UI work. Deep glossy black, metallic silver borders, restrained neon green/red status accents, real colored semantic icons, readable typography, accessible contrast, keyboard navigation, responsive RTL/LTR. Dashboard: sidebar modules, research workspace, evidence status, L-READY six-axis checklist (no aggregate readiness score), recent documents, API cost indicator. Use real data or clearly labelled demo fixtures. Capture actual running UI screenshots for acceptance; do not substitute mockups. Do not treat the reference as a completed app.
+
+[Owner-approved dashboard reference](design/dashboard-approved.webp), supplied on 2026-11-26. The original attachment bytes are WebP. [The provisional SVG](design/dashboard-reference.svg) remains as design history.
+
+P0 follows the approved composition with a top bar, left module rail, blue hero, colored shortcuts, research activity, six L-READY dimensions, discovery cards, a right statistics rail and footer navigation. Arabic content reads RTL. The rails stack on narrow screens. The reference's mock counts, partner logos and controls are represented by labeled synthetic data, provider website links and working navigation. The hero uses a CSS illustration and the shell uses semantic color icons.
+
+Use the approved image as the visual baseline and capture the running interface for each milestone. Use verified company links. External providers listed as references do not imply endorsement or partnership.

@@ -1,0 +1,130 @@
+import { copy, modules, dimensions, fixtures, metrics, activities, providers } from './content.js';
+
+const primary = ['dashboard', 'research', 'library', 'evidence', 'l-ready', 'economics', 'assistant', 'network', 'collaboration', 'reports', 'settings', 'about'];
+const shortcuts = ['research', 'evidence', 'l-ready', 'economics', 'assistant', 'network'];
+const additional = ['references', 'messages', 'observatory', 'analytics', 'education'];
+const repo = 'https://github.com/nexvary/Nexvary-NRI';
+
+function icon(glyph) {
+  return `<span class="icon" aria-hidden="true">${glyph}</span>`;
+}
+
+export function render({ lang, view, version }) {
+  const tr = (pair) => pair[lang === 'ar' ? 1 : 0];
+  const t = (key) => tr(copy[key]);
+  const href = (target, language = lang) => `/?lang=${language}&amp;view=${target}`;
+  const label = (id) => tr(modules[id][2]);
+  const link = (id) => `<a href="${href(id)}"${view === id ? ' aria-current="page"' : ''}>${icon(modules[id][0])}<span>${label(id)}</span></a>`;
+  const tile = (id) => {
+    const [glyph, color, name, description] = modules[id];
+    return `<a class="tile surface ${color}" href="${href(id)}">${icon(glyph)}<strong>${tr(name)}</strong><small>${tr(description)}</small></a>`;
+  };
+  const dimensionList = `<ul class="dimensions">${dimensions.map(([letter, glyph, color, name]) =>
+    `<li class="${color}">${icon(glyph)}<bdi>${letter}</bdi><small>${tr(name)}</small></li>`).join('')}</ul>`;
+  const isModule = Object.hasOwn(modules, view);
+  const title = isModule ? label(view) : t(view === 'developer' ? 'aboutDeveloper' : 'unknown');
+  const direction = lang === 'ar' ? 'rtl' : 'ltr';
+  const dashboard = () => `
+    <section class="hero surface" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <h1 id="hero-title" class="wordmark"><bdi>NEXVARY <em>NRI</em></bdi></h1>
+        <p class="hero-name">${t('product')}</p>
+        <p>${t('motto')}</p>
+      </div>
+      <div class="hero-links">${['references', 'evidence', 'analytics', 'observatory'].map(link).join('')}</div>
+    </section>
+    <div class="dashboard-grid">
+      <div class="workspace">
+        <nav class="shortcuts" aria-label="${t('navigation')}">${shortcuts.map(tile).join('')}</nav>
+        <div class="workspace-panels">
+          <section class="surface panel">
+            <h2>${icon('🗂️')}${t('latest')} <small class="tag">${t('demo')}</small></h2>
+            <ul class="records">${fixtures.map(([date, name, status, color]) => `
+              <li>${icon('📄')}<span><strong>${tr(name)}</strong><time datetime="${date}" dir="ltr">${date}</time></span><span class="tag ${color}">${tr(status)}</span></li>`).join('')}</ul>
+          </section>
+          <section class="surface panel">
+            <h2>${icon('🧪')}${t('quick')}</h2>
+            ${dimensionList}
+            <a class="action" href="${href('l-ready')}">${label('l-ready')} <span aria-hidden="true">↗</span></a>
+          </section>
+        </div>
+        <div class="discovery">${['network', 'library', 'education'].map(tile).join('')}</div>
+        <section class="surface panel providers">
+          <h2>${icon('🔗')}${t('sources')}</h2>
+          <ul>${Object.entries(providers).map(([name, url]) => `<li><a href="${url}" lang="en" dir="ltr">${name}</a></li>`).join('')}</ul>
+        </section>
+      </div>
+      <aside class="dashboard-aside">
+        <section class="surface panel">
+          <h2>${icon('📊')}${t('statistics')}</h2>
+          <dl class="metrics">${metrics.map(([glyph, name, value]) => `<div>${icon(glyph)}<dt>${tr(name)}</dt><dd>${new Intl.NumberFormat(lang).format(value)}</dd></div>`).join('')}
+            <div>${icon('🧾')}<dt>${t('api')}</dt><dd class="inactive">${t('inactive')}</dd></div>
+          </dl>
+        </section>
+        <section class="surface panel">
+          <h2>${icon('🕒')}${t('activity')}</h2>
+          <ul class="activity">${activities.map(([glyph, name]) => `<li>${icon(glyph)}${tr(name)}</li>`).join('')}</ul>
+        </section>
+        <section class="surface panel summary"><h2>${t('aboutSystem')}</h2><p>${t('motto')}</p><a href="${href('about')}">${label('about')}</a></section>
+      </aside>
+    </div>`;
+  const about = () => `
+    <section class="surface panel detail">
+      <nav class="tabs" aria-label="${label('about')}">
+        <a href="${href('about')}"${view === 'about' ? ' aria-current="page"' : ''}>${t('aboutSystem')}</a>
+        <a href="${href('developer')}"${view === 'developer' ? ' aria-current="page"' : ''}>${t('aboutDeveloper')}</a>
+      </nav>
+      <h1>${t(view === 'about' ? 'aboutSystem' : 'aboutDeveloper')}</h1>
+      ${view === 'about'
+        ? `<p>${t('motto')}</p><p>${t('framework')}</p><p>${t('version')} <bdi>${version}</bdi> · ${t('build')}</p>
+           <ul class="about-links"><li><a href="${repo}/blob/main/docs/PROJECT.md">${t('docs')}</a></li><li><a href="${repo}/blob/main/docs/STATUS.md">${t('status')}</a></li></ul>`
+        : `<p>${t('developer')}</p><a href="https://nexvary.com/">${t('website')}</a>`}
+    </section>`;
+  const detail = () => `
+    <section class="surface panel detail">
+      <h1>${icon(modules[view][0])}${title}</h1>
+      ${modules[view][3] ? `<p>${tr(modules[view][3])}</p>` : ''}
+      ${view === 'l-ready' ? `<p>${t('framework')}</p>${dimensionList}` : ''}
+      <p class="tag">${t('planned')}</p>
+      <p>${t('unavailable')}</p>
+      ${view === 'research' || view === 'library' ? `<p>${t('empty')}</p>` : ''}
+      <a class="action" href="${href('dashboard')}">${t('home')}</a>
+    </section>`;
+  const content = view === 'dashboard' ? dashboard()
+    : view === 'about' || view === 'developer' ? about()
+      : isModule ? detail()
+        : `<section class="surface panel detail"><h1>${title}</h1><a class="action" href="${href('dashboard')}">${t('home')}</a></section>`;
+  const otherLanguage = lang === 'ar' ? 'en' : 'ar';
+  const validView = isModule || view === 'developer' ? view : 'dashboard';
+  return `<!doctype html>
+<html lang="${lang}" dir="${direction}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>${title} | NEXVARY NRI</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <a class="skip" href="#main">${t('skip')}</a>
+  <header class="topbar">
+    <a class="wordmark" href="${href('dashboard')}" lang="en" dir="ltr">NEXVARY <em>NRI</em><span>Research Intelligence</span></a>
+    <nav class="language" aria-label="${t('language')}">
+      <a href="${href(validView, otherLanguage)}" hreflang="${otherLanguage}" lang="${otherLanguage}" dir="auto">${icon('🌐')}${otherLanguage === 'ar' ? 'العربية' : 'English'}</a>
+    </nav>
+  </header>
+  <div class="layout">
+    <aside class="surface sidebar" dir="${direction}">
+      <nav aria-label="${t('navigation')}">
+        <ul>${primary.map((id) => `<li>${link(id)}</li>`).join('')}</ul>
+      </nav>
+      <div class="version surface"><bdi>NEXVARY NRI</bdi><bdi>v${version}</bdi></div>
+    </aside>
+    <main id="main" tabindex="-1" dir="${direction}">${content}</main>
+  </div>
+  <footer class="surface footer"><nav aria-label="${t('docs')}">
+    <ul>${additional.map((id) => `<li>${link(id)}</li>`).join('')}<li><a href="${repo}/blob/main/docs/PROJECT.md">${icon('📘')}${t('docs')}</a></li></ul>
+  </nav></footer>
+</body>
+</html>`;
+}
