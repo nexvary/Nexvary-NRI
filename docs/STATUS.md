@@ -1,5 +1,12 @@
 # Development status
 
+## P7b · Scoped project summary sharing · 2026-11-27 (Cairo)
+
+Project owners can invite discoverable researchers to read a summary. The recipient must accept. The scoped role exposes the project title and description. Existing access controls continue to protect files, references, evidence and reports. Owners can revoke access. Blocking revokes access in both directions, with an activity record.
+
+- 44/44 Node tests passed, including invite consent, recipient identity, direct-route isolation, revoke, block and no reinstatement after unblock.
+- Qt WebEngine verified the invitation flow and audit display on [Arabic desktop](qa/p7b/sharing-ar-desktop.webp) and [English mobile](qa/p7b/sharing-en-mobile.webp).
+
 ## P7 · Local security and recovery baseline · 2026-11-26
 
 Added private account security settings with session revocation and a bounded sign-in/sign-out audit trail. The recovery CLI backs up SQLite and its paired document key with integrity validation, then restores to a fresh directory with active sessions removed.
@@ -147,7 +154,7 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | NRI-07 | Verified | One-year operating model with explicit assumptions, currency, units, capacity, sensitivity, scenario comparison and reproducible JSON export. |
 | NRI-08 | Not started | Providers, consent, verification, limits and usage accounting remain. |
 | NRI-09 | Partial | Opt-in profiles, search, follow and block, bounded requests and private profile isolation verified. Verified ORCID ownership, posts, groups, publication sharing and moderation remain. |
-| NRI-10 | Partial | Collaboration request and recipient acceptance/decline are verified. Project invitations, roles, notes, tasks and access history remain. |
+| NRI-10 | Partial | Collaboration requests and scoped project-summary invitations, acceptance/decline, revoke and access history are verified. Broader roles, notifications, shared notes and tasks remain. |
 | NRI-11 | Not started | Conversations, notification preferences and authorization remain. |
 | NRI-12 | Verified | Private watchlists, saved library searches, date-stamped manual updates, filters and provider provenance. |
 | NRI-13 | Verified | Bounded UTF-8 CSV import, numeric validation, descriptive metrics, histogram, IQR outlier flags, units and reproducible JSON export. |

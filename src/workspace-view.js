@@ -18,6 +18,7 @@ const labels = {
   empty: ['Your projects will appear here after you create one.', 'ستظهر مشاريعك هنا بعد إنشاء أول مشروع.'],
   confirmProject: ['Confirm deletion of this project and its files', 'أؤكد حذف المشروع وكل ملفاته'],
   documents: ['Private PDFs', 'ملفات PDF الخاصة'],
+  sharing: ['Project invitations', 'دعوات المشروع'],
   reports: ['Report studio', 'استوديو التقارير'],
   economics: ['Economic feasibility', 'الجدوى الاقتصادية'],
   readiness: ['L-READY assessment', 'تقييم L-READY'],
@@ -166,6 +167,7 @@ export function workspacePage(lang, kind, options = {}) {
           <a class="action" href="/workspace/projects/${id}/readiness?lang=${lang}">${t('readiness')}</a>
           <a class="action" href="/workspace/projects/${id}/economics?lang=${lang}">${t('economics')}</a>
           <a class="action" href="/workspace/projects/${id}/reports?lang=${lang}">${t('reports')}</a>
+          <a class="action" href="/workspace/projects/${id}/sharing?lang=${lang}">${t('sharing')}</a>
         </nav>
         ${editor}
         <form method="post" action="/workspace/projects/${id}/delete?lang=${lang}" class="delete-project">
