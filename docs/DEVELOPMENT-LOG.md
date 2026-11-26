@@ -61,3 +61,9 @@
 - P4e merged into main at [`e992ce4`](https://github.com/nexvary/Nexvary-NRI/commit/e992ce4f75f1119868ebfbbd67f004ca6b4e327c).
 - Added versioned PDF/DOCX exports with private project sources, evidence and L-READY results. 41/41 tests passed with the renderer enabled, including actual authenticated bilingual downloads. Browser captures record the download controls.
 - Security and release verification follow. Optional AI remains disabled.
+
+## 2026-11-26 · P7 local security and recovery
+
+- P6 merged into main at [`b727312`](https://github.com/nexvary/Nexvary-NRI/commit/b727312602957d4310fd168de266b23176afffd5).
+- Added session controls and a bounded security audit, verified backups/restores, and a read-only CI workflow with real bilingual report rendering. 43/43 tests passed locally with the renderer enabled. Settings screenshots verify Arabic desktop and English mobile.
+- Commercial deployment, billing, verified ORCID OAuth ownership, optional AI, richer manuscript tools and project-scoped collaboration authorization are still open.

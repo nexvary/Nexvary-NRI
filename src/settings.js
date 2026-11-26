@@ -1,0 +1,63 @@
+import { escapeHtml, workspacePath } from './workspace-view.js';
+
+export const settingsSchema = `
+  CREATE TABLE security_events (
+    id INTEGER PRIMARY KEY,
+    account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    action TEXT NOT NULL CHECK(action IN ('sign-in', 'sign-out', 'revoke-others')),
+    recorded_at INTEGER NOT NULL
+  ) STRICT;
+  CREATE INDEX security_events_account ON security_events(account_id, id DESC);
+  PRAGMA user_version = 10;
+`;
+
+export function settingsStore(db, now) {
+  const insert = db.prepare('INSERT INTO security_events(account_id, action, recorded_at) VALUES (?, ?, ?)');
+  const trim = db.prepare(`
+    DELETE FROM security_events WHERE account_id=? AND id IN (
+      SELECT id FROM security_events WHERE account_id=? ORDER BY id DESC LIMIT -1 OFFSET 200
+    )
+  `);
+  const list = db.prepare('SELECT action, recorded_at AS recordedAt FROM security_events WHERE account_id=? ORDER BY id DESC LIMIT 25');
+  return {
+    record(owner, action) {
+      insert.run(owner, action, now());
+      trim.run(owner, owner);
+    },
+    list: (owner) => list.all(owner),
+  };
+}
+
+const labels = {
+  title: ['Account security', 'أمان الحساب'],
+  email: ['Signed-in account', 'الحساب الحالي'],
+  other: ['Other active sessions', 'الجلسات النشطة الأخرى'],
+  revoke: ['Sign out other sessions', 'سجّل الخروج من الجلسات الأخرى'],
+  events: ['Recent security activity', 'نشاط الأمان الأخير'],
+  empty: ['No security events recorded yet.', 'لا توجد أحداث أمان مسجّلة بعد.'],
+  'sign-in': ['Signed in', 'تسجيل الدخول'],
+  'sign-out': ['Signed out', 'تسجيل الخروج'],
+  'revoke-others': ['Other sessions revoked', 'أُلغيت الجلسات الأخرى'],
+  back: ['Research workspace', 'مساحة الأبحاث'],
+};
+
+export function settingsPage(store, lang, account, token) {
+  const t = (key) => labels[key][lang === 'ar' ? 1 : 0];
+  const recent = store.settings.list(account.id);
+  const count = store.otherSessions(account.id, token);
+  const current = new Intl.NumberFormat(lang).format(count);
+  const date = new Intl.DateTimeFormat(lang, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' });
+  return {
+    title: t('title'), path: '/workspace/settings',
+    html: `<section class="surface panel detail workspace-page"><h1>${t('title')}</h1>
+      <a href="${workspacePath(lang)}">${t('back')}</a>
+      <dl class="reference-meta"><div><dt>${t('email')}</dt><dd><bdi>${escapeHtml(account.email)}</bdi></dd></div>
+        <div><dt>${t('other')}</dt><dd>${current}</dd></div></dl>
+      ${count ? `<form method="post" action="/workspace/settings?lang=${lang}">
+        <button class="action" name="intent" value="revoke-others">${t('revoke')}</button></form>` : ''}
+      <h2>${t('events')}</h2>
+      ${recent.length ? `<ul class="activity">${recent.map((event) => `<li>${t(event.action)}
+        <time datetime="${new Date(event.recordedAt).toISOString()}">${date.format(event.recordedAt)} UTC</time></li>`).join('')}</ul>`
+        : `<p>${t('empty')}</p>`}</section>`,
+  };
+}

@@ -9,6 +9,8 @@
   "scripts": {
     "start": "node src/server.js",
     "test": "node --test",
-    "account:create": "node src/account-cli.js"
+    "account:create": "node src/account-cli.js",
+    "workspace:backup": "node src/recovery-cli.js backup",
+    "workspace:restore": "node src/recovery-cli.js restore"
   }
 }

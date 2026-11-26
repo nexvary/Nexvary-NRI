@@ -1,5 +1,13 @@
 # Development status
 
+## P7 · Local security and recovery baseline · 2026-11-26
+
+Added private account security settings with session revocation and a bounded sign-in/sign-out audit trail. The recovery CLI backs up SQLite and its paired document key with integrity validation, then restores to a fresh directory with active sessions removed.
+
+- 43/43 Node tests passed with the real report renderer enabled. The suite exercises cross-account and origin boundaries, session revocation, tamper detection and encrypted PDF recovery.
+- Qt WebEngine verified the settings audit view on [Arabic desktop](qa/p7/settings-ar-desktop.webp) and [English mobile](qa/p7/settings-en-mobile.webp).
+- [Local recovery instructions](RECOVERY.md) record deployment and backup boundaries. This remains a loopback preview.
+
 ## P6 · Bilingual PDF and DOCX reports · 2026-11-26
 
 The private Report Studio renders PDF and DOCX files locally with dated citations, provider notices, evidence matrices, L-READY findings and limitations. Reports include the app and template versions. The optional Python renderer and font prerequisites are documented in README.md.
@@ -147,7 +155,7 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | NRI-15 | Verified | Versioned Arabic/English PDF and DOCX downloads with citations, evidence, L-READY findings and limitations. Requires the documented local renderer. |
 | NRI-16 | Partial | System About view shows the purpose, framework wording, build version and documentation links. Changelog, licensing, privacy, terms and support content remain. |
 | NRI-17 | Partial | Separate developer view identifies Nexvary Inc. and links to the official company site. Dedicated confirmed contact information remains. |
-| NRI-18 | Partial | Local session lifecycle, project and PDF boundaries, PDF-byte encryption and RTL/LTR are verified. Team RBAC, MFA, recovery, user settings, full accessibility audit and administration remain. |
-| NRI-19 | Not started | Entitlements, billing, production deployment and recovery remain. |
+| NRI-18 | Partial | Local authentication, session revocation, account audit, authorization, encrypted PDF bytes, RTL/LTR and verified recovery are implemented. Team RBAC, MFA, account recovery, export/deletion, accessibility audit and administration remain. |
+| NRI-19 | Partial | Local restore and regression workflow configuration are implemented. Entitlements, approved hosting, operational monitoring and billing remain. |
 
 Next milestone: P2c, claim-to-source mapping and evidence review.

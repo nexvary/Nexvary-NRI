@@ -1,4 +1,5 @@
 import { createDocumentHandler, resolveDocumentRoute } from './documents.js';
+import { settingsPage } from './settings.js';
 import { createReportHandler, resolveReportRoute } from './reports.js';
 import { createObservatoryHandler, resolveObservatoryRoute } from './observatory.js';
 import { handleAnalytics } from './analytics.js';
@@ -22,6 +23,7 @@ const maxConcurrentLogins = 2;
 export function resolveWorkspaceRoute(pathname) {
   if (pathname === '/login') return { kind: 'login' };
   if (pathname === '/logout') return { kind: 'logout' };
+  if (pathname === '/workspace/settings') return { kind: 'settings' };
   if (pathname === '/workspace/analytics') return { kind: 'analytics' };
   if (pathname === '/workspace/network') return { kind: 'network' };
   if (pathname === '/workspace/collaboration') return { kind: 'collaboration' };
@@ -138,8 +140,7 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
           show(401, 'login', { error: 'credentials' });
           return;
         }
-        const session = store.newSession(credentials.id);
-        store.revokeSession(token);
+        const session = store.signIn(credentials.id, token);
         redirect(workspacePath(lang), { 'Set-Cookie': sessionCookie(session, sessionLifetime) });
       } finally {
         inFlight--;
@@ -152,8 +153,22 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
       return;
     }
     if (kind === 'logout') {
-      store.revokeSession(token);
+      store.signOut(account.id, token);
       redirect(loginPath(lang), { 'Set-Cookie': sessionCookie('', 0) });
+      return;
+    }
+
+    if (kind === 'settings') {
+      if (method === 'POST') {
+        if (form.get('intent') !== 'revoke-others') {
+          reply(422);
+          return;
+        }
+        store.revokeOtherSessions(account.id, token);
+        redirect(`/workspace/settings?lang=${lang}`);
+        return;
+      }
+      reply(200, settingsPage(store, lang, account, token));
       return;
     }
 

@@ -4,6 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { bindDocumentKey } from './document-crypto.js';
 import { documentSchema, documentStore } from './document-store.js';
+import { settingsSchema, settingsStore } from './settings.js';
 import { observatorySchema, observatoryStore } from './observatory-store.js';
 import { networkSchema, networkStore } from './network-store.js';
 import { libraryStore } from './library.js';
@@ -13,7 +14,7 @@ import { evidenceSchema, evidenceStore } from './evidence-store.js';
 import { referenceSchema, referenceMigrationV4, referenceStore } from './reference-store.js';
 
 export const sessionLifetime = 8 * 60 * 60;
-const schemaVersion = 9;
+const schemaVersion = 10;
 const schema = `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -65,6 +66,7 @@ function initialize(db, path) {
     if (version < 7) db.exec(economicsSchema);
     if (version < 8) db.exec(networkSchema);
     if (version < 9) db.exec(observatorySchema);
+    if (version < 10) db.exec(settingsSchema);
     return bindDocumentKey(db, path);
   });
 }
@@ -108,12 +110,23 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
     SELECT accounts.id, accounts.email FROM sessions JOIN accounts ON accounts.id = sessions.account_id
     WHERE sessions.token_hash = ? AND sessions.expires_at > ?
   `);
+  const countOthers = db.prepare('SELECT count(*) AS count FROM sessions WHERE account_id = ? AND token_hash <> ? AND expires_at > ?');
+  const removeOthers = db.prepare('DELETE FROM sessions WHERE account_id = ? AND token_hash <> ? AND expires_at > ?');
+  const settings = settingsStore(db, now);
   const removeSession = db.prepare('DELETE FROM sessions WHERE token_hash = ?');
   const insertProject = db.prepare('INSERT INTO projects VALUES (?, ?, ?, ?, ?)');
   const listProjects = db.prepare('SELECT id, title FROM projects WHERE owner_id = ? ORDER BY updated_at DESC, id');
   const getProject = db.prepare('SELECT id, title, description FROM projects WHERE owner_id = ? AND id = ?');
   const updateProject = db.prepare('UPDATE projects SET title = ?, description = ?, updated_at = ? WHERE owner_id = ? AND id = ?');
   const deleteProject = db.prepare('DELETE FROM projects WHERE owner_id = ? AND id = ?');
+
+  function issueSession(accountId) {
+    const token = randomBytes(32).toString('base64url');
+    const issuedAt = now();
+    clearExpired.run(issuedAt);
+    insertSession.run(tokenHash(token), accountId, issuedAt + sessionLifetime * 1000);
+    return token;
+  }
 
   return {
     documents,
@@ -124,6 +137,7 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
     library: libraryStore(db),
     network: networkStore(db, now, transact),
     observatory: observatoryStore(db, now),
+    settings,
     close() {
       db.close();
     },
@@ -133,18 +147,32 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
     credentials(email) {
       return findAccount.get(email);
     },
-    newSession(accountId) {
-      const token = randomBytes(32).toString('base64url');
-      const issuedAt = now();
-      clearExpired.run(issuedAt);
-      insertSession.run(tokenHash(token), accountId, issuedAt + sessionLifetime * 1000);
-      return token;
+    newSession: issueSession,
+    signIn(accountId, previousToken) {
+      return transact(db, () => {
+        const session = issueSession(accountId);
+        if (previousToken) removeSession.run(tokenHash(previousToken));
+        settings.record(accountId, 'sign-in');
+        return session;
+      });
+    },
+    signOut(accountId, token) {
+      return transact(db, () => {
+        if (removeSession.run(tokenHash(token)).changes) settings.record(accountId, 'sign-out');
+      });
     },
     session(token) {
       return token ? getSession.get(tokenHash(token), now()) : undefined;
     },
-    revokeSession(token) {
-      if (token) removeSession.run(tokenHash(token));
+    otherSessions(owner, token) {
+      return countOthers.get(owner, tokenHash(token), now()).count;
+    },
+    revokeOtherSessions(owner, token) {
+      return transact(db, () => {
+        const removed = removeOthers.run(owner, tokenHash(token), now()).changes;
+        if (removed) settings.record(owner, 'revoke-others');
+        return removed;
+      });
     },
     listProjects(owner) {
       return listProjects.all(owner);
