@@ -1,5 +1,12 @@
 # Development status
 
+## P7c · Bilingual research learning library · 2026-11-27 (Cairo)
+
+Added lessons on reference provenance and descriptive statistics, server-graded quizzes with account-scoped progress, and an illustrative mean-versus-median simulation backed by the analytics engine.
+
+- 45/45 Node tests passed with the report renderer enabled. The learning test covers scoring, input validation and private progress.
+- Qt WebEngine verified quiz completion and the simulation on [Arabic desktop](qa/p7c/education-ar-desktop.webp) and [English mobile](qa/p7c/education-en-mobile.webp).
+
 ## P7b · Scoped project summary sharing · 2026-11-27 (Cairo)
 
 Project owners can invite discoverable researchers to read a summary. The recipient must accept. The scoped role exposes the project title and description. Existing access controls continue to protect files, references, evidence and reports. Owners can revoke access. Blocking revokes access in both directions, with an activity record.
@@ -158,7 +165,7 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | NRI-11 | Not started | Conversations, notification preferences and authorization remain. |
 | NRI-12 | Verified | Private watchlists, saved library searches, date-stamped manual updates, filters and provider provenance. |
 | NRI-13 | Verified | Bounded UTF-8 CSV import, numeric validation, descriptive metrics, histogram, IQR outlier flags, units and reproducible JSON export. |
-| NRI-14 | Not started | Learning content, exercises and progress remain. |
+| NRI-14 | Verified | Bilingual starter lessons, quizzes, model-backed illustrative simulation and private progress. |
 | NRI-15 | Verified | Versioned Arabic/English PDF and DOCX downloads with citations, evidence, L-READY findings and limitations. Requires the documented local renderer. |
 | NRI-16 | Partial | System About view shows the purpose, framework wording, build version and documentation links. Changelog, licensing, privacy, terms and support content remain. |
 | NRI-17 | Partial | Separate developer view identifies Nexvary Inc. and links to the official company site. Dedicated confirmed contact information remains. |

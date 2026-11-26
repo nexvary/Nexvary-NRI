@@ -1,4 +1,5 @@
 import { createDocumentHandler, resolveDocumentRoute } from './documents.js';
+import { createEducationHandler } from './education.js';
 import { createSharingHandler, resolveSharingRoute } from './sharing.js';
 import { settingsPage } from './settings.js';
 import { createReportHandler, resolveReportRoute } from './reports.js';
@@ -24,6 +25,7 @@ const maxConcurrentLogins = 2;
 export function resolveWorkspaceRoute(pathname) {
   if (pathname === '/login') return { kind: 'login' };
   if (pathname === '/logout') return { kind: 'logout' };
+  if (pathname === '/workspace/education') return { kind: 'education' };
   if (pathname === '/workspace/settings') return { kind: 'settings' };
   if (pathname === '/workspace/analytics') return { kind: 'analytics' };
   if (pathname === '/workspace/network') return { kind: 'network' };
@@ -75,6 +77,7 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
   const handleObservatory = createObservatoryHandler(store);
   const handleReports = createReportHandler(store, version, reportRenderer);
   const handleSharing = createSharingHandler(store);
+  const handleEducation = createEducationHandler(store);
   const handleEconomics = createEconomicsHandler(store);
   const handleReadiness = createReadinessHandler(store);
   const handleEvidence = createEvidenceHandler(store);
@@ -160,6 +163,10 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
       return;
     }
 
+    if (kind === 'education') {
+      handleEducation({ request, reply, lang, account, form });
+      return;
+    }
     if (kind.startsWith('sharing')) {
       handleSharing({ request, reply, redirect, route, lang, account, form });
       return;

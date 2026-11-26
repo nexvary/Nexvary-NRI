@@ -4,6 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { bindDocumentKey } from './document-crypto.js';
 import { documentSchema, documentStore } from './document-store.js';
+import { educationSchema, educationStore } from './education.js';
 import { sharingSchema, sharingStore } from './sharing-store.js';
 import { settingsSchema, settingsStore } from './settings.js';
 import { observatorySchema, observatoryStore } from './observatory-store.js';
@@ -15,7 +16,7 @@ import { evidenceSchema, evidenceStore } from './evidence-store.js';
 import { referenceSchema, referenceMigrationV4, referenceStore } from './reference-store.js';
 
 export const sessionLifetime = 8 * 60 * 60;
-const schemaVersion = 11;
+const schemaVersion = 12;
 const schema = `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -69,6 +70,7 @@ function initialize(db, path) {
     if (version < 9) db.exec(observatorySchema);
     if (version < 10) db.exec(settingsSchema);
     if (version < 11) db.exec(sharingSchema);
+    if (version < 12) db.exec(educationSchema);
     return bindDocumentKey(db, path);
   });
 }
@@ -142,6 +144,7 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
     observatory: observatoryStore(db, now),
     settings,
     sharing,
+    education: educationStore(db, now),
     close() {
       db.close();
     },

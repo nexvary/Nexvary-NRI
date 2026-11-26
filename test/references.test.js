@@ -218,7 +218,8 @@ test('migrates a P1b database and persists reference snapshots and the local cac
     const document = store.documents.create(owner, project, { name: 'fixture.pdf', bytes: Buffer.from('test bytes') });
     store.close();
     const raw = new DatabaseSync(path);
-    raw.exec(`DROP TABLE project_share_events;
+    raw.exec(`DROP TABLE lesson_progress;
+      DROP TABLE project_share_events;
       DROP TABLE project_shares;
       DROP TABLE security_events;
       DROP TABLE observatory_updates;
