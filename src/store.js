@@ -4,6 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { bindDocumentKey } from './document-crypto.js';
 import { documentSchema, documentStore } from './document-store.js';
+import { libraryStore } from './library.js';
 import { economicsSchema, economicsStore } from './economics.js';
 import { readinessSchema, readinessStore } from './readiness-store.js';
 import { evidenceSchema, evidenceStore } from './evidence-store.js';
@@ -116,6 +117,7 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
     evidence,
     readiness,
     economics,
+    library: libraryStore(db),
     close() {
       db.close();
     },

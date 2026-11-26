@@ -1,4 +1,5 @@
 import { createDocumentHandler, resolveDocumentRoute } from './documents.js';
+import { libraryPage } from './library.js';
 import { createEconomicsHandler, resolveEconomicsRoute } from './economics.js';
 import { createReadinessHandler, resolveReadinessRoute } from './readiness.js';
 import { createEvidenceHandler, resolveEvidenceRoute } from './evidence.js';
@@ -17,6 +18,7 @@ const maxConcurrentLogins = 2;
 export function resolveWorkspaceRoute(pathname) {
   if (pathname === '/login') return { kind: 'login' };
   if (pathname === '/logout') return { kind: 'logout' };
+  if (pathname === '/workspace/library') return { kind: 'library' };
   if (pathname === '/workspace') return { kind: 'index' };
   const match = pathname.match(/^\/workspace\/projects\/([0-9a-f-]{36})(\/delete)?$/);
   if (match) return { kind: match[2] ? 'delete' : 'project', id: match[1] };
@@ -33,7 +35,7 @@ function acceptsPost(request) {
   return knownAuthority && request.headers.origin === `http://${host}`;
 }
 
-function readSessionCookie(header = '') {
+export function readSessionCookie(header = '') {
   const value = header.match(/(?:^|;\s*)nri_session=([A-Za-z0-9_-]{43})(?:;|$)/);
   return value?.[1];
 }
@@ -74,7 +76,7 @@ export function createWorkspaceHandler(store, providers) {
     };
     const postOnly = kind === 'delete' || kind === 'logout' || kind === 'delete-document';
     const allowed = postOnly ? ['POST'] : ['GET', 'HEAD'];
-    if (!postOnly && !['download-document', 'reference-projects', 'evidence-projects', 'evidence-export', 'readiness-projects', 'economics-projects', 'economics-export'].includes(kind)) allowed.push('POST');
+    if (!postOnly && !['download-document', 'reference-projects', 'evidence-projects', 'evidence-export', 'readiness-projects', 'economics-projects', 'economics-export', 'library'].includes(kind)) allowed.push('POST');
     const method = request.method;
     if (!allowed.includes(method)) {
       reply(405, null, { Allow: allowed.join(', ') });
@@ -145,6 +147,10 @@ export function createWorkspaceHandler(store, providers) {
       return;
     }
 
+    if (kind === 'library') {
+      reply(200, libraryPage(lang, new URL('http://localhost' + request.url), store, account.id));
+      return;
+    }
     if (kind.startsWith('economics')) {
       handleEconomics({ request, reply, redirect, route, lang, account, form });
       return;

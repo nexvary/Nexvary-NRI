@@ -1,5 +1,13 @@
 # Development status
 
+## P4b · Private library and operational dashboard · 2026-11-26
+
+The dashboard now uses signed-in workspace counts, recent projects and library activity. The scientific library searches and filters private PDFs and saved reference metadata across projects. The dashboard and module navigation use multicolor SVG icons.
+
+- 35/35 Node tests passed, including guest and cross-account isolation, filters and live dashboard counts.
+- Qt WebEngine verified the signed-in dashboard and a library search after saving a live Crossref lookup. Captures: [Arabic dashboard](qa/p4b/dashboard-ar-desktop.webp) · [English mobile library](qa/p4b/library-en-mobile.webp).
+- Collections, annotations, BibTeX/RIS, richer manuscript workflows, verified researcher profiles and team permissions remain pending.
+
 ## P4 · Hypothetical economics and sensitivity · 2026-11-26
 
 Private projects support saved one-year operating scenarios, currency and output units, capacity and utilization assumptions, exact minor-unit calculations, break-even, and one-variable sensitivity to utilization and sale price. The JSON export includes assumptions, calculation version and results. Taxes, financing, capital expenditure and exchange-rate conversion remain outside this model.
@@ -89,13 +97,13 @@ The audit started at `0136a7f` on `main`. The tree contained only AGENTS.md, the
 
 ## Functional acceptance
 
-Compared all 19 requirements with the application routes, persistence, renderer and test suite on the P2b branch. Modules with only shell navigation are **Not started**. Dashboard data continues to come from the labeled fixtures in `src/content.js`. The workspace, file and reference handlers have functional tests, and About and L-READY shell behavior is covered in `test/shell.test.js`.
+Compared all 19 requirements with the application routes, persistence, renderer and test suite on the P2b branch. Modules with only shell navigation are **Not started**. The current dashboard reads account-scoped data from the library and project store. The workspace, file and reference handlers have functional tests, and About and L-READY shell behavior is covered in `test/shell.test.js`.
 
 | ID | Status | Implemented evidence and remaining acceptance |
 |---|---|---|
-| NRI-01 | Partial | Tested navigation, RTL/LTR, and labeled synthetic metrics and activity. Real metrics, quick actions, ORCID, operational UI states, and tenant isolation remain. |
+| NRI-01 | Partial | Verified real private project, PDF, reference and evidence counts, recent activity, sign-in/empty states and account isolation. Network, ORCID profile and metered cost metrics remain. |
 | NRI-02 | Partial | Personal project CRUD, project PDF versions, project DOI records and access denial are verified. Rich manuscript records, authors, tags, search, notes, tasks, collaboration and publication status remain. |
-| NRI-03 | Partial | Project-bound PDF upload, metadata, encrypted persistence, version downloads and deletion are verified. Other formats, browsing by collection, search, reading, annotation, citation import/export and deduplication remain. |
+| NRI-03 | Partial | Project-bound PDF upload, metadata, encrypted persistence, version downloads and deletion are verified. Cross-project search and type filtering for PDFs and saved sources are verified. Other formats, collections, reading and annotation, citation import/export and deduplication remain. |
 | NRI-04 | Partial | Crossref and OpenAlex DOI lookups, dated per-provider source links, correction/retraction metadata, per-provider local cache, rate limits and unknown/failure outcomes are verified. Side-by-side provider comparison view implemented. Agency resolution, additional providers, claim-to-source mapping and evidence review remain. |
 | NRI-05 | Partial | Claims, dated source snapshots, study type, limitations, conflicting evidence, owner review and JSON export are verified. Team reviewer roles and review revisions remain. |
 | NRI-06 | Partial | Six ordered dimensions, four qualitative categories, project evidence links, revision history, reviewer and safety/authorization blockers are verified. Independent team reviewer roles remain. |

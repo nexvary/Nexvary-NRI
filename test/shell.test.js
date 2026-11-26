@@ -18,13 +18,13 @@ after(() => new Promise((resolve, reject) => {
   app.close((error) => error ? reject(error) : resolve());
 }));
 
-test('serves a bilingual dashboard with explicit fixtures and API state', async () => {
+test('serves a bilingual dashboard without fabricated dashboard metrics', async () => {
   const ar = await fetch(base);
   assert.equal(ar.status, 200);
   assert.equal(ar.headers.get('content-language'), 'ar');
   const arabic = await ar.text();
   assert.match(arabic, /<html lang="ar" dir="rtl">/);
-  assert.match(arabic, /بيانات تجريبية/);
+  assert.match(arabic, /سجّل الدخول لعرض مساحة عملك/);
   assert.match(arabic, /غير مفعّل/);
   assert.match(arabic, /class="skip" href="#main"/);
 
@@ -32,7 +32,9 @@ test('serves a bilingual dashboard with explicit fixtures and API state', async 
   assert.equal(en.headers.get('content-language'), 'en');
   const english = await en.text();
   assert.match(english, /<html lang="en" dir="ltr">/);
-  assert.match(english, /Demo data/);
+  assert.match(english, /Sign in to see your workspace/);
+  assert.doesNotMatch(english, /Demo data|Assessing rainwater harvesting/);
+  assert.match(english, /<svg class="icon"/);
   assert.match(english, /Live API spend/);
   assert.match(english, /Inactive/);
   assert.match(english, /aria-current="page"/);
@@ -40,10 +42,10 @@ test('serves a bilingual dashboard with explicit fixtures and API state', async 
 
 test('navigates to every module and preserves its view across language changes', async () => {
   for (const [id, module] of Object.entries(modules)) {
-    if (['research', 'references', 'evidence', 'l-ready', 'economics'].includes(id)) {
+    if (['research', 'references', 'evidence', 'l-ready', 'economics', 'library'].includes(id)) {
       const start = await fetch(`${base}/?lang=en&view=${id}`, { redirect: 'manual' });
       assert.equal(start.status, 303);
-      const destination = { research: '/workspace', references: '/workspace/reference-projects', evidence: '/workspace/evidence-projects', 'l-ready': '/workspace/readiness-projects', economics: '/workspace/economics-projects' }[id];
+      const destination = { research: '/workspace', references: '/workspace/reference-projects', evidence: '/workspace/evidence-projects', 'l-ready': '/workspace/readiness-projects', economics: '/workspace/economics-projects', library: '/workspace/library' }[id];
       assert.equal(start.headers.get('location'), destination + '?lang=en');
       continue;
     }
