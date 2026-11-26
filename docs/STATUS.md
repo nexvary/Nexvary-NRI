@@ -6,6 +6,7 @@
 
 - Node.js 24.22.3: 28/28 tests pass. Coverage includes provider rate limits, v3 migration, independent removal, mismatched DOI rejection and open-access link validation.
 - Live Crossref and OpenAlex adapter checks returned public metadata for DOI `10.1038/nature14539`.
+- Qt WebEngine verified sign-in, project creation, live DOI checks, comparison, independent removal, and no horizontal overflow. Captures: [Arabic desktop, 1536×900](qa/p2b/references-ar-desktop.webp) and [English mobile, 390×844](qa/p2b/references-en-mobile.webp).
 
 ## P2b · OpenAlex multi-provider DOI checks with side-by-side comparison · 2026-11-26
 
