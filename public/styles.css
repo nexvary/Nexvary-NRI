@@ -304,3 +304,16 @@ small { font-size: .84rem; }
 .form-error { color: #ffb1b5; }
 .delete-project { display: flex; align-items: center; flex-wrap: wrap; gap: .7rem; }
 .delete-project .danger { color: #ffe0e3; border-color: #ed8b96; background: #542936; }
+
+.project-files { width: fit-content; }
+.workspace-form input[type="file"] { width: 100%; }
+.document-history { list-style: none; padding: 0; margin: 0; }
+.document-history li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .55rem;
+  border-block-start: 1px solid #34465d;
+  padding-block: .5rem;
+}

@@ -14,9 +14,26 @@ const labels = {
   create: ['Create project', 'إنشاء المشروع'],
   save: ['Save changes', 'حفظ التعديلات'],
   remove: ['Delete project', 'حذف المشروع'],
-  confirm: ['Confirm deletion', 'أؤكد حذف المشروع'],
   missing: ['Project unavailable', 'المشروع غير متاح'],
   empty: ['Your projects will appear here after you create one.', 'ستظهر مشاريعك هنا بعد إنشاء أول مشروع.'],
+  confirmProject: ['Confirm deletion of this project and its files', 'أؤكد حذف المشروع وكل ملفاته'],
+  documents: ['Private PDFs', 'ملفات PDF الخاصة'],
+  emptyDocuments: ['This project has no PDFs yet.', 'لم تُضف ملفات PDF إلى هذا المشروع بعد.'],
+  backToProject: ['Back to the project', 'العودة إلى المشروع'],
+  backToDocuments: ['Back to project files', 'العودة إلى ملفات المشروع'],
+  pdfFile: ['PDF file', 'ملف PDF'],
+  upload: ['Upload PDF', 'رفع ملف PDF'],
+  uploadVersion: ['Upload new version', 'رفع إصدار جديد'],
+  history: ['Version history', 'سجل الإصدارات'],
+  version: ['Version', 'الإصدار'],
+  download: ['Download PDF', 'تنزيل PDF'],
+  bytes: ['bytes', 'بايت'],
+  fileLimit: ['Up to 8 MiB per PDF.', 'الحد الأقصى 8 ميبيبايت لكل ملف PDF.'],
+  invalidPdf: ['Choose one PDF file with a valid PDF signature.', 'اختر ملف PDF واحدًا بتوقيع صالح.'],
+  largePdf: ['The PDF exceeds the 8 MiB limit.', 'يتجاوز الملف الحد الأقصى البالغ 8 ميبيبايت.'],
+  uploadBusy: ['Other uploads are in progress. Try again shortly.', 'هناك ملفات أخرى قيد الرفع. جرّب مرة أخرى بعد قليل.'],
+  deleteDocument: ['Delete PDF and all versions', 'حذف ملف PDF وكل إصداراته'],
+  confirmDocument: ['Confirm file deletion', 'أؤكد حذف الملف'],
   invalid: ['Enter a title of up to 120 characters and a summary of up to 2,000 characters.', 'أدخل اسمًا من 120 حرفًا بحد أقصى وملخّصًا من 2000 حرف بحد أقصى.'],
 };
 
@@ -27,6 +44,11 @@ function escape(value) {
 
 export function workspacePath(lang, id) {
   return `/workspace${id ? `/projects/${id}` : ''}?lang=${lang}`;
+}
+
+export function documentsPath(lang, projectId, documentId) {
+  const root = `/workspace/projects/${projectId}/documents`;
+  return `${root}${documentId ? `/${documentId}` : ''}?lang=${lang}`;
 }
 
 export function loginPath(lang) {
@@ -58,6 +80,58 @@ export function workspacePage(lang, kind, options = {}) {
       </section>`);
   }
 
+  if (kind === 'documents' || kind === 'document') {
+    const { project, document, documents, versions, documentId } = options;
+    const route = documentsPath(lang, id, documentId);
+    const path = route.split('?')[0];
+    const upload = `
+      ${feedback}
+      <form method="post" action="${route}" enctype="multipart/form-data" class="workspace-form">
+        <label>${t('pdfFile')}<input type="file" name="pdf" accept="application/pdf,.pdf" aria-describedby="pdf-limit" required></label>
+        <small id="pdf-limit">${t('fileLimit')}</small>
+        <button class="action" type="submit">${t(document ? 'uploadVersion' : 'upload')}</button>
+      </form>`;
+
+    if (kind === 'documents') {
+      return panel(t('documents'), path, `
+        <section class="surface panel detail workspace-page">
+          <a href="${workspacePath(lang, id)}">${t('backToProject')}</a>
+          <h1>${t('documents')}</h1><p dir="auto">${escape(project.title)}</p>
+          <section class="project-list">
+            ${documents.length
+              ? `<ul>${documents.map((item) => `
+                <li><a href="${documentsPath(lang, id, item.id)}"><bdi>${escape(item.title)}</bdi></a>
+                  <small>${t('history')} · ${new Intl.NumberFormat(lang).format(item.versionCount)}</small></li>`).join('')}</ul>`
+              : `<p>${t('emptyDocuments')}</p>`}
+          </section>
+          <section class="project-editor"><h2>${t('upload')}</h2>${upload}</section>
+        </section>`);
+    }
+
+    const date = new Intl.DateTimeFormat(lang, { timeZone: 'UTC', dateStyle: 'medium' });
+    const numeric = new Intl.NumberFormat(lang);
+    return panel(t('history'), path, `
+      <section class="surface panel detail workspace-page">
+        <a href="${documentsPath(lang, id)}">${t('backToDocuments')}</a>
+        <h1 dir="auto">${escape(document.title)}</h1>
+        <section class="project-list">
+          <h2>${t('history')}</h2>
+          <ol class="document-history">
+            ${versions.map((item) => `
+              <li><div><strong>${t('version')} ${numeric.format(item.number)}</strong><br>
+                <bdi>${escape(item.filename)}</bdi><br>
+                <time datetime="${new Date(item.created_at).toISOString()}">${date.format(item.created_at)}</time> · ${numeric.format(item.size)} ${t('bytes')}
+              </div><a class="action" href="${path}/versions/${item.number}?lang=${lang}">${t('download')}</a></li>`).join('')}
+          </ol>
+        </section>
+        <section class="project-editor"><h2>${t('uploadVersion')}</h2>${upload}</section>
+        <form method="post" action="${path}/delete?lang=${lang}" class="delete-project">
+          <label><input type="checkbox" name="confirm" value="yes" required> ${t('confirmDocument')}</label>
+          <button type="submit" class="action danger">${t('deleteDocument')}</button>
+        </form>
+      </section>`);
+  }
+
   const action = workspacePath(lang, id);
   const editor = `
     ${feedback}
@@ -72,9 +146,10 @@ export function workspacePage(lang, kind, options = {}) {
       <section class="surface panel detail workspace-page">
         <a href="${workspace}">${t('back')}</a>
         <h1 dir="auto">${escape(values.title)}</h1>
+        <a class="action project-files" href="${documentsPath(lang, id)}">${t('documents')}</a>
         ${editor}
         <form method="post" action="/workspace/projects/${id}/delete?lang=${lang}" class="delete-project">
-          <label><input type="checkbox" name="confirm" value="yes" required> ${t('confirm')}</label>
+          <label><input type="checkbox" name="confirm" value="yes" required> ${t('confirmProject')}</label>
           <button type="submit" class="action danger">${t('remove')}</button>
         </form>
       </section>`);
