@@ -42,10 +42,10 @@ test('serves a bilingual dashboard without fabricated dashboard metrics', async 
 
 test('navigates to every module and preserves its view across language changes', async () => {
   for (const [id, module] of Object.entries(modules)) {
-    if (['research', 'references', 'evidence', 'l-ready', 'economics', 'library', 'network', 'collaboration', 'analytics', 'observatory'].includes(id)) {
+    if (['research', 'references', 'evidence', 'l-ready', 'economics', 'library', 'network', 'collaboration', 'analytics', 'observatory', 'reports'].includes(id)) {
       const start = await fetch(`${base}/?lang=en&view=${id}`, { redirect: 'manual' });
       assert.equal(start.status, 303);
-      const destination = { research: '/workspace', references: '/workspace/reference-projects', evidence: '/workspace/evidence-projects', 'l-ready': '/workspace/readiness-projects', economics: '/workspace/economics-projects', library: '/workspace/library', network: '/workspace/network', collaboration: '/workspace/collaboration', analytics: '/workspace/analytics', observatory: '/workspace/observatory' }[id];
+      const destination = { research: '/workspace', references: '/workspace/reference-projects', evidence: '/workspace/evidence-projects', 'l-ready': '/workspace/readiness-projects', economics: '/workspace/economics-projects', library: '/workspace/library', network: '/workspace/network', collaboration: '/workspace/collaboration', analytics: '/workspace/analytics', observatory: '/workspace/observatory', reports: '/workspace/report-projects' }[id];
       assert.equal(start.headers.get('location'), destination + '?lang=en');
       continue;
     }
