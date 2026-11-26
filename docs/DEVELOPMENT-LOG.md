@@ -37,3 +37,9 @@
 - P4 merged into main at [`0b65081`](https://github.com/nexvary/Nexvary-NRI/commit/0b65081aafa0324b5fa931db2239c146dc9fd0d0).
 - Added scoped library search and replaced sample dashboard records with real account data. 35/35 Node tests passed. Browser acceptance exercised a live Crossref lookup, Arabic dashboard and English mobile search.
 - Researcher profiles and permissions are next. Rich library and manuscript workflows remain open.
+
+## 2026-11-26 · P4c research network
+
+- P4b merged into main at [`1401e0d`](https://github.com/nexvary/Nexvary-NRI/commit/1401e0df6992aba475cc775b823a3a4ea167cbe9).
+- Added opt-in discovery, follow/block and scoped collaboration requests. 36/36 Node tests passed. Bilingual browser acceptance verified profile opt-in and a local request.
+- Role-based project sharing and verified ORCID account linking remain separate release work.

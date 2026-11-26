@@ -47,7 +47,7 @@ export function createApp(store = openWorkspaceStore(), {
     };
 
     if (route) {
-      const section = { reference: 'references', evidence: 'evidence', readiness: 'l-ready', economics: 'economics', library: 'library' };
+      const section = { reference: 'references', evidence: 'evidence', readiness: 'l-ready', economics: 'economics', library: 'library', network: 'network', collaboration: 'collaboration' };
       const view = Object.entries(section).find(([key]) => route.kind.startsWith(key))?.[1] ?? 'research';
       const reply = (status, page, headers, body) => {
         const privateHeaders = { 'Cache-Control': 'no-store', ...headers };
@@ -75,6 +75,10 @@ export function createApp(store = openWorkspaceStore(), {
     if (pathname === '/' && view === 'dashboard') {
       const session = store.session(readSessionCookie(request.headers.cookie));
       sendPage(200, view, undefined, { 'Cache-Control': 'no-store' }, session ? store.library.dashboard(session.id) : undefined);
+      return;
+    }
+    if (pathname === '/' && ['network', 'collaboration'].includes(view)) {
+      redirect(`/workspace/${view}?lang=${lang}`);
       return;
     }
     if (pathname === '/' && view === 'library') {

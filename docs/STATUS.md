@@ -1,5 +1,13 @@
 # Development status
 
+## P4c · Researcher directory and collaboration requests · 2026-11-26
+
+Signed-in researchers can opt in to discovery, search by name and interests, follow or block peers and send collaboration requests. Recipients can accept or decline. Profiles and request relationships are removed from discovery when the researcher opts out. The optional ORCID iD is self-reported.
+
+- 36/36 Node tests passed, including opt-in, block boundaries, independent recipient authorization and private project denial after accepting a request.
+- Qt WebEngine verified opt-in and a local collaboration request using two test accounts. Captures: [Arabic desktop](qa/p4c/network-ar-desktop.webp) · [English mobile](qa/p4c/network-en-mobile.webp).
+- Project invitations, shared project authorization, reporting and moderation, posts and messages remain pending.
+
 ## P4b · Private library and operational dashboard · 2026-11-26
 
 The dashboard now uses signed-in workspace counts, recent projects and library activity. The scientific library searches and filters private PDFs and saved reference metadata across projects. The dashboard and module navigation use multicolor SVG icons.
@@ -109,8 +117,8 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | NRI-06 | Partial | Six ordered dimensions, four qualitative categories, project evidence links, revision history, reviewer and safety/authorization blockers are verified. Independent team reviewer roles remain. |
 | NRI-07 | Verified | One-year operating model with explicit assumptions, currency, units, capacity, sensitivity, scenario comparison and reproducible JSON export. |
 | NRI-08 | Not started | Providers, consent, verification, limits and usage accounting remain. |
-| NRI-09 | Not started | Profiles, discovery, moderation and private sharing remain. |
-| NRI-10 | Not started | Invitations, collaboration, notifications and access history remain. |
+| NRI-09 | Partial | Opt-in profiles, search, follow and block, bounded requests and private profile isolation verified. Verified ORCID ownership, posts, groups, publication sharing and moderation remain. |
+| NRI-10 | Partial | Collaboration request and recipient acceptance/decline are verified. Project invitations, roles, notes, tasks and access history remain. |
 | NRI-11 | Not started | Conversations, notification preferences and authorization remain. |
 | NRI-12 | Not started | Watchlists, dated updates and provenance remain. |
 | NRI-13 | Not started | Import, analysis, charts and reproducible exports remain. |

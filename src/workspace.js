@@ -1,4 +1,5 @@
 import { createDocumentHandler, resolveDocumentRoute } from './documents.js';
+import { createNetworkHandler } from './network.js';
 import { libraryPage } from './library.js';
 import { createEconomicsHandler, resolveEconomicsRoute } from './economics.js';
 import { createReadinessHandler, resolveReadinessRoute } from './readiness.js';
@@ -18,6 +19,8 @@ const maxConcurrentLogins = 2;
 export function resolveWorkspaceRoute(pathname) {
   if (pathname === '/login') return { kind: 'login' };
   if (pathname === '/logout') return { kind: 'logout' };
+  if (pathname === '/workspace/network') return { kind: 'network' };
+  if (pathname === '/workspace/collaboration') return { kind: 'collaboration' };
   if (pathname === '/workspace/library') return { kind: 'library' };
   if (pathname === '/workspace') return { kind: 'index' };
   const match = pathname.match(/^\/workspace\/projects\/([0-9a-f-]{36})(\/delete)?$/);
@@ -61,6 +64,7 @@ function projectFields(form) {
 
 export function createWorkspaceHandler(store, providers) {
   const handleDocuments = createDocumentHandler(store);
+  const handleNetwork = createNetworkHandler(store);
   const handleEconomics = createEconomicsHandler(store);
   const handleReadiness = createReadinessHandler(store);
   const handleEvidence = createEvidenceHandler(store);
@@ -147,6 +151,10 @@ export function createWorkspaceHandler(store, providers) {
       return;
     }
 
+    if (kind === 'network' || kind === 'collaboration') {
+      handleNetwork({ request, reply, redirect, route, lang, account, form });
+      return;
+    }
     if (kind === 'library') {
       reply(200, libraryPage(lang, new URL('http://localhost' + request.url), store, account.id));
       return;
