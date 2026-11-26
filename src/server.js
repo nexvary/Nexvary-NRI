@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { createCrossrefClient } from './crossref.js';
 import { createOpenAlexClient } from './openalex.js';
+import { createOrcidClient, createZenodoClient } from './public-identifiers.js';
 import { modules } from './content.js';
 import { render } from './render.js';
 import { openWorkspaceStore, workspaceDatabasePath } from './store.js';
@@ -20,8 +21,10 @@ const securityHeaders = {
 export function createApp(store = openWorkspaceStore(), {
   crossref = createCrossrefClient(),
   openalex = createOpenAlexClient(),
+  orcid = createOrcidClient(),
+  zenodo = createZenodoClient(),
 } = {}) {
-  const workspace = createWorkspaceHandler(store, crossref, openalex);
+  const workspace = createWorkspaceHandler(store, { crossref, openalex, orcid, zenodo });
 
   async function handle(request, response) {
     if (!request.url?.startsWith('/')) {

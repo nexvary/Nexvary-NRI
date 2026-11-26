@@ -7,6 +7,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { test } from 'node:test';
 import { createCrossrefClient, crossrefUrl, normalizeDoi, resolverUrl } from '../src/crossref.js';
 import { createOpenAlexClient, openAlexUrl } from '../src/openalex.js';
+import { createOrcidClient, createZenodoClient, normalizeOrcid, normalizeZenodoDoi } from '../src/public-identifiers.js';
 import { createApp } from '../src/server.js';
 import { openWorkspaceStore } from '../src/store.js';
 
@@ -422,9 +423,8 @@ test('saves OpenAlex DOI results alongside Crossref and enables comparison', asy
     // Reject unknown provider
     now += 1001;
     const r5 = await post(path(project), { doi, action: 'check', provider: 'unknown-provider' });
-    // defaults to crossref, uses cache
-    assert.equal(r5.status, 303);
-    assert.equal(crossrefCalls, 1); // still cached
+    assert.equal(r5.status, 400);
+    assert.equal(crossrefCalls, 1);
 
   } finally {
     await new Promise((resolve, reject) => app.close((error) => error ? reject(error) : resolve()));
@@ -497,4 +497,63 @@ test('rejects mismatched OpenAlex records and restricts links to reported open-a
   assert.equal((await fetchWork(work)).metadata.openAccessUrl, '');
   work.best_oa_location = { pdf_url: 'javascript:alert(1)', landing_page_url: 'https://example.org/repository' };
   assert.equal((await fetchWork(work)).metadata.openAccessUrl, 'https://example.org/repository');
+});
+
+test('validates public identifiers and saves dated ORCID and Zenodo snapshots in the private workspace', async () => {
+  const id = '0000-0002-1825-0097';
+  const doi = '10.5281/zenodo.123';
+  assert.equal(normalizeOrcid('https://orcid.org/' + id), id);
+  assert.equal(normalizeOrcid('0000-0002-1825-0098'), null);
+  assert.equal(normalizeOrcid('https://orcid.org.evil.test/' + id), null);
+  assert.equal(normalizeZenodoDoi('https://doi.org/' + doi), doi);
+  assert.equal(normalizeZenodoDoi('10.5281/zenodo.123/extra'), null);
+
+  const store = openWorkspaceStore();
+  store.addAccount('provider-owner@example.test', credentials);
+  store.addAccount('provider-other@example.test', credentials);
+  const owner = store.credentials('provider-owner@example.test').id;
+  const other = store.credentials('provider-other@example.test').id;
+  const project = store.createProject(owner, { title: 'Provider integration fixture', description: '' });
+  const ownerCookie = 'nri_session=' + store.newSession(owner);
+  const otherCookie = 'nri_session=' + store.newSession(other);
+  let orcidCalls = 0;
+  const orcid = createOrcidClient({ fetchRecord: async (url) => {
+    assert.equal(url, 'https://pub.orcid.org/v3.0/' + id + '/person');
+    orcidCalls++;
+    return Response.json({ name: { path: id, visibility: 'public', 'credit-name': { value: 'Synthetic public name' } } });
+  } });
+  const zenodo = createZenodoClient({ fetchRecord: async (url) => {
+    assert.equal(url, 'https://zenodo.org/api/records/123');
+    return Response.json({
+      doi, status: 'published', metadata: {
+        title: 'Synthetic dataset', creators: [{ name: 'Synthetic author' }],
+        publication_date: '2026-11-26', license: { id: 'cc-by-4.0' },
+      },
+    });
+  } });
+  const app = createApp(store, { orcid, zenodo });
+  app.listen(0, '127.0.0.1');
+  await new Promise((resolve) => app.once('listening', resolve));
+  const origin = 'http://127.0.0.1:' + app.address().port;
+  const url = origin + '/workspace/projects/' + project + '/references?lang=en';
+  const check = (provider, doi, cookie = ownerCookie) => fetch(url, {
+    method: 'POST', redirect: 'manual',
+    headers: { cookie, origin },
+    body: new URLSearchParams({ provider, doi, action: 'check' }),
+  });
+  try {
+    assert.equal((await check('orcid', id, otherCookie)).status, 404);
+    assert.equal((await check('orcid', id + 'x')).status, 422);
+    assert.equal(orcidCalls, 0);
+    assert.equal((await check('orcid', id)).status, 303);
+    assert.equal((await check('orcid', id)).status, 303);
+    assert.equal(orcidCalls, 1);
+    assert.equal((await check('zenodo', doi)).status, 303);
+    const html = await (await fetch(url, { headers: { cookie: ownerCookie } })).text();
+    for (const expected of ['Synthetic public name', 'Ownership is unverified', 'Synthetic dataset', 'cc-by-4.0', 'Retrieved (UTC)']) {
+      assert.ok(html.includes(expected), expected);
+    }
+  } finally {
+    await new Promise((resolve, reject) => app.close((error) => error ? reject(error) : resolve()));
+  }
 });
