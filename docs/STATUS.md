@@ -1,5 +1,12 @@
 # Development status
 
+## P4d · Descriptive scientific analytics · 2026-11-26
+
+Signed-in users can import a UTF-8 CSV file or paste CSV, select a numeric column and label its unit. The analysis calculates descriptive measures, histogram bins and potential IQR outliers. JSON export records the values, units, calculation version and results for reproduction. CSV data is processed in memory for the request.
+
+- 38/38 Node tests passed, including format validation, exact fixture summaries, multipart upload, deterministic export, cache headers and origin checks.
+- Qt WebEngine verified results and the histogram on [Arabic desktop](qa/p4d/analytics-ar-desktop.webp) and [English mobile](qa/p4d/analytics-en-mobile.webp) using illustrative measurements.
+
 ## P4c · Researcher directory and collaboration requests · 2026-11-26
 
 Signed-in researchers can opt in to discovery, search by name and interests, follow or block peers and send collaboration requests. Recipients can accept or decline. Profiles and request relationships are removed from discovery when the researcher opts out. The optional ORCID iD is self-reported.
@@ -121,7 +128,7 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | NRI-10 | Partial | Collaboration request and recipient acceptance/decline are verified. Project invitations, roles, notes, tasks and access history remain. |
 | NRI-11 | Not started | Conversations, notification preferences and authorization remain. |
 | NRI-12 | Not started | Watchlists, dated updates and provenance remain. |
-| NRI-13 | Not started | Import, analysis, charts and reproducible exports remain. |
+| NRI-13 | Verified | Bounded UTF-8 CSV import, numeric validation, descriptive metrics, histogram, IQR outlier flags, units and reproducible JSON export. |
 | NRI-14 | Not started | Learning content, exercises and progress remain. |
 | NRI-15 | Not started | PDF/DOCX report exports and bilingual templates remain. |
 | NRI-16 | Partial | System About view shows the purpose, framework wording, build version and documentation links. Changelog, licensing, privacy, terms and support content remain. |

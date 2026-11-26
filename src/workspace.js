@@ -1,4 +1,5 @@
 import { createDocumentHandler, resolveDocumentRoute } from './documents.js';
+import { handleAnalytics } from './analytics.js';
 import { createNetworkHandler } from './network.js';
 import { libraryPage } from './library.js';
 import { createEconomicsHandler, resolveEconomicsRoute } from './economics.js';
@@ -19,6 +20,7 @@ const maxConcurrentLogins = 2;
 export function resolveWorkspaceRoute(pathname) {
   if (pathname === '/login') return { kind: 'login' };
   if (pathname === '/logout') return { kind: 'logout' };
+  if (pathname === '/workspace/analytics') return { kind: 'analytics' };
   if (pathname === '/workspace/network') return { kind: 'network' };
   if (pathname === '/workspace/collaboration') return { kind: 'collaboration' };
   if (pathname === '/workspace/library') return { kind: 'library' };
@@ -94,7 +96,7 @@ export function createWorkspaceHandler(store, providers) {
         reply(403);
         return;
       }
-      if (!['logout', 'documents', 'document'].includes(kind)) {
+      if (!['logout', 'documents', 'document', 'analytics'].includes(kind)) {
         const { status, fields } = await readForm(request);
         if (status) {
           reply(status);
@@ -151,6 +153,10 @@ export function createWorkspaceHandler(store, providers) {
       return;
     }
 
+    if (kind === 'analytics') {
+      await handleAnalytics({ request, reply, lang, stillSignedIn: () => store.session(token)?.id === account.id });
+      return;
+    }
     if (kind === 'network' || kind === 'collaboration') {
       handleNetwork({ request, reply, redirect, route, lang, account, form });
       return;
