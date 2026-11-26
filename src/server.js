@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { createCrossrefClient } from './crossref.js';
 import { createOpenAlexClient } from './openalex.js';
 import { createOrcidClient, createZenodoClient } from './public-identifiers.js';
+import { createLocalReportRenderer } from './reports.js';
 import { modules } from './content.js';
 import { render } from './render.js';
 import { openWorkspaceStore, workspaceDatabasePath } from './store.js';
@@ -23,8 +24,9 @@ export function createApp(store = openWorkspaceStore(), {
   openalex = createOpenAlexClient(),
   orcid = createOrcidClient(),
   zenodo = createZenodoClient(),
+  reportRenderer = createLocalReportRenderer(),
 } = {}) {
-  const workspace = createWorkspaceHandler(store, { crossref, openalex, orcid, zenodo });
+  const workspace = createWorkspaceHandler(store, { crossref, openalex, orcid, zenodo }, version, reportRenderer);
 
   async function handle(request, response) {
     if (!request.url?.startsWith('/')) {
@@ -47,7 +49,7 @@ export function createApp(store = openWorkspaceStore(), {
     };
 
     if (route) {
-      const section = { reference: 'references', evidence: 'evidence', readiness: 'l-ready', economics: 'economics', library: 'library', network: 'network', collaboration: 'collaboration', analytics: 'analytics', observatory: 'observatory' };
+      const section = { reference: 'references', evidence: 'evidence', readiness: 'l-ready', economics: 'economics', library: 'library', network: 'network', collaboration: 'collaboration', analytics: 'analytics', observatory: 'observatory', report: 'reports' };
       const view = Object.entries(section).find(([key]) => route.kind.startsWith(key))?.[1] ?? 'research';
       const reply = (status, page, headers, body) => {
         const privateHeaders = { 'Cache-Control': 'no-store', ...headers };
@@ -75,6 +77,10 @@ export function createApp(store = openWorkspaceStore(), {
     if (pathname === '/' && view === 'dashboard') {
       const session = store.session(readSessionCookie(request.headers.cookie));
       sendPage(200, view, undefined, { 'Cache-Control': 'no-store' }, session ? store.library.dashboard(session.id) : undefined);
+      return;
+    }
+    if (pathname === '/' && view === 'reports') {
+      redirect(`/workspace/report-projects?lang=${lang}`);
       return;
     }
     if (pathname === '/' && ['network', 'collaboration', 'analytics', 'observatory'].includes(view)) {

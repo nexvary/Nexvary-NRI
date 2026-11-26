@@ -55,3 +55,9 @@
 - P4d merged into main at [`db65e09`](https://github.com/nexvary/Nexvary-NRI/commit/db65e092b6775cb65bc15ea08223127c3e9f33f1).
 - Added private watchlists, saved searches, and dated source updates with preserved metadata. 39/39 Node tests passed. Browser verification used captured public Zenodo metadata in both locales.
 - Bilingual PDF and DOCX report generation follows.
+
+## 2026-11-26 · P6 Report Studio
+
+- P4e merged into main at [`e992ce4`](https://github.com/nexvary/Nexvary-NRI/commit/e992ce4f75f1119868ebfbbd67f004ca6b4e327c).
+- Added versioned PDF/DOCX exports with private project sources, evidence and L-READY results. 41/41 tests passed with the renderer enabled, including actual authenticated bilingual downloads. Browser captures record the download controls.
+- Security and release verification follow. Optional AI remains disabled.

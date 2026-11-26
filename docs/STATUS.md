@@ -1,5 +1,12 @@
 # Development status
 
+## P6 · Bilingual PDF and DOCX reports · 2026-11-26
+
+The private Report Studio renders PDF and DOCX files locally with dated citations, provider notices, evidence matrices, L-READY findings and limitations. Reports include the app and template versions. The optional Python renderer and font prerequisites are documented in README.md.
+
+- 41/41 Node tests passed with the local renderer enabled. The authenticated download routes returned actual PDFs and valid DOCX archives in both languages. Arabic PDF text extraction and DOCX bidi markup were verified.
+- Qt WebEngine verified the download controls on [Arabic desktop](qa/p6/reports-ar-desktop.webp) and [English mobile](qa/p6/reports-en-mobile.webp).
+
 ## P4e · Technology observatory · 2026-11-26
 
 Added private topic watchlists, saved library searches, and dated update notes with original reference snapshots and retrieval timestamps. Watchlist updates support keyword filtering and use manually selected project sources. No automated polling is configured.
@@ -137,7 +144,7 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | NRI-12 | Verified | Private watchlists, saved library searches, date-stamped manual updates, filters and provider provenance. |
 | NRI-13 | Verified | Bounded UTF-8 CSV import, numeric validation, descriptive metrics, histogram, IQR outlier flags, units and reproducible JSON export. |
 | NRI-14 | Not started | Learning content, exercises and progress remain. |
-| NRI-15 | Not started | PDF/DOCX report exports and bilingual templates remain. |
+| NRI-15 | Verified | Versioned Arabic/English PDF and DOCX downloads with citations, evidence, L-READY findings and limitations. Requires the documented local renderer. |
 | NRI-16 | Partial | System About view shows the purpose, framework wording, build version and documentation links. Changelog, licensing, privacy, terms and support content remain. |
 | NRI-17 | Partial | Separate developer view identifies Nexvary Inc. and links to the official company site. Dedicated confirmed contact information remains. |
 | NRI-18 | Partial | Local session lifecycle, project and PDF boundaries, PDF-byte encryption and RTL/LTR are verified. Team RBAC, MFA, recovery, user settings, full accessibility audit and administration remain. |

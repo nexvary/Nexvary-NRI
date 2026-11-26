@@ -37,6 +37,18 @@ Open **Reference validator**, choose a project, and enter a DOI or a DOI link. C
 
 The public APIs are used on demand without a paid API key. The request contains the identifier, with no project or document contents. A successful result can be reused from the local account cache for up to 24 hours. A missing result is specific to the selected provider. Save both results to compare their metadata and provenance. See the [reference architecture decision](docs/decisions/0004-crossref-reference-provenance.md).
 
+## Enable PDF and DOCX report exports
+
+Report Studio is optional. Install Python 3.10+, the WeasyPrint system libraries (Pango and font support), and the Noto Naskh Arabic and DejaVu Sans fonts for predictable bilingual PDF layout. In a local Python virtual environment, run:
+
+```sh
+python -m pip install -r scripts/report-requirements.txt
+NRI_REPORT_PYTHON="$(command -v python)" npm start
+NRI_REPORT_PYTHON="$(command -v python)" npm test
+```
+
+Open a project, choose **Report studio**, then select PDF or DOCX. The local renderer receives the selected project's report data and uses no network resources.
+
 - [Product charter](docs/PROJECT.md)
 - [Functional acceptance baseline](docs/REQUIREMENTS.md)
 - [Visual reference](docs/VISUAL.md)

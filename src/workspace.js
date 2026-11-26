@@ -1,4 +1,5 @@
 import { createDocumentHandler, resolveDocumentRoute } from './documents.js';
+import { createReportHandler, resolveReportRoute } from './reports.js';
 import { createObservatoryHandler, resolveObservatoryRoute } from './observatory.js';
 import { handleAnalytics } from './analytics.js';
 import { createNetworkHandler } from './network.js';
@@ -28,7 +29,7 @@ export function resolveWorkspaceRoute(pathname) {
   if (pathname === '/workspace') return { kind: 'index' };
   const match = pathname.match(/^\/workspace\/projects\/([0-9a-f-]{36})(\/delete)?$/);
   if (match) return { kind: match[2] ? 'delete' : 'project', id: match[1] };
-  return resolveDocumentRoute(pathname) ?? resolveReferenceRoute(pathname) ?? resolveEvidenceRoute(pathname) ?? resolveReadinessRoute(pathname) ?? resolveEconomicsRoute(pathname) ?? resolveObservatoryRoute(pathname);
+  return resolveDocumentRoute(pathname) ?? resolveReferenceRoute(pathname) ?? resolveEvidenceRoute(pathname) ?? resolveReadinessRoute(pathname) ?? resolveEconomicsRoute(pathname) ?? resolveObservatoryRoute(pathname) ?? resolveReportRoute(pathname);
 }
 
 function acceptsPost(request) {
@@ -65,10 +66,11 @@ function projectFields(form) {
   };
 }
 
-export function createWorkspaceHandler(store, providers) {
+export function createWorkspaceHandler(store, providers, version, reportRenderer) {
   const handleDocuments = createDocumentHandler(store);
   const handleNetwork = createNetworkHandler(store);
   const handleObservatory = createObservatoryHandler(store);
+  const handleReports = createReportHandler(store, version, reportRenderer);
   const handleEconomics = createEconomicsHandler(store);
   const handleReadiness = createReadinessHandler(store);
   const handleEvidence = createEvidenceHandler(store);
@@ -84,7 +86,7 @@ export function createWorkspaceHandler(store, providers) {
     };
     const postOnly = kind === 'delete' || kind === 'logout' || kind === 'delete-document';
     const allowed = postOnly ? ['POST'] : ['GET', 'HEAD'];
-    if (!postOnly && !['download-document', 'reference-projects', 'evidence-projects', 'evidence-export', 'readiness-projects', 'economics-projects', 'economics-export', 'library'].includes(kind)) allowed.push('POST');
+    if (!postOnly && !['download-document', 'reference-projects', 'evidence-projects', 'evidence-export', 'readiness-projects', 'economics-projects', 'economics-export', 'library', 'report-projects'].includes(kind)) allowed.push('POST');
     const method = request.method;
     if (!allowed.includes(method)) {
       reply(405, null, { Allow: allowed.join(', ') });
@@ -155,6 +157,10 @@ export function createWorkspaceHandler(store, providers) {
       return;
     }
 
+    if (kind.startsWith('report')) {
+      await handleReports({ request, reply, route, lang, account, form, stillSignedIn: () => store.session(token)?.id === account.id });
+      return;
+    }
     if (kind.startsWith('observatory')) {
       handleObservatory({ request, reply, redirect, route, lang, account, form });
       return;
