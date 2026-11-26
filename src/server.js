@@ -47,10 +47,11 @@ export function createApp(store = openWorkspaceStore(), {
     };
 
     if (route) {
-      const section = ['references', 'reference-projects'].includes(route.kind) ? 'references' : route.kind.startsWith('evidence') ? 'evidence' : route.kind.startsWith('readiness') ? 'l-ready' : 'research';
+      const section = { reference: 'references', evidence: 'evidence', readiness: 'l-ready', economics: 'economics' };
+      const view = Object.entries(section).find(([key]) => route.kind.startsWith(key))?.[1] ?? 'research';
       const reply = (status, page, headers, body) => {
         const privateHeaders = { 'Cache-Control': 'no-store', ...headers };
-        if (page) sendPage(status, section, page, privateHeaders);
+        if (page) sendPage(status, view, page, privateHeaders);
         else response.writeHead(status, { ...securityHeaders, ...privateHeaders }).end(request.method === 'HEAD' ? undefined : body);
       };
       await workspace({ request, reply, redirect, route, lang });
@@ -69,6 +70,10 @@ export function createApp(store = openWorkspaceStore(), {
     const view = searchParams.get('view') ?? 'dashboard';
     if (pathname === '/' && view === 'research') {
       redirect(workspacePath(lang));
+      return;
+    }
+    if (pathname === '/' && view === 'economics') {
+      redirect(`/workspace/economics-projects?lang=${lang}`);
       return;
     }
     if (pathname === '/' && view === 'l-ready') {
