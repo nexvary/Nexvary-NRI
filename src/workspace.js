@@ -1,3 +1,4 @@
+import { showAssistant } from './assistant.js';
 import { createDocumentHandler, resolveDocumentRoute } from './documents.js';
 import { createEducationHandler } from './education.js';
 import { createSharingHandler, resolveSharingRoute } from './sharing.js';
@@ -25,6 +26,7 @@ const maxConcurrentLogins = 2;
 export function resolveWorkspaceRoute(pathname) {
   if (pathname === '/login') return { kind: 'login' };
   if (pathname === '/logout') return { kind: 'logout' };
+  if (pathname === '/workspace/assistant') return { kind: 'assistant' };
   if (pathname === '/workspace/education') return { kind: 'education' };
   if (pathname === '/workspace/settings') return { kind: 'settings' };
   if (pathname === '/workspace/analytics') return { kind: 'analytics' };
@@ -93,7 +95,7 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
     };
     const postOnly = kind === 'delete' || kind === 'logout' || kind === 'delete-document';
     const allowed = postOnly ? ['POST'] : ['GET', 'HEAD'];
-    if (!postOnly && !['download-document', 'reference-projects', 'evidence-projects', 'evidence-export', 'readiness-projects', 'economics-projects', 'economics-export', 'library', 'report-projects', 'sharing-project'].includes(kind)) allowed.push('POST');
+    if (!postOnly && !['download-document', 'reference-projects', 'evidence-projects', 'evidence-export', 'readiness-projects', 'economics-projects', 'economics-export', 'library', 'report-projects', 'sharing-project', 'assistant'].includes(kind)) allowed.push('POST');
     const method = request.method;
     if (!allowed.includes(method)) {
       reply(405, null, { Allow: allowed.join(', ') });
@@ -163,6 +165,10 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
       return;
     }
 
+    if (kind === 'assistant') {
+      showAssistant({ reply, request, lang, store, account });
+      return;
+    }
     if (kind === 'education') {
       handleEducation({ request, reply, lang, account, form });
       return;

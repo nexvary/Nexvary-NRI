@@ -78,3 +78,10 @@
 
 - P7b merged into main at [`d8b6a5f`](https://github.com/nexvary/Nexvary-NRI/commit/d8b6a5f335ef76e458a2fe04cdc5aa5ebc3b888d) after [GitHub Actions run 45902068331](https://github.com/nexvary/Nexvary-NRI/actions/runs/45902068331) succeeded.
 - Added two bilingual lessons with local scoring and a descriptive-statistics simulation. 45/45 local tests passed with PDF/DOCX rendering enabled. Both locales were exercised in Qt WebEngine.
+
+## 2026-11-27 · NRI-08a local source review
+
+- Resumed from remote main at `0c643a4`, the merge of PR #18.
+- Replaced the Assistant placeholder with a signed-in bilingual source review. Uses saved, owner-scoped snapshots, including historical provider notices. The local review uses no external APIs.
+- Targeted regression: 6/6. Full suite: 45 passed, zero failures and one optional report-renderer integration test skipped locally. Browser captures are pending.
+- Continue with BYOK, explicit external sharing consent and metered, cited answers before starting messaging.

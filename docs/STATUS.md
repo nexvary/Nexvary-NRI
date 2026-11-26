@@ -1,5 +1,14 @@
 # Development status
 
+## NRI-08a · Local source review · 2026-11-27 (Cairo)
+
+The signed-in Assistant reviews a project's saved provider snapshots and links back to the reference validator. It filters by title or identifier and shows the provider, retrieval date, and editorial or retraction notices. Missing provider results and unknown retraction status remain explicit. The page makes no external requests.
+
+- Baseline: main at `0c643a4` (merged PR #18).
+- Targeted tests: 6 passed. The full Node suite passed 45 tests, with the bilingual report renderer integration test skipped because the optional local report runtime was unavailable.
+- HTTP acceptance covered English and Arabic, guest redirects, cross-account denial, escaped metadata, provider-status distinctions, bounded results and a read-only route. Browser capture remains pending.
+- Next: BYOK provider and model selection, consent for external data, grounded answers, durable usage and cost limits, cancellation and caching. NRI-11 follows.
+
 ## P7c · Bilingual research learning library · 2026-11-27 (Cairo)
 
 Added lessons on reference provenance and descriptive statistics, server-graded quizzes with account-scoped progress, and an illustrative mean-versus-median simulation backed by the analytics engine.
@@ -159,7 +168,7 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | NRI-05 | Partial | Claims, dated source snapshots, study type, limitations, conflicting evidence, owner review and JSON export are verified. Team reviewer roles and review revisions remain. |
 | NRI-06 | Partial | Six ordered dimensions, four qualitative categories, project evidence links, revision history, reviewer and safety/authorization blockers are verified. Independent team reviewer roles remain. |
 | NRI-07 | Verified | One-year operating model with explicit assumptions, currency, units, capacity, sensitivity, scenario comparison and reproducible JSON export. |
-| NRI-08 | Not started | Providers, consent, verification, limits and usage accounting remain. |
+| NRI-08 | Partial | NRI-08a exercises private saved-source review, provenance and retraction/editorial warnings in `test/assistant.test.js`. BYOK, provider and model options, consent, generated cited answers, cancellation, caching, and usage/cost accounting remain. |
 | NRI-09 | Partial | Opt-in profiles, search, follow and block, bounded requests and private profile isolation verified. Verified ORCID ownership, posts, groups, publication sharing and moderation remain. |
 | NRI-10 | Partial | Collaboration requests and scoped project-summary invitations, acceptance/decline, revoke and access history are verified. Broader roles, notifications, shared notes and tasks remain. |
 | NRI-11 | Not started | Conversations, notification preferences and authorization remain. |
@@ -172,4 +181,4 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | NRI-18 | Partial | Local authentication, session revocation, account audit, authorization, encrypted PDF bytes, RTL/LTR and verified recovery are implemented. Team RBAC, MFA, account recovery, export/deletion, accessibility audit and administration remain. |
 | NRI-19 | Partial | Local restore and regression workflow configuration are implemented. Entitlements, approved hosting, operational monitoring and billing remain. |
 
-Next milestone: P2c, claim-to-source mapping and evidence review.
+Next milestone: NRI-08 provider integration and safeguards, followed by NRI-11 private messaging.
