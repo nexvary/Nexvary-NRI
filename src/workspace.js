@@ -1,4 +1,5 @@
 import { createDocumentHandler, resolveDocumentRoute } from './documents.js';
+import { createReferenceHandler, resolveReferenceRoute } from './references.js';
 import { readBoundedBody } from './request-body.js';
 import { normalizeAddress, verifyPassword } from './password.js';
 import { sessionLifetime } from './store.js';
@@ -16,7 +17,7 @@ export function resolveWorkspaceRoute(pathname) {
   if (pathname === '/workspace') return { kind: 'index' };
   const match = pathname.match(/^\/workspace\/projects\/([0-9a-f-]{36})(\/delete)?$/);
   if (match) return { kind: match[2] ? 'delete' : 'project', id: match[1] };
-  return resolveDocumentRoute(pathname);
+  return resolveDocumentRoute(pathname) ?? resolveReferenceRoute(pathname);
 }
 
 function acceptsPost(request) {
@@ -53,8 +54,9 @@ function projectFields(form) {
   };
 }
 
-export function createWorkspaceHandler(store) {
+export function createWorkspaceHandler(store, crossref) {
   const handleDocuments = createDocumentHandler(store);
+  const handleReferences = createReferenceHandler(store, crossref);
   let windowStarted = 0;
   let attempts = 0;
   let inFlight = 0;
@@ -66,7 +68,7 @@ export function createWorkspaceHandler(store) {
     };
     const postOnly = kind === 'delete' || kind === 'logout' || kind === 'delete-document';
     const allowed = postOnly ? ['POST'] : ['GET', 'HEAD'];
-    if (!postOnly && kind !== 'download-document') allowed.push('POST');
+    if (!postOnly && !['download-document', 'reference-projects'].includes(kind)) allowed.push('POST');
     const method = request.method;
     if (!allowed.includes(method)) {
       reply(405, null, { Allow: allowed.join(', ') });
@@ -137,6 +139,12 @@ export function createWorkspaceHandler(store) {
       return;
     }
 
+    const stillSignedIn = () => store.session(token)?.id === account.id;
+    if (['references', 'reference-projects'].includes(kind)) {
+      await handleReferences({ request, reply, redirect, route, lang, account, form, stillSignedIn });
+      return;
+    }
+
     if (['documents', 'document', 'delete-document', 'download-document'].includes(kind)) {
       if (kind === 'delete-document' && form.get('confirm') !== 'yes') {
         reply(400);
@@ -144,7 +152,7 @@ export function createWorkspaceHandler(store) {
       }
       await handleDocuments({
         request, reply, redirect, route, lang, account,
-        stillSignedIn: () => store.session(token)?.id === account.id,
+        stillSignedIn,
       });
       return;
     }

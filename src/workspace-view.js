@@ -18,6 +18,7 @@ const labels = {
   empty: ['Your projects will appear here after you create one.', 'ستظهر مشاريعك هنا بعد إنشاء أول مشروع.'],
   confirmProject: ['Confirm deletion of this project and its files', 'أؤكد حذف المشروع وكل ملفاته'],
   documents: ['Private PDFs', 'ملفات PDF الخاصة'],
+  references: ['Reference validator', 'التحقق من المراجع'],
   emptyDocuments: ['This project has no PDFs yet.', 'لم تُضف ملفات PDF إلى هذا المشروع بعد.'],
   backToProject: ['Back to the project', 'العودة إلى المشروع'],
   backToDocuments: ['Back to project files', 'العودة إلى ملفات المشروع'],
@@ -38,7 +39,7 @@ const labels = {
 };
 
 const entities = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
-function escape(value) {
+export function escapeHtml(value) {
   return value.replaceAll(/[&<>"']/g, (character) => entities[character]);
 }
 
@@ -49,6 +50,14 @@ export function workspacePath(lang, id) {
 export function documentsPath(lang, projectId, documentId) {
   const root = `/workspace/projects/${projectId}/documents`;
   return `${root}${documentId ? `/${documentId}` : ''}?lang=${lang}`;
+}
+
+export function referenceProjectsPath(lang) {
+  return `/workspace/reference-projects?lang=${lang}`;
+}
+
+export function projectReferencesPath(lang, id) {
+  return `/workspace/projects/${id}/references?lang=${lang}`;
 }
 
 export function loginPath(lang) {
@@ -96,11 +105,11 @@ export function workspacePage(lang, kind, options = {}) {
       return panel(t('documents'), path, `
         <section class="surface panel detail workspace-page">
           <a href="${workspacePath(lang, id)}">${t('backToProject')}</a>
-          <h1>${t('documents')}</h1><p dir="auto">${escape(project.title)}</p>
+          <h1>${t('documents')}</h1><p dir="auto">${escapeHtml(project.title)}</p>
           <section class="project-list">
             ${documents.length
               ? `<ul>${documents.map((item) => `
-                <li><a href="${documentsPath(lang, id, item.id)}"><bdi>${escape(item.title)}</bdi></a>
+                <li><a href="${documentsPath(lang, id, item.id)}"><bdi>${escapeHtml(item.title)}</bdi></a>
                   <small>${t('history')} · ${new Intl.NumberFormat(lang).format(item.versionCount)}</small></li>`).join('')}</ul>`
               : `<p>${t('emptyDocuments')}</p>`}
           </section>
@@ -113,13 +122,13 @@ export function workspacePage(lang, kind, options = {}) {
     return panel(t('history'), path, `
       <section class="surface panel detail workspace-page">
         <a href="${documentsPath(lang, id)}">${t('backToDocuments')}</a>
-        <h1 dir="auto">${escape(document.title)}</h1>
+        <h1 dir="auto">${escapeHtml(document.title)}</h1>
         <section class="project-list">
           <h2>${t('history')}</h2>
           <ol class="document-history">
             ${versions.map((item) => `
               <li><div><strong>${t('version')} ${numeric.format(item.number)}</strong><br>
-                <bdi>${escape(item.filename)}</bdi><br>
+                <bdi>${escapeHtml(item.filename)}</bdi><br>
                 <time datetime="${new Date(item.created_at).toISOString()}">${date.format(item.created_at)}</time> · ${numeric.format(item.size)} ${t('bytes')}
               </div><a class="action" href="${path}/versions/${item.number}?lang=${lang}">${t('download')}</a></li>`).join('')}
           </ol>
@@ -136,8 +145,8 @@ export function workspacePage(lang, kind, options = {}) {
   const editor = `
     ${feedback}
     <form method="post" action="${action}" class="workspace-form">
-      <label>${t('title')}<input name="title" dir="auto" maxlength="120" required value="${escape(values.title)}"></label>
-      <label>${t('description')}<textarea name="description" dir="auto" maxlength="2000" rows="5">${escape(values.description)}</textarea></label>
+      <label>${t('title')}<input name="title" dir="auto" maxlength="120" required value="${escapeHtml(values.title)}"></label>
+      <label>${t('description')}<textarea name="description" dir="auto" maxlength="2000" rows="5">${escapeHtml(values.description)}</textarea></label>
       <button class="action" type="submit">${t(id ? 'save' : 'create')}</button>
     </form>`;
 
@@ -145,8 +154,11 @@ export function workspacePage(lang, kind, options = {}) {
     return panel(t('workspace'), `/workspace/projects/${id}`, `
       <section class="surface panel detail workspace-page">
         <a href="${workspace}">${t('back')}</a>
-        <h1 dir="auto">${escape(values.title)}</h1>
-        <a class="action project-files" href="${documentsPath(lang, id)}">${t('documents')}</a>
+        <h1 dir="auto">${escapeHtml(values.title)}</h1>
+        <nav class="project-tools" aria-label="${t('workspace')}">
+          <a class="action project-files" href="${documentsPath(lang, id)}">${t('documents')}</a>
+          <a class="action" href="${projectReferencesPath(lang, id)}">${t('references')}</a>
+        </nav>
         ${editor}
         <form method="post" action="/workspace/projects/${id}/delete?lang=${lang}" class="delete-project">
           <label><input type="checkbox" name="confirm" value="yes" required> ${t('confirmProject')}</label>
@@ -158,13 +170,13 @@ export function workspacePage(lang, kind, options = {}) {
   return panel(t('workspace'), '/workspace', `
     <section class="surface panel detail workspace-page">
       <div class="workspace-heading">
-        <div><h1>${t('workspace')}</h1><p><bdi>${escape(account.email)}</bdi></p></div>
+        <div><h1>${t('workspace')}</h1><p><bdi>${escapeHtml(account.email)}</bdi></p></div>
         <form method="post" action="/logout?lang=${lang}"><button class="action" type="submit">${t('signOut')}</button></form>
       </div>
       <section class="project-list">
         <h2>${t('projects')}</h2>
         ${projects.length
-          ? `<ul>${projects.map((project) => `<li><a href="${workspacePath(lang, project.id)}"><bdi>${escape(project.title)}</bdi></a></li>`).join('')}</ul>`
+          ? `<ul>${projects.map((project) => `<li><a href="${workspacePath(lang, project.id)}"><bdi>${escapeHtml(project.title)}</bdi></a></li>`).join('')}</ul>`
           : `<p>${t('empty')}</p>`}
       </section>
       <section class="project-editor"><h2>${t('newProject')}</h2>${editor}</section>

@@ -303,7 +303,7 @@ small { font-size: .84rem; }
 .project-editor h2 { margin-block-end: .55rem; }
 .form-error { color: #ffb1b5; }
 .delete-project { display: flex; align-items: center; flex-wrap: wrap; gap: .7rem; }
-.delete-project .danger { color: #ffe0e3; border-color: #ed8b96; background: #542936; }
+.action.danger { color: #ffe0e3; border-color: #ed8b96; background: #542936; }
 
 .project-files { width: fit-content; }
 .workspace-form input[type="file"] { width: 100%; }
@@ -316,4 +316,19 @@ small { font-size: .84rem; }
   gap: .55rem;
   border-block-start: 1px solid #34465d;
   padding-block: .5rem;
+}
+
+.project-tools { display: flex; align-items: center; flex-wrap: wrap; row-gap: .65rem; }
+.project-tools :is(a, button) + :is(a, button) { margin-inline-start: .65rem; }
+.reference-record { margin-block-start: .7rem; }
+.reference-record h3 { margin: 0; }
+.reference-record h4 { margin: .6rem 0 .2rem; }
+.reference-meta { display: grid; gap: .35rem; margin-block: .55rem; }
+.reference-meta div { display: grid; grid-template-columns: minmax(7rem, .8fr) minmax(0, 1fr); gap: .55rem; }
+.reference-meta dt { color: var(--muted); }
+.reference-meta dd { margin-inline: 0; }
+.reference-notices li { display: flex; flex-wrap: wrap; row-gap: .35rem; }
+.reference-notices li > * + * { margin-inline-start: .55rem; }
+@media (max-width: 470px) {
+  .reference-meta div { grid-template-columns: minmax(0, 1fr); gap: .1rem; }
 }

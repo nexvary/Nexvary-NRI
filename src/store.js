@@ -4,9 +4,10 @@ import { dirname, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { bindDocumentKey } from './document-crypto.js';
 import { documentSchema, documentStore } from './document-store.js';
+import { referenceSchema, referenceStore } from './reference-store.js';
 
 export const sessionLifetime = 8 * 60 * 60;
-const schemaVersion = 2;
+const schemaVersion = 3;
 const schema = `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -50,7 +51,8 @@ function initialize(db, path) {
     const { user_version: version } = db.prepare('PRAGMA user_version').get();
     if (version > schemaVersion) throw new Error('The workspace database requires a newer NRI version.');
     if (version === 0) db.exec(schema);
-    if (version < 2) db.exec(documentSchema + 'PRAGMA user_version = 2;');
+    if (version < 2) db.exec(documentSchema);
+    if (version < 3) db.exec(referenceSchema + 'PRAGMA user_version = 3;');
     return bindDocumentKey(db, path);
   });
 }
@@ -71,8 +73,10 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
 
   const db = new DatabaseSync(path, { enableForeignKeyConstraints: true, timeout: 3000 });
   let documents;
+  let references;
   try {
     documents = documentStore(db, initialize(db, path), now, transact);
+    references = referenceStore(db, now, transact);
   } catch (error) {
     db.close();
     throw error;
@@ -95,6 +99,7 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
 
   return {
     documents,
+    references,
     close() {
       db.close();
     },
