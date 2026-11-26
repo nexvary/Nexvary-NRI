@@ -49,3 +49,9 @@
 - P4c merged into main at [`eba9742`](https://github.com/nexvary/Nexvary-NRI/commit/eba9742304654c26fc9b269b2201bfb4c597d6b4).
 - Added private, request-scoped CSV analysis, descriptive metrics, histogram, outlier flags and reproducible JSON export. 38/38 Node tests passed and browser verification exercised both locales.
 - Technology observatory follows.
+
+## 2026-11-26 · P4e technology observatory
+
+- P4d merged into main at [`db65e09`](https://github.com/nexvary/Nexvary-NRI/commit/db65e092b6775cb65bc15ea08223127c3e9f33f1).
+- Added private watchlists, saved searches, and dated source updates with preserved metadata. 39/39 Node tests passed. Browser verification used captured public Zenodo metadata in both locales.
+- Bilingual PDF and DOCX report generation follows.

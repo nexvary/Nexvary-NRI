@@ -1,5 +1,12 @@
 # Development status
 
+## P4e · Technology observatory · 2026-11-26
+
+Added private topic watchlists, saved library searches, and dated update notes with original reference snapshots and retrieval timestamps. Watchlist updates support keyword filtering and use manually selected project sources. No automated polling is configured.
+
+- 39/39 Node tests passed, including cross-account denials, date checks, filters and source snapshot retention.
+- Qt WebEngine verified both locales using captured public Zenodo metadata and an illustrative update note. Captures: [Arabic desktop](qa/p4e/observatory-ar-desktop.webp) · [English mobile](qa/p4e/observatory-en-mobile.webp).
+
 ## P4d · Descriptive scientific analytics · 2026-11-26
 
 Signed-in users can import a UTF-8 CSV file or paste CSV, select a numeric column and label its unit. The analysis calculates descriptive measures, histogram bins and potential IQR outliers. JSON export records the values, units, calculation version and results for reproduction. CSV data is processed in memory for the request.
@@ -127,7 +134,7 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | NRI-09 | Partial | Opt-in profiles, search, follow and block, bounded requests and private profile isolation verified. Verified ORCID ownership, posts, groups, publication sharing and moderation remain. |
 | NRI-10 | Partial | Collaboration request and recipient acceptance/decline are verified. Project invitations, roles, notes, tasks and access history remain. |
 | NRI-11 | Not started | Conversations, notification preferences and authorization remain. |
-| NRI-12 | Not started | Watchlists, dated updates and provenance remain. |
+| NRI-12 | Verified | Private watchlists, saved library searches, date-stamped manual updates, filters and provider provenance. |
 | NRI-13 | Verified | Bounded UTF-8 CSV import, numeric validation, descriptive metrics, histogram, IQR outlier flags, units and reproducible JSON export. |
 | NRI-14 | Not started | Learning content, exercises and progress remain. |
 | NRI-15 | Not started | PDF/DOCX report exports and bilingual templates remain. |

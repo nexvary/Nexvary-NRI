@@ -1,4 +1,5 @@
 import { createDocumentHandler, resolveDocumentRoute } from './documents.js';
+import { createObservatoryHandler, resolveObservatoryRoute } from './observatory.js';
 import { handleAnalytics } from './analytics.js';
 import { createNetworkHandler } from './network.js';
 import { libraryPage } from './library.js';
@@ -27,7 +28,7 @@ export function resolveWorkspaceRoute(pathname) {
   if (pathname === '/workspace') return { kind: 'index' };
   const match = pathname.match(/^\/workspace\/projects\/([0-9a-f-]{36})(\/delete)?$/);
   if (match) return { kind: match[2] ? 'delete' : 'project', id: match[1] };
-  return resolveDocumentRoute(pathname) ?? resolveReferenceRoute(pathname) ?? resolveEvidenceRoute(pathname) ?? resolveReadinessRoute(pathname) ?? resolveEconomicsRoute(pathname);
+  return resolveDocumentRoute(pathname) ?? resolveReferenceRoute(pathname) ?? resolveEvidenceRoute(pathname) ?? resolveReadinessRoute(pathname) ?? resolveEconomicsRoute(pathname) ?? resolveObservatoryRoute(pathname);
 }
 
 function acceptsPost(request) {
@@ -67,6 +68,7 @@ function projectFields(form) {
 export function createWorkspaceHandler(store, providers) {
   const handleDocuments = createDocumentHandler(store);
   const handleNetwork = createNetworkHandler(store);
+  const handleObservatory = createObservatoryHandler(store);
   const handleEconomics = createEconomicsHandler(store);
   const handleReadiness = createReadinessHandler(store);
   const handleEvidence = createEvidenceHandler(store);
@@ -153,6 +155,10 @@ export function createWorkspaceHandler(store, providers) {
       return;
     }
 
+    if (kind.startsWith('observatory')) {
+      handleObservatory({ request, reply, redirect, route, lang, account, form });
+      return;
+    }
     if (kind === 'analytics') {
       await handleAnalytics({ request, reply, lang, stillSignedIn: () => store.session(token)?.id === account.id });
       return;
