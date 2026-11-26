@@ -43,3 +43,9 @@
 - P4b merged into main at [`1401e0d`](https://github.com/nexvary/Nexvary-NRI/commit/1401e0df6992aba475cc775b823a3a4ea167cbe9).
 - Added opt-in discovery, follow/block and scoped collaboration requests. 36/36 Node tests passed. Bilingual browser acceptance verified profile opt-in and a local request.
 - Role-based project sharing and verified ORCID account linking remain separate release work.
+
+## 2026-11-26 · P4d scientific analytics
+
+- P4c merged into main at [`eba9742`](https://github.com/nexvary/Nexvary-NRI/commit/eba9742304654c26fc9b269b2201bfb4c597d6b4).
+- Added private, request-scoped CSV analysis, descriptive metrics, histogram, outlier flags and reproducible JSON export. 38/38 Node tests passed and browser verification exercised both locales.
+- Technology observatory follows.
