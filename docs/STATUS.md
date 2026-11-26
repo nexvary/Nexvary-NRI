@@ -1,5 +1,13 @@
 # Development status
 
+## P3 · Qualitative L-READY assessment · 2026-11-26
+
+Added private assessments for a specific intended use, with six independent dimensions, four qualitative categories, reviewed source links, limitations, reviewer and immutable revisions. Safety and authorization blockers take precedence. No aggregate score is calculated.
+
+- 32/32 Node tests passed, including blocker precedence, project isolation, reviewed-source requirements and rejection of stale revisions.
+- Qt WebEngine verified a blocked assessment and bilingual responsive layout. Captures: [Arabic desktop](qa/p3/readiness-ar-desktop.webp) · [English mobile](qa/p3/readiness-en-mobile.webp).
+- Governance and reviewer inputs are manually reported in the private workspace. Independent team reviews remain pending collaboration roles.
+
 ## P2d · Claim-source evidence and review · 2026-11-26
 
 Private projects now support claim statements, links to saved source snapshots, study type, limitations, supporting/conflicting/inconclusive relationships and an owner review decision with rationale. Evidence snapshots survive removal of the originating reference check. The owner can download a versioned JSON evidence matrix.
@@ -83,7 +91,7 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | NRI-03 | Partial | Project-bound PDF upload, metadata, encrypted persistence, version downloads and deletion are verified. Other formats, browsing by collection, search, reading, annotation, citation import/export and deduplication remain. |
 | NRI-04 | Partial | Crossref and OpenAlex DOI lookups, dated per-provider source links, correction/retraction metadata, per-provider local cache, rate limits and unknown/failure outcomes are verified. Side-by-side provider comparison view implemented. Agency resolution, additional providers, claim-to-source mapping and evidence review remain. |
 | NRI-05 | Partial | Claims, dated source snapshots, study type, limitations, conflicting evidence, owner review and JSON export are verified. Team reviewer roles and review revisions remain. |
-| NRI-06 | Partial | Tested six ordered dimensions and framework wording. Qualitative assessment, evidence history, reviewers and safety/authorization blocking remain. |
+| NRI-06 | Partial | Six ordered dimensions, four qualitative categories, project evidence links, revision history, reviewer and safety/authorization blockers are verified. Independent team reviewer roles remain. |
 | NRI-07 | Not started | Economic models, scenarios and exports remain. |
 | NRI-08 | Not started | Providers, consent, verification, limits and usage accounting remain. |
 | NRI-09 | Not started | Profiles, discovery, moderation and private sharing remain. |

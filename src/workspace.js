@@ -1,4 +1,5 @@
 import { createDocumentHandler, resolveDocumentRoute } from './documents.js';
+import { createReadinessHandler, resolveReadinessRoute } from './readiness.js';
 import { createEvidenceHandler, resolveEvidenceRoute } from './evidence.js';
 import { createReferenceHandler, resolveReferenceRoute } from './references.js';
 import { readBoundedBody } from './request-body.js';
@@ -18,7 +19,7 @@ export function resolveWorkspaceRoute(pathname) {
   if (pathname === '/workspace') return { kind: 'index' };
   const match = pathname.match(/^\/workspace\/projects\/([0-9a-f-]{36})(\/delete)?$/);
   if (match) return { kind: match[2] ? 'delete' : 'project', id: match[1] };
-  return resolveDocumentRoute(pathname) ?? resolveReferenceRoute(pathname) ?? resolveEvidenceRoute(pathname);
+  return resolveDocumentRoute(pathname) ?? resolveReferenceRoute(pathname) ?? resolveEvidenceRoute(pathname) ?? resolveReadinessRoute(pathname);
 }
 
 function acceptsPost(request) {
@@ -57,6 +58,7 @@ function projectFields(form) {
 
 export function createWorkspaceHandler(store, providers) {
   const handleDocuments = createDocumentHandler(store);
+  const handleReadiness = createReadinessHandler(store);
   const handleEvidence = createEvidenceHandler(store);
   const handleReferences = createReferenceHandler(store, providers);
   let windowStarted = 0;
@@ -70,7 +72,7 @@ export function createWorkspaceHandler(store, providers) {
     };
     const postOnly = kind === 'delete' || kind === 'logout' || kind === 'delete-document';
     const allowed = postOnly ? ['POST'] : ['GET', 'HEAD'];
-    if (!postOnly && !['download-document', 'reference-projects', 'evidence-projects', 'evidence-export'].includes(kind)) allowed.push('POST');
+    if (!postOnly && !['download-document', 'reference-projects', 'evidence-projects', 'evidence-export', 'readiness-projects'].includes(kind)) allowed.push('POST');
     const method = request.method;
     if (!allowed.includes(method)) {
       reply(405, null, { Allow: allowed.join(', ') });
@@ -138,6 +140,11 @@ export function createWorkspaceHandler(store, providers) {
     if (kind === 'logout') {
       store.revokeSession(token);
       redirect(loginPath(lang), { 'Set-Cookie': sessionCookie('', 0) });
+      return;
+    }
+
+    if (kind.startsWith('readiness')) {
+      handleReadiness({ request, reply, redirect, route, lang, account, form });
       return;
     }
 

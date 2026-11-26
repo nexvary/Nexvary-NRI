@@ -29,7 +29,7 @@ test('migrates v4, links a saved source to a claim, records human review and exp
     }, true);
     legacy.close();
     const raw = new DatabaseSync(dbPath);
-    raw.exec('DROP TABLE evidence_items; DROP TABLE claims; PRAGMA user_version = 4;');
+    raw.exec('DROP TABLE readiness_revisions; DROP TABLE evidence_items; DROP TABLE claims; PRAGMA user_version = 4;');
     raw.close();
     const store = openWorkspaceStore(dbPath);
     const ownerCookie = 'nri_session=' + store.newSession(owner);

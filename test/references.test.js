@@ -218,7 +218,7 @@ test('migrates a P1b database and persists reference snapshots and the local cac
     const document = store.documents.create(owner, project, { name: 'fixture.pdf', bytes: Buffer.from('test bytes') });
     store.close();
     const raw = new DatabaseSync(path);
-    raw.exec('DROP TABLE evidence_items; DROP TABLE claims; DROP TABLE project_references; DROP TABLE reference_cache; PRAGMA user_version = 2;');
+    raw.exec('DROP TABLE readiness_revisions; DROP TABLE evidence_items; DROP TABLE claims; DROP TABLE project_references; DROP TABLE reference_cache; PRAGMA user_version = 2;');
     raw.close();
     store = openWorkspaceStore(path, now);
     const record = { doi: unknown, provider: 'crossref', status: 'not-found', checkedAt: fixtureTime, metadata: null };
