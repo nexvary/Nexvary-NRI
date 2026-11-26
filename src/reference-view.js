@@ -1,5 +1,5 @@
 import { crossrefUrl, resolverUrl } from './crossref.js';
-import { openAlexUrl } from './openalex.js';
+import { openAlexUrl, safeOpenAccessUrl } from './openalex.js';
 import { escapeHtml, projectReferencesPath, workspacePath } from './workspace-view.js';
 
 const copy = {
@@ -13,8 +13,7 @@ const copy = {
   refresh: ['Check again', 'أعد التحقق'],
   remove: ['Remove', 'أزل المرجع'],
   provider: ['Provider', 'مزوّد البيانات'],
-  disclosureCrossref: ['A lookup sends the entered DOI to Crossref when a fresh check is needed. A saved result shows the original retrieval time.', 'يُرسَل معرّف DOI إلى Crossref عند الحاجة إلى فحص جديد.'],
-  disclosureOpenalex: ['A lookup sends the entered DOI to OpenAlex when a fresh check is needed. A saved result shows the original retrieval time.', 'يُرسَل معرّف DOI إلى OpenAlex عند الحاجة إلى فحص جديد.'],
+  disclosure: ['A fresh check sends the entered DOI to the selected provider. Saved results show their original retrieval times.', 'يُرسَل معرّف DOI إلى المزوّد المحدد عند إجراء فحص جديد. تُظهر النتائج المحفوظة وقت جلبها الأصلي.'],
   saved: ['Saved references', 'المراجع المحفوظة'],
   empty: ['No DOI checks saved for this project.', 'لا توجد نتائج تحقق محفوظة لهذا المشروع.'],
   source: ['Source', 'المصدر'],
@@ -30,6 +29,8 @@ const copy = {
   authors: ['Authors', 'المؤلفون'],
   moreAuthors: ['and others', 'وآخرون'],
   type: ['Record type reported by Crossref', 'نوع السجل بحسب Crossref'],
+  openalexType: ['Record type reported by OpenAlex', 'نوع السجل بحسب OpenAlex'],
+  unknownRetraction: ['OpenAlex did not flag a retraction. Retraction status remains unverified.', 'لم يُشر OpenAlex إلى سحب السجل. لا تزال حالة السحب غير مؤكدة.'],
   preprint: ['Preprint', 'مسودة قبل النشر'],
   issued: ['Issue date', 'تاريخ الإصدار'],
   updatedBy: ['Updates affecting this work', 'تحديثات تخص هذا العمل'],
@@ -98,7 +99,7 @@ export function referencePage(lang, options = {}) {
     const type = data.type === 'posted-content' && data.subtype === 'preprint'
       ? t('preprint') : [data.type, data.subtype].filter(Boolean).join(' · ');
     const authors = data.authors.join(', ') + (data.moreAuthors ? ` · ${t('moreAuthors')}` : '');
-    return `<dl class="reference-meta">${row('type', type)}${row('venue', data.venue)}${row('publisher', data.publisher)}${row('authors', authors)}${row('issued', data.issued)}</dl>
+    return `<dl class="reference-meta">${row('title', data.title)}${row('type', type)}${row('venue', data.venue)}${row('publisher', data.publisher)}${row('authors', authors)}${row('issued', data.issued)}</dl>
       ${notices(data.updatedBy, 'updatedBy')}${notices(data.updates, 'updates')}
       ${data.updatesTruncated ? `<p>${t('moreNotices')}</p>` : ''}
       ${data.updatedBy.length || data.updates.length ? '' : `<p>${t('noUpdates')}</p>`}`;
@@ -107,9 +108,10 @@ export function referencePage(lang, options = {}) {
   const openalexMeta = (data) => {
     const row = (key, value) => value ? `<div><dt>${t(key)}</dt><dd dir="auto">${escapeHtml(value)}</dd></div>` : '';
     const authors = data.authors.join(', ') + (data.moreAuthors ? ` · ${t('moreAuthors')}` : '');
-    return `<dl class="reference-meta">${row('title', data.title)}${row('type', data.type)}${row('venue', data.venue)}${row('publisher', data.publisher)}${row('authors', authors)}${row('issued', data.issued)}</dl>
-      ${data.isRetracted ? `<p class="tag danger">${t('retracted')}</p>` : ''}
-      ${data.openAccessUrl ? `<p><a href="${escapeHtml(data.openAccessUrl)}">${t('openAccess')}</a></p>` : ''}`;
+    const openAccessUrl = safeOpenAccessUrl(data.openAccessUrl);
+    return `<dl class="reference-meta">${row('title', data.title)}${row('openalexType', data.type)}${row('venue', data.venue)}${row('publisher', data.publisher)}${row('authors', authors)}${row('issued', data.issued)}</dl>
+      ${data.isRetracted ? `<p class="tag danger">${t('retracted')}</p>` : `<p>${t('unknownRetraction')}</p>`}
+      ${openAccessUrl ? `<p><a href="${escapeHtml(openAccessUrl)}">${t('openAccess')}</a></p>` : ''}`;
   };
 
   const renderMeta = (record) => {
@@ -128,8 +130,7 @@ export function referencePage(lang, options = {}) {
   const recordsHtml = [...byDoi.entries()].map(([doi, byProvider]) => {
     const crossrefRecord = byProvider.crossref;
     const openalexRecord = byProvider.openalex;
-    const primary = crossrefRecord ?? openalexRecord;
-    const titleText = primary.metadata?.title || doi;
+    const titleText = crossrefRecord?.metadata?.title || openalexRecord?.metadata?.title || doi;
 
     const renderRecord = (record) => {
       if (!record) return '';
@@ -164,8 +165,6 @@ export function referencePage(lang, options = {}) {
     </article>`;
   }).join('');
 
-  const disclosureKey = provider === 'openalex' ? 'disclosureOpenalex' : 'disclosureCrossref';
-
   return {
     title, path,
     html: `
@@ -179,7 +178,7 @@ export function referencePage(lang, options = {}) {
             <label><input type="radio" name="provider" value="crossref"${provider !== 'openalex' ? ' checked' : ''}> Crossref</label>
             <label><input type="radio" name="provider" value="openalex"${provider === 'openalex' ? ' checked' : ''}> OpenAlex</label>
           </fieldset>
-          <small id="doi-disclosure">${t(disclosureKey)}</small>
+          <small id="doi-disclosure">${t('disclosure')}</small>
           <button class="action" name="action" value="check">${t('lookup')}</button>
         </form>
         ${error ? `<p class="form-error" role="alert">${t(error)}</p>` : ''}

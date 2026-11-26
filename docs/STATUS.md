@@ -1,5 +1,12 @@
 # Development status
 
+## P2b · OpenAlex comparison · 2026-11-26
+
+[PR #5](https://github.com/nexvary/Nexvary-NRI/pull/5) adds provider-specific snapshots and cache entries, schema v4 migration, and bilingual comparison. The acceptance changes verify the DOI returned by OpenAlex, restrict open-access links to reported HTTPS locations, and preserve provider attribution and unknown retraction status.
+
+- Node.js 24.22.3: 28/28 tests pass. Coverage includes provider rate limits, v3 migration, independent removal, mismatched DOI rejection and open-access link validation.
+- Live Crossref and OpenAlex adapter checks returned public metadata for DOI `10.1038/nature14539`.
+
 ## P2b · OpenAlex multi-provider DOI checks with side-by-side comparison · 2026-11-26
 
 P2b starts from P2a at `fa4318c`. All changes are on branch `feature/p2b-openalex-provider`. It adds the OpenAlex Works API as an independent reference provider with per-provider caching, schema migration, and a side-by-side comparison view that prompts users to check both providers and shows differences between results.
@@ -51,7 +58,7 @@ The audit started at `0136a7f` on `main`. The tree contained only AGENTS.md, the
 
 ## Functional acceptance
 
-Evidence for partial items comes from the commits and tests listed above. A planned module route alone leaves that requirement in **Not started**.
+Compared all 19 requirements with the application routes, persistence, renderer and test suite on the P2b branch. Modules with only shell navigation are **Not started**. Dashboard data continues to come from the labeled fixtures in `src/content.js`. The workspace, file and reference handlers have functional tests, and About and L-READY shell behavior is covered in `test/shell.test.js`.
 
 | ID | Status | Implemented evidence and remaining acceptance |
 |---|---|---|

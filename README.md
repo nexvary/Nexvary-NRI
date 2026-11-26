@@ -29,9 +29,9 @@ NRI creates a 32-byte key in `<database path>.key` and encrypts PDF bytes in SQL
 
 ## Check references by DOI
 
-Open **Reference validator**, choose a project, and enter a DOI or a DOI link. NRI checks Crossref and saves its result, provider link and retrieval time in that project. Each result can be checked again or removed from the project.
+Open **Reference validator**, choose a project, and enter a DOI or a DOI link. Choose Crossref or OpenAlex. NRI saves the result, provider link and retrieval time in that project. Each result can be checked again or removed from the project.
 
-The public Crossref API is used on demand. The request contains the entered DOI, with no project or document contents. A successful result can be reused from the local account cache for up to 24 hours. A missing result is specific to Crossref. See the [reference architecture decision](docs/decisions/0004-crossref-reference-provenance.md).
+The public APIs are used on demand without a paid API key. The request contains the entered DOI, with no project or document contents. A successful result can be reused from the local account cache for up to 24 hours. A missing result is specific to the selected provider. Save both results to compare their metadata and provenance. See the [reference architecture decision](docs/decisions/0004-crossref-reference-provenance.md).
 
 - [Product charter](docs/PROJECT.md)
 - [Functional acceptance baseline](docs/REQUIREMENTS.md)

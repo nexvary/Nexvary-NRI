@@ -1,9 +1,21 @@
+import { normalizeDoi } from './crossref.js';
+
 const api = 'https://api.openalex.org/works/doi:';
 const responseLimit = 2 * 1024 * 1024;
 const requestInterval = 1000;
 
 function text(value, limit = 400) {
   return typeof value === 'string' ? value.trim().slice(0, limit) : '';
+}
+
+export function safeOpenAccessUrl(value) {
+  try {
+    const url = new URL(text(value, 2048));
+    if (url.protocol === 'https:' && !url.username && !url.password) return url.href;
+  } catch {
+    return '';
+  }
+  return '';
 }
 
 function normalizeWork(work) {
@@ -22,7 +34,11 @@ function normalizeWork(work) {
     ? String(work.publication_year)
     : '';
   const isRetracted = work.is_retracted === true;
-  const openAccessUrl = text(primary.pdf_url ?? primary.landing_page_url);
+  const best = work.best_oa_location;
+  const openAccessUrl = [
+    best?.pdf_url, best?.landing_page_url,
+    ...(primary.is_oa === true ? [primary.pdf_url, primary.landing_page_url] : []),
+  ].map(safeOpenAccessUrl).find(Boolean) ?? '';
   return { title, venue, publisher, authors, moreAuthors, type, issued: year, isRetracted, openAccessUrl };
 }
 
@@ -64,7 +80,7 @@ export function createOpenAlexClient({ fetchRecord = fetch, now = Date.now } = {
     nextAllowed = start + requestInterval;
     try {
       const response = await fetchRecord(openAlexUrl(doi), {
-        headers: { Accept: 'application/json', 'User-Agent': 'Nexvary-NRI/0.5.0 (mailto:info@nexvary.com)' },
+        headers: { Accept: 'application/json', 'User-Agent': 'Nexvary-NRI/0.4.0' },
         redirect: 'error',
         signal: AbortSignal.timeout(8000),
       });
@@ -81,7 +97,7 @@ export function createOpenAlexClient({ fetchRecord = fetch, now = Date.now } = {
         return { status: 'unavailable' };
       }
       const payload = await readJson(response);
-      if (!payload || typeof payload !== 'object') return { status: 'unavailable' };
+      if (normalizeDoi(payload?.doi) !== doi) return { status: 'unavailable' };
       return { status: 'found', checkedAt: now(), metadata: normalizeWork(payload) };
     } catch {
       return { status: 'unavailable' };

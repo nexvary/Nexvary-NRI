@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { test } from 'node:test';
-import { createCrossrefClient, crossrefUrl, normalizeDoi } from '../src/crossref.js';
+import { createCrossrefClient, crossrefUrl, normalizeDoi, resolverUrl } from '../src/crossref.js';
 import { createOpenAlexClient, openAlexUrl } from '../src/openalex.js';
 import { createApp } from '../src/server.js';
 import { openWorkspaceStore } from '../src/store.js';
@@ -254,6 +254,7 @@ test('normalizes OpenAlex work metadata and handles retraction flag', async () =
     is_retracted: false,
     primary_location: {
       source: { display_name: 'Test Journal', host_organization_name: 'Test Publisher' },
+      is_oa: true,
       landing_page_url: 'https://example.org/landing',
       pdf_url: null,
     },
@@ -352,7 +353,7 @@ test('saves OpenAlex DOI results alongside Crossref and enables comparison', asy
       assert.equal(url, openAlexUrl(doi));
       return Response.json({
         id: 'https://openalex.org/W1',
-        doi: 'https://doi.org/' + doi,
+        doi: resolverUrl(doi),
         title: 'OpenAlex Title',
         type: 'article',
         publication_year: 2023,
@@ -484,4 +485,16 @@ test('migrates a P2a database (version 3) to version 4 and preserves existing re
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+test('rejects mismatched OpenAlex records and restricts links to reported open-access locations', async () => {
+  const doi = '10.5555/nri-test';
+  async function fetchWork(work) {
+    return createOpenAlexClient({ fetchRecord: async () => Response.json(work) })(doi);
+  }
+  assert.deepEqual(await fetchWork({ doi: '10.5555/other-work' }), { status: 'unavailable' });
+  const work = { doi, primary_location: { landing_page_url: 'https://example.org/paywalled' } };
+  assert.equal((await fetchWork(work)).metadata.openAccessUrl, '');
+  work.best_oa_location = { pdf_url: 'javascript:alert(1)', landing_page_url: 'https://example.org/repository' };
+  assert.equal((await fetchWork(work)).metadata.openAccessUrl, 'https://example.org/repository');
 });
