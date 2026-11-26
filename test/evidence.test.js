@@ -29,7 +29,17 @@ test('migrates v4, links a saved source to a claim, records human review and exp
     }, true);
     legacy.close();
     const raw = new DatabaseSync(dbPath);
-    raw.exec('DROP TABLE observatory_updates; DROP TABLE observatory_topics; DROP TABLE researcher_request_events; DROP TABLE researcher_links; DROP TABLE researcher_profiles; DROP TABLE economic_scenarios; DROP TABLE readiness_revisions; DROP TABLE evidence_items; DROP TABLE claims; PRAGMA user_version = 4;');
+    raw.exec(`DROP TABLE security_events;
+      DROP TABLE observatory_updates;
+      DROP TABLE observatory_topics;
+      DROP TABLE researcher_request_events;
+      DROP TABLE researcher_links;
+      DROP TABLE researcher_profiles;
+      DROP TABLE economic_scenarios;
+      DROP TABLE readiness_revisions;
+      DROP TABLE evidence_items;
+      DROP TABLE claims;
+      PRAGMA user_version = 4;`);
     raw.close();
     const store = openWorkspaceStore(dbPath);
     const ownerCookie = 'nri_session=' + store.newSession(owner);
