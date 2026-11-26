@@ -29,3 +29,10 @@ jobs:
         run: |
           export NRI_REPORT_PYTHON="$RUNNER_TEMP/nri-report-python/bin/python"
           npm test
+      - name: Capture Arabic and English Assistant layouts
+        run: node scripts/assistant-browser-qa.mjs "$RUNNER_TEMP/nri-assistant-qa"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: nri-assistant-visual-qa
+          path: ${{ runner.temp }}/nri-assistant-qa/*.webp
+          if-no-files-found: error
