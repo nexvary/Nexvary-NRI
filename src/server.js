@@ -49,7 +49,7 @@ export function createApp(store = openWorkspaceStore(), {
     };
 
     if (route) {
-      const section = { reference: 'references', evidence: 'evidence', readiness: 'l-ready', economics: 'economics', library: 'library', network: 'network', collaboration: 'collaboration', analytics: 'analytics', observatory: 'observatory', report: 'reports', settings: 'settings', sharing: 'collaboration' };
+      const section = { reference: 'references', evidence: 'evidence', readiness: 'l-ready', economics: 'economics', library: 'library', network: 'network', collaboration: 'collaboration', analytics: 'analytics', observatory: 'observatory', report: 'reports', settings: 'settings', sharing: 'collaboration', education: 'education' };
       const view = Object.entries(section).find(([key]) => route.kind.startsWith(key))?.[1] ?? 'research';
       const reply = (status, page, headers, body) => {
         const privateHeaders = { 'Cache-Control': 'no-store', ...headers };
@@ -83,7 +83,7 @@ export function createApp(store = openWorkspaceStore(), {
       redirect(`/workspace/report-projects?lang=${lang}`);
       return;
     }
-    if (pathname === '/' && ['network', 'collaboration', 'analytics', 'observatory', 'settings'].includes(view)) {
+    if (pathname === '/' && ['network', 'collaboration', 'analytics', 'observatory', 'settings', 'education'].includes(view)) {
       redirect(`/workspace/${view}?lang=${lang}`);
       return;
     }

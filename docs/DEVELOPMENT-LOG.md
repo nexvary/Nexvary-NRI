@@ -73,3 +73,8 @@
 - P7 merged into main at [`45bbdde`](https://github.com/nexvary/Nexvary-NRI/commit/45bbddee57d6e36f87d85caedefeb7722c270f44) after [GitHub Actions run 45901615488](https://github.com/nexvary/Nexvary-NRI/actions/runs/45901615488) succeeded.
 - Added explicit summary-reader invitations with acceptance, decline, revoke and block-driven access removal. 44/44 local tests passed, and both locales were exercised in the browser.
 - Shared notes, tasks and wider roles remain pending. Optional AI, verified ORCID OAuth, production identity and billing still need external credentials, defined entitlements or owner operating decisions as applicable.
+
+## 2026-11-27 · P7c research learning library
+
+- P7b merged into main at [`d8b6a5f`](https://github.com/nexvary/Nexvary-NRI/commit/d8b6a5f335ef76e458a2fe04cdc5aa5ebc3b888d) after [GitHub Actions run 45902068331](https://github.com/nexvary/Nexvary-NRI/actions/runs/45902068331) succeeded.
+- Added two bilingual lessons with local scoring and a descriptive-statistics simulation. 45/45 local tests passed with PDF/DOCX rendering enabled. Both locales were exercised in Qt WebEngine.

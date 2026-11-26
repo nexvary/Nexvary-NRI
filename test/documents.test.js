@@ -196,6 +196,7 @@ test('migrates a P1a database and persists encrypted files across restarts', asy
       DROP TABLE document_versions;
       DROP TABLE documents;
       DROP TABLE document_key;
+      DROP TABLE lesson_progress;
       DROP TABLE project_share_events;
       DROP TABLE project_shares;
       DROP TABLE security_events;

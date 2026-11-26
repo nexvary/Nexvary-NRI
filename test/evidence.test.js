@@ -29,7 +29,8 @@ test('migrates v4, links a saved source to a claim, records human review and exp
     }, true);
     legacy.close();
     const raw = new DatabaseSync(dbPath);
-    raw.exec(`DROP TABLE project_share_events;
+    raw.exec(`DROP TABLE lesson_progress;
+      DROP TABLE project_share_events;
       DROP TABLE project_shares;
       DROP TABLE security_events;
       DROP TABLE observatory_updates;
