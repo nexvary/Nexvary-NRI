@@ -1,5 +1,14 @@
 # Development status
 
+## P1b · Private PDF uploads and versions · 2026-11-26
+
+P1b starts from draft P1a at `9780ae5`. Commit `185df9207e1eb952252d81f0c5c7b75396cb2a2f` adds private PDFs inside projects, immutable versions with file name/date/size, downloads by version and confirmed file deletion. It migrates P1a SQLite data and encrypts PDF bytes with a separate local key. See the [P1b architecture decision](decisions/0003-private-pdf-versions.md) and [run instructions](../README.md).
+
+- `npm test` passed **17/17** on Node.js 24.22.3. It covered intact attachment downloads, sequential and concurrent uploads, cross-account and cross-project denial, rejected file size/type/origin, cascade deletion, database migration and restart, missing or wrong key, and authentication-tag failure.
+- Qt WebEngine verified the project-to-files path, two PDF uploads using the browser file input, both version links, and layout at the Arabic desktop and English mobile widths. The attachment bytes and response headers were verified separately by the HTTP suite. Full keyboard traversal and the screen-reader audit remain open.
+- Running captures with synthetic data: [Arabic desktop, 1536×900](qa/p1b/history-ar-desktop.webp) and [English mobile, 390×844](qa/p1b/history-en-mobile.webp).
+- Local preview with an 8 MiB per-PDF limit and plaintext file and project metadata. Rich library tools, other file formats, malware scanning, encrypted metadata, key rotation, production hosting and backup orchestration remain pending. No paid services or deployments were used.
+
 ## P1a · Local accounts and private projects · 2026-11-26
 
 P1a starts from the open P0 draft at `8ff5ccf`. Commit `41adf6020f0a167658c621a4f7afcbbae32edcd4` adds terminal-provisioned accounts, sign-in and sign-out, persistent personal project workspaces and bilingual create, view, edit and delete actions. See the [P1a architecture decision](decisions/0002-local-private-workspace.md) and [run instructions](../README.md).
@@ -27,8 +36,8 @@ Evidence for partial items comes from the commits and tests listed above. A plan
 | ID | Status | Implemented evidence and remaining acceptance |
 |---|---|---|
 | NRI-01 | Partial | Tested navigation, RTL/LTR, and labeled synthetic metrics and activity. Real metrics, quick actions, ORCID, operational UI states, and tenant isolation remain. |
-| NRI-02 | Partial | Personal project CRUD and cross-account access denial are verified. Manuscripts, versions, authors, tags, search, notes, tasks, collaboration, publication status and DOI remain. |
-| NRI-03 | Not started | Library persistence, document handling, reading and citation tools remain. |
+| NRI-02 | Partial | Personal project CRUD, project PDF version history and access denial are verified. Rich manuscript records, authors, tags, search, notes, tasks, collaboration, publication status and DOI remain. |
+| NRI-03 | Partial | Project-bound PDF upload, metadata, encrypted persistence, version downloads and deletion are verified. Other formats, browsing by collection, search, reading, annotation, citation import/export and deduplication remain. |
 | NRI-04 | Not started | Provider adapters, resolution, comparison and provenance remain. |
 | NRI-05 | Not started | Claim modeling, evidence review and exports remain. |
 | NRI-06 | Partial | Tested six ordered dimensions and framework wording. Qualitative assessment, evidence history, reviewers and safety/authorization blocking remain. |
@@ -43,7 +52,7 @@ Evidence for partial items comes from the commits and tests listed above. A plan
 | NRI-15 | Not started | PDF/DOCX report exports and bilingual templates remain. |
 | NRI-16 | Partial | System About view shows the purpose, framework wording, build version and documentation links. Changelog, licensing, privacy, terms and support content remain. |
 | NRI-17 | Partial | Separate developer view identifies Nexvary Inc. and links to the official company site. Dedicated confirmed contact information remains. |
-| NRI-18 | Partial | Local sign-in/out, session expiry and personal project boundaries are tested, along with RTL/LTR. Team RBAC, MFA, recovery, user settings, accessibility audit and administration remain. |
+| NRI-18 | Partial | Local session lifecycle, project and PDF boundaries, PDF-byte encryption and RTL/LTR are verified. Team RBAC, MFA, recovery, user settings, full accessibility audit and administration remain. |
 | NRI-19 | Not started | Entitlements, billing, production deployment and recovery remain. |
 
-Next milestone: P1b private documents and version metadata. Define storage encryption and access rules first, then verify project-bound uploads and downloads across two personal workspaces.
+Next milestone: a bounded P2 reference-validation slice for DOI resolution and dated provider metadata. Add evidence review after provenance and unknown states are testable with reproducible fixtures.
