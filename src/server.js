@@ -3,48 +3,87 @@ import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { modules } from './content.js';
 import { render } from './render.js';
+import { openWorkspaceStore, workspaceDatabasePath } from './store.js';
+import { createWorkspaceHandler, resolveWorkspaceRoute } from './workspace.js';
+import { workspacePath } from './workspace-view.js';
 
 const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 const stylesheet = readFileSync(new URL('../public/styles.css', import.meta.url));
+const securityHeaders = {
+  'Content-Security-Policy': "default-src 'none'; style-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'same-origin',
+};
 
-export function createApp() {
-  return createServer((req, res) => {
-    const headers = {
-      'Content-Security-Policy': "default-src 'none'; style-src 'self'; base-uri 'none'; frame-ancestors 'none'",
-      'X-Content-Type-Options': 'nosniff',
+export function createApp(store = openWorkspaceStore()) {
+  const workspace = createWorkspaceHandler(store);
+
+  async function handle(request, response) {
+    if (!request.url?.startsWith('/')) {
+      response.writeHead(400, securityHeaders).end();
+      return;
+    }
+    const { pathname, searchParams } = new URL(`http://localhost${request.url}`);
+    const lang = searchParams.get('lang') === 'en' ? 'en' : 'ar';
+    const route = resolveWorkspaceRoute(pathname);
+
+    const redirect = (location, headers) => {
+      response.writeHead(303, { ...securityHeaders, 'Cache-Control': 'no-store', Location: location, ...headers }).end();
     };
 
-    if (req.method !== 'GET' && req.method !== 'HEAD') {
-      res.writeHead(405, { ...headers, Allow: 'GET, HEAD' }).end();
+    const sendPage = (status, view, page, headers) => {
+      const answer = request.method === 'HEAD' ? undefined : render({ lang, view, version, page });
+      response.writeHead(status, {
+        ...securityHeaders, 'Content-Type': 'text/html; charset=utf-8', 'Content-Language': lang, ...headers,
+      }).end(answer);
+    };
+
+    if (route) {
+      const reply = (status, page, headers) => {
+        const privateHeaders = { 'Cache-Control': 'no-store', ...headers };
+        if (page) sendPage(status, 'research', page, privateHeaders);
+        else response.writeHead(status, { ...securityHeaders, ...privateHeaders }).end();
+      };
+      await workspace({ request, reply, redirect, route, lang });
       return;
     }
-
-    if (!req.url?.startsWith('/')) {
-      res.writeHead(400, headers).end();
+    if (request.method !== 'GET' && request.method !== 'HEAD') {
+      response.writeHead(405, { ...securityHeaders, Allow: 'GET, HEAD' }).end();
       return;
     }
-
-    const { pathname, searchParams } = new URL(`http://localhost${req.url}`);
     if (pathname === '/styles.css') {
-      res.writeHead(200, { ...headers, 'Content-Type': 'text/css; charset=utf-8' });
-      res.end(req.method === 'HEAD' ? undefined : stylesheet);
+      response.writeHead(200, { ...securityHeaders, 'Content-Type': 'text/css; charset=utf-8' });
+      response.end(request.method === 'HEAD' ? undefined : stylesheet);
       return;
     }
 
-    const lang = searchParams.get('lang') === 'en' ? 'en' : 'ar';
-    const requestedView = searchParams.get('view') ?? 'dashboard';
-    const available = pathname === '/' && (Object.hasOwn(modules, requestedView) || requestedView === 'developer');
-    const view = available ? requestedView : 'not-found';
+    const view = searchParams.get('view') ?? 'dashboard';
+    if (pathname === '/' && view === 'research') {
+      redirect(workspacePath(lang));
+      return;
+    }
+    const available = pathname === '/' && (Object.hasOwn(modules, view) || view === 'developer');
+    sendPage(available ? 200 : 404, available ? view : 'not-found');
+  }
 
-    res.writeHead(available ? 200 : 404, { ...headers, 'Content-Type': 'text/html; charset=utf-8', 'Content-Language': lang });
-    res.end(req.method === 'HEAD' ? undefined : render({ lang, view, version }));
+  const app = createServer({ requestTimeout: 15_000 }, (request, response) => {
+    handle(request, response).catch((error) => {
+      console.error('NRI HTTP request failed:', error.code ?? error.name);
+      if (response.headersSent) response.destroy();
+      else response.writeHead(500, { ...securityHeaders, 'Cache-Control': 'no-store' }).end();
+    });
   });
+  app.once('close', () => store.close());
+  return app;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const port = Number(process.env.PORT ?? 3000);
   const host = process.env.HOST ?? '127.0.0.1';
-  const app = createApp().listen(port, host, () => {
+  if (!['127.0.0.1', '::1', 'localhost'].includes(host)) {
+    throw new Error('The private workspace preview requires a loopback host.');
+  }
+  const app = createApp(openWorkspaceStore(workspaceDatabasePath())).listen(port, host, () => {
     const { address, port: selectedPort } = app.address();
     const displayAddress = address.includes(':') ? `[${address}]` : address;
     console.log(`NRI preview: http://${displayAddress}:${selectedPort}`);

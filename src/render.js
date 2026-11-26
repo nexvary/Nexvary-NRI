@@ -9,7 +9,7 @@ function icon(glyph) {
   return `<span class="icon" aria-hidden="true">${glyph}</span>`;
 }
 
-export function render({ lang, view, version }) {
+export function render({ lang, view, version, page }) {
   const tr = (pair) => pair[lang === 'ar' ? 1 : 0];
   const t = (key) => tr(copy[key]);
   const href = (target, language = lang) => `/?lang=${language}&amp;view=${target}`;
@@ -22,7 +22,7 @@ export function render({ lang, view, version }) {
   const dimensionList = `<ul class="dimensions">${dimensions.map(([letter, glyph, color, name]) =>
     `<li class="${color}">${icon(glyph)}<bdi>${letter}</bdi><small>${tr(name)}</small></li>`).join('')}</ul>`;
   const isModule = Object.hasOwn(modules, view);
-  const title = isModule ? label(view) : t(view === 'developer' ? 'aboutDeveloper' : 'unknown');
+  const title = page?.title ?? (isModule ? label(view) : t(view === 'developer' ? 'aboutDeveloper' : 'unknown'));
   const direction = lang === 'ar' ? 'rtl' : 'ltr';
   const dashboard = () => `
     <section class="hero surface" aria-labelledby="hero-title">
@@ -90,12 +90,13 @@ export function render({ lang, view, version }) {
       ${view === 'research' || view === 'library' ? `<p>${t('empty')}</p>` : ''}
       <a class="action" href="${href('dashboard')}">${t('home')}</a>
     </section>`;
-  const content = view === 'dashboard' ? dashboard()
+  const content = page?.html ?? (view === 'dashboard' ? dashboard()
     : view === 'about' || view === 'developer' ? about()
       : isModule ? detail()
-        : `<section class="surface panel detail"><h1>${title}</h1><a class="action" href="${href('dashboard')}">${t('home')}</a></section>`;
+        : `<section class="surface panel detail"><h1>${title}</h1><a class="action" href="${href('dashboard')}">${t('home')}</a></section>`);
   const otherLanguage = lang === 'ar' ? 'en' : 'ar';
   const validView = isModule || view === 'developer' ? view : 'dashboard';
+  const languageLink = page ? `${page.path}?lang=${otherLanguage}` : href(validView, otherLanguage);
   return `<!doctype html>
 <html lang="${lang}" dir="${direction}">
 <head>
@@ -110,7 +111,7 @@ export function render({ lang, view, version }) {
   <header class="topbar">
     <a class="wordmark" href="${href('dashboard')}" lang="en" dir="ltr">NEXVARY <em>NRI</em><span>Research Intelligence</span></a>
     <nav class="language" aria-label="${t('language')}">
-      <a href="${href(validView, otherLanguage)}" hreflang="${otherLanguage}" lang="${otherLanguage}" dir="auto">${icon('🌐')}${otherLanguage === 'ar' ? 'العربية' : 'English'}</a>
+      <a href="${languageLink}" hreflang="${otherLanguage}" lang="${otherLanguage}" dir="auto">${icon('🌐')}${otherLanguage === 'ar' ? 'العربية' : 'English'}</a>
     </nav>
   </header>
   <div class="layout">
