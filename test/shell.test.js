@@ -40,10 +40,11 @@ test('serves a bilingual dashboard with explicit fixtures and API state', async 
 
 test('navigates to every module and preserves its view across language changes', async () => {
   for (const [id, module] of Object.entries(modules)) {
-    if (id === 'research') {
-      const start = await fetch(`${base}/?lang=en&view=research`, { redirect: 'manual' });
+    if (id === 'research' || id === 'references') {
+      const start = await fetch(`${base}/?lang=en&view=${id}`, { redirect: 'manual' });
       assert.equal(start.status, 303);
-      assert.equal(start.headers.get('location'), '/workspace?lang=en');
+      const destination = id === 'research' ? '/workspace' : '/workspace/reference-projects';
+      assert.equal(start.headers.get('location'), destination + '?lang=en');
       continue;
     }
     const response = await fetch(`${base}/?lang=en&view=${id}`);

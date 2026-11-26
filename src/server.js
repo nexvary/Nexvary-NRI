@@ -1,11 +1,12 @@
 import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { createCrossrefClient } from './crossref.js';
 import { modules } from './content.js';
 import { render } from './render.js';
 import { openWorkspaceStore, workspaceDatabasePath } from './store.js';
 import { createWorkspaceHandler, resolveWorkspaceRoute } from './workspace.js';
-import { workspacePath } from './workspace-view.js';
+import { referenceProjectsPath, workspacePath } from './workspace-view.js';
 
 const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 const stylesheet = readFileSync(new URL('../public/styles.css', import.meta.url));
@@ -15,8 +16,8 @@ const securityHeaders = {
   'Referrer-Policy': 'same-origin',
 };
 
-export function createApp(store = openWorkspaceStore()) {
-  const workspace = createWorkspaceHandler(store);
+export function createApp(store = openWorkspaceStore(), { crossref = createCrossrefClient() } = {}) {
+  const workspace = createWorkspaceHandler(store, crossref);
 
   async function handle(request, response) {
     if (!request.url?.startsWith('/')) {
@@ -39,9 +40,10 @@ export function createApp(store = openWorkspaceStore()) {
     };
 
     if (route) {
+      const section = ['references', 'reference-projects'].includes(route.kind) ? 'references' : 'research';
       const reply = (status, page, headers, body) => {
         const privateHeaders = { 'Cache-Control': 'no-store', ...headers };
-        if (page) sendPage(status, 'research', page, privateHeaders);
+        if (page) sendPage(status, section, page, privateHeaders);
         else response.writeHead(status, { ...securityHeaders, ...privateHeaders }).end(request.method === 'HEAD' ? undefined : body);
       };
       await workspace({ request, reply, redirect, route, lang });
@@ -60,6 +62,10 @@ export function createApp(store = openWorkspaceStore()) {
     const view = searchParams.get('view') ?? 'dashboard';
     if (pathname === '/' && view === 'research') {
       redirect(workspacePath(lang));
+      return;
+    }
+    if (pathname === '/' && view === 'references') {
+      redirect(referenceProjectsPath(lang));
       return;
     }
     const available = pathname === '/' && (Object.hasOwn(modules, view) || view === 'developer');

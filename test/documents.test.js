@@ -190,7 +190,14 @@ test('migrates a P1a database and persists encrypted files across restarts', asy
 
     // Reconstruct the pre-document schema while preserving real P1a rows.
     let db = new DatabaseSync(path);
-    db.exec('DROP TABLE document_versions; DROP TABLE documents; DROP TABLE document_key; PRAGMA user_version = 1;');
+    db.exec(`
+      DROP TABLE project_references;
+      DROP TABLE reference_cache;
+      DROP TABLE document_versions;
+      DROP TABLE documents;
+      DROP TABLE document_key;
+      PRAGMA user_version = 1;
+    `);
     db.close();
     await rm(keyPath);
     local = openWorkspaceStore(path);
