@@ -31,3 +31,9 @@
 - P3 merged into main at [`8bcef24`](https://github.com/nexvary/Nexvary-NRI/commit/8bcef2421881fb0aa4a95b9b9162fc8625fef269).
 - Added comparable hypothetical scenarios, break-even, one-variable sensitivities and a versioned JSON export.
 - 34/34 Node tests passed. Browser acceptance verified a saved scenario in Arabic desktop and English mobile. Scientific library and workspace come next.
+
+## 2026-11-26 · P4b scientific library and dashboard
+
+- P4 merged into main at [`0b65081`](https://github.com/nexvary/Nexvary-NRI/commit/0b65081aafa0324b5fa931db2239c146dc9fd0d0).
+- Added scoped library search and replaced sample dashboard records with real account data. 35/35 Node tests passed. Browser acceptance exercised a live Crossref lookup, Arabic dashboard and English mobile search.
+- Researcher profiles and permissions are next. Rich library and manuscript workflows remain open.

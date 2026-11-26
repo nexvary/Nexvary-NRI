@@ -1,15 +1,15 @@
-import { copy, modules, dimensions, fixtures, metrics, activities, providers } from './content.js';
+import { copy, modules, dimensions, metrics, providers } from './content.js';
+
+import { icon } from './icons.js';
+import { libraryEntryPath } from './library.js';
+import { escapeHtml, loginPath, workspacePath } from './workspace-view.js';
 
 const primary = ['dashboard', 'research', 'library', 'evidence', 'l-ready', 'economics', 'assistant', 'network', 'collaboration', 'reports', 'settings', 'about'];
 const shortcuts = ['research', 'evidence', 'l-ready', 'economics', 'assistant', 'network'];
 const additional = ['references', 'messages', 'observatory', 'analytics', 'education'];
 const repo = 'https://github.com/nexvary/Nexvary-NRI';
 
-function icon(glyph) {
-  return `<span class="icon" aria-hidden="true">${glyph}</span>`;
-}
-
-export function render({ lang, view, version, page }) {
+export function render({ lang, view, version, page, workspace }) {
   const tr = (pair) => pair[lang === 'ar' ? 1 : 0];
   const t = (key) => tr(copy[key]);
   const href = (target, language = lang) => `/?lang=${language}&amp;view=${target}`;
@@ -38,9 +38,11 @@ export function render({ lang, view, version, page }) {
         <nav class="shortcuts" aria-label="${t('navigation')}">${shortcuts.map(tile).join('')}</nav>
         <div class="workspace-panels">
           <section class="surface panel">
-            <h2>${icon('🗂️')}${t('latest')} <small class="tag">${t('demo')}</small></h2>
-            <ul class="records">${fixtures.map(([date, name, status, color]) => `
-              <li>${icon('📄')}<span><strong>${tr(name)}</strong><time datetime="${date}" dir="ltr">${date}</time></span><span class="tag ${color}">${tr(status)}</span></li>`).join('')}</ul>
+            <h2>${icon('🗂️')}${t('latest')}</h2>
+            ${workspace?.projects.length ? `<ul class="records">${workspace.projects.map((project) =>
+              `<li>${icon('📄')}<span><a href="${workspacePath(lang, project.id)}"><bdi>${escapeHtml(project.title)}</bdi></a>
+              <time dir="ltr">${new Date(project.updatedAt).toISOString().slice(0, 10)}</time></span></li>`).join('')}</ul>`
+              : workspace ? `<p>${t('noResearch')}</p>` : `<a class="action" href="${loginPath(lang)}">${t('signIn')}</a>`}
           </section>
           <section class="surface panel">
             <h2>${icon('🧪')}${t('quick')}</h2>
@@ -57,14 +59,16 @@ export function render({ lang, view, version, page }) {
       <aside class="dashboard-aside">
         <section class="surface panel">
           <h2>${icon('📊')}${t('statistics')}</h2>
-          <dl class="metrics">${metrics.map(([glyph, name, value]) => `<div>${icon(glyph)}<dt>${tr(name)}</dt><dd>${new Intl.NumberFormat(lang).format(value)}</dd></div>`).join('')}
-            <div>${icon('🧾')}<dt>${t('api')}</dt><dd class="inactive">${t('inactive')}</dd></div>
-          </dl>
+          ${workspace ? `<dl class="metrics">${metrics.map(([glyph, key, name]) =>
+            `<div>${icon(glyph)}<dt>${tr(name)}</dt><dd>${new Intl.NumberFormat(lang).format(workspace.metrics[key])}</dd></div>`).join('')}</dl>` : ''}
+          <dl class="metrics"><div>${icon('🧾')}<dt>${t('api')}</dt><dd class="inactive">${t('inactive')}</dd></div></dl>
         </section>
-        <section class="surface panel">
+        ${workspace ? `<section class="surface panel">
           <h2>${icon('🕒')}${t('activity')}</h2>
-          <ul class="activity">${activities.map(([glyph, name]) => `<li>${icon(glyph)}${tr(name)}</li>`).join('')}</ul>
-        </section>
+          ${workspace.activity.length ? `<ul class="activity">${workspace.activity.map((item) =>
+            `<li>${icon(item.kind === 'pdf' ? '📄' : '🔗')}<a href="${libraryEntryPath(lang, item)}"><bdi>${escapeHtml(item.title)}</bdi></a></li>`).join('')}</ul>`
+            : `<p>${t('noActivity')}</p>`}
+        </section>` : ''}
         <section class="surface panel summary"><h2>${t('aboutSystem')}</h2><p>${t('motto')}</p><a href="${href('about')}">${label('about')}</a></section>
       </aside>
     </div>`;

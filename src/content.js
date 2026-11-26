@@ -5,11 +5,13 @@ export const copy = {
   skip: ['Skip to content', 'انتقل إلى المحتوى'],
   navigation: ['Main navigation', 'التنقّل الرئيسي'],
   language: ['Change language', 'تغيير اللغة'],
-  demo: ['Demo data', 'بيانات تجريبية'],
+  signIn: ['Sign in to see your workspace', 'سجّل الدخول لعرض مساحة عملك'],
+  noResearch: ['No projects yet', 'لا توجد مشاريع بعد'],
+  noActivity: ['No library activity yet', 'لا يوجد نشاط في المكتبة بعد'],
   latest: ['Recent research', 'أبحاثي الأخيرة'],
   quick: ['Explore the L-READY framework', 'استكشف إطار L-READY'],
-  statistics: ['Demo workspace statistics', 'إحصاءات مساحة العمل التجريبية'],
-  activity: ['Recent demo activity', 'أحدث الأنشطة التجريبية'],
+  statistics: ['Workspace statistics', 'إحصاءات مساحة العمل'],
+  activity: ['Recent library activity', 'أحدث نشاط في المكتبة'],
   sources: ['Reference provider websites', 'مواقع مزوّدي المراجع'],
   planned: ['Planned module', 'وحدة قيد التخطيط'],
   unavailable: ['This module is scheduled for a later milestone.', 'هذه الوحدة مجدولة لمرحلة تطوير لاحقة.'],
@@ -31,8 +33,8 @@ export const copy = {
 
 export const modules = {
   dashboard: ['🏠', 'blue', ['Dashboard', 'لوحة التحكم']],
-  research: ['📚', 'blue', ['Research workspace', 'إدارة الأبحاث'], ['Organize research projects and manuscripts', 'تنظيم المشاريع البحثية والمخطوطات']],
-  library: ['📖', 'blue', ['Scientific library', 'المكتبة العلمية'], ['Browse sources and reference collections', 'تصفّح المصادر ومجموعات المراجع']],
+  research: ['📚', 'blue', ['Research workspace', 'إدارة الأبحاث'], ['Manage projects and research records', 'إدارة المشاريع والسجلات البحثية']],
+  library: ['📖', 'blue', ['Scientific library', 'المكتبة العلمية'], ['Search private PDFs and saved sources', 'ابحث في ملفات PDF الخاصة والمصادر المحفوظة']],
   references: ['🔗', 'blue', ['Reference validator', 'التحقق من المراجع']],
   evidence: ['🔎', 'pink', ['Evidence intelligence', 'تحليل الأدلة'], ['Review the evidence behind claims', 'مراجعة الأدلة التي تستند إليها الادعاءات']],
   'l-ready': ['🛡️', 'green', ['L-READY', 'L-READY'], ['Explore technology readiness', 'استكشاف جاهزية التكنولوجيا']],
@@ -58,23 +60,11 @@ export const dimensions = [
   ['Y', '🌿', 'green', ['Societal value', 'القيمة المجتمعية']],
 ];
 
-export const fixtures = [
-  ['2026-11-21', ['Assessing rainwater harvesting', 'تقييم حصاد مياه الأمطار'], ['Draft', 'مسودة'], 'green'],
-  ['2026-11-18', ['Evidence review for photovoltaic cooling', 'مراجعة أدلة تبريد الألواح الشمسية'], ['In review', 'قيد المراجعة'], 'blue'],
-  ['2026-11-15', ['Economic study of irrigation sensors', 'دراسة اقتصادية لمستشعرات الري'], ['Complete', 'مكتمل'], 'violet'],
-];
-
 export const metrics = [
-  ['📄', ['Research records', 'سجلات بحثية'], fixtures.length],
-  ['📚', ['Library references', 'مراجع في المكتبة'], 8],
-  ['🌐', ['Research profiles', 'ملفات باحثين'], 4],
-  ['🔎', ['Evidence records', 'سجلات الأدلة'], 6],
-];
-
-export const activities = [
-  ['📖', ['Reference added', 'أُضيف مرجع تجريبي']],
-  ['🛡️', ['Framework example opened', 'فُتح مثال على إطار L-READY']],
-  ['📝', ['Research draft updated', 'حُدّثت مسودة بحثية تجريبية']],
+  ['📄', 'projects', ['Research projects', 'مشاريع الأبحاث']],
+  ['📚', 'pdfs', ['Private PDFs', 'ملفات PDF الخاصة']],
+  ['🔗', 'sources', ['Saved sources', 'المصادر المحفوظة']],
+  ['🔎', 'evidence', ['Evidence links', 'روابط الأدلة']],
 ];
 
 export const providers = {

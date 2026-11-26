@@ -7,7 +7,7 @@ import { createOrcidClient, createZenodoClient } from './public-identifiers.js';
 import { modules } from './content.js';
 import { render } from './render.js';
 import { openWorkspaceStore, workspaceDatabasePath } from './store.js';
-import { createWorkspaceHandler, resolveWorkspaceRoute } from './workspace.js';
+import { createWorkspaceHandler, readSessionCookie, resolveWorkspaceRoute } from './workspace.js';
 import { referenceProjectsPath, workspacePath } from './workspace-view.js';
 
 const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
@@ -39,15 +39,15 @@ export function createApp(store = openWorkspaceStore(), {
       response.writeHead(303, { ...securityHeaders, 'Cache-Control': 'no-store', Location: location, ...headers }).end();
     };
 
-    const sendPage = (status, view, page, headers) => {
-      const answer = request.method === 'HEAD' ? undefined : render({ lang, view, version, page });
+    const sendPage = (status, view, page, headers, dashboard) => {
+      const answer = request.method === 'HEAD' ? undefined : render({ lang, view, version, page, workspace: dashboard });
       response.writeHead(status, {
         ...securityHeaders, 'Content-Type': 'text/html; charset=utf-8', 'Content-Language': lang, ...headers,
       }).end(answer);
     };
 
     if (route) {
-      const section = { reference: 'references', evidence: 'evidence', readiness: 'l-ready', economics: 'economics' };
+      const section = { reference: 'references', evidence: 'evidence', readiness: 'l-ready', economics: 'economics', library: 'library' };
       const view = Object.entries(section).find(([key]) => route.kind.startsWith(key))?.[1] ?? 'research';
       const reply = (status, page, headers, body) => {
         const privateHeaders = { 'Cache-Control': 'no-store', ...headers };
@@ -70,6 +70,15 @@ export function createApp(store = openWorkspaceStore(), {
     const view = searchParams.get('view') ?? 'dashboard';
     if (pathname === '/' && view === 'research') {
       redirect(workspacePath(lang));
+      return;
+    }
+    if (pathname === '/' && view === 'dashboard') {
+      const session = store.session(readSessionCookie(request.headers.cookie));
+      sendPage(200, view, undefined, { 'Cache-Control': 'no-store' }, session ? store.library.dashboard(session.id) : undefined);
+      return;
+    }
+    if (pathname === '/' && view === 'library') {
+      redirect(`/workspace/library?lang=${lang}`);
       return;
     }
     if (pathname === '/' && view === 'economics') {

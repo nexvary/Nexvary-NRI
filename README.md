@@ -1,6 +1,6 @@
 # Nexvary Research Intelligence
 
-A bilingual research workspace preview for Arabic and English. It runs locally after checkout. The public dashboard shows labeled synthetic examples.
+A bilingual research workspace preview for Arabic and English. It runs locally after checkout. Sign in to see account-scoped project, PDF, reference and evidence counts.
 
 ## Run locally
 
@@ -26,6 +26,10 @@ Credentials, sessions and projects persist in `.nri/workspace.sqlite`. The accou
 Open a project, select **Private PDFs**, and upload a PDF up to 8 MiB. Open the file history to download an existing version or upload the next one. Deleting a file removes all its versions. Deleting a project also removes its files.
 
 NRI creates a 32-byte key in `<database path>.key` and encrypts PDF bytes in SQLite. File names, version dates, sizes and project metadata are stored in plaintext. Preserve both the database and its key for recovery. The preview runs on loopback for development with synthetic data. See the [document architecture decision](docs/decisions/0003-private-pdf-versions.md).
+
+## Browse the scientific library
+
+The signed-in library searches private PDFs and saved reference records across your projects. Filter by record type and open the source project or PDF version history.
 
 ## Check references and researcher identifiers
 
