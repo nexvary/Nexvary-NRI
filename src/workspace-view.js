@@ -18,6 +18,7 @@ const labels = {
   empty: ['Your projects will appear here after you create one.', 'ستظهر مشاريعك هنا بعد إنشاء أول مشروع.'],
   confirmProject: ['Confirm deletion of this project and its files', 'أؤكد حذف المشروع وكل ملفاته'],
   documents: ['Private PDFs', 'ملفات PDF الخاصة'],
+  evidence: ['Evidence intelligence', 'تحليل الأدلة'],
   references: ['Reference validator', 'التحقق من المراجع'],
   emptyDocuments: ['This project has no PDFs yet.', 'لم تُضف ملفات PDF إلى هذا المشروع بعد.'],
   backToProject: ['Back to the project', 'العودة إلى المشروع'],
@@ -158,6 +159,7 @@ export function workspacePage(lang, kind, options = {}) {
         <nav class="project-tools" aria-label="${t('workspace')}">
           <a class="action project-files" href="${documentsPath(lang, id)}">${t('documents')}</a>
           <a class="action" href="${projectReferencesPath(lang, id)}">${t('references')}</a>
+          <a class="action" href="/workspace/projects/${id}/evidence?lang=${lang}">${t('evidence')}</a>
         </nav>
         ${editor}
         <form method="post" action="/workspace/projects/${id}/delete?lang=${lang}" class="delete-project">

@@ -286,7 +286,7 @@ small { font-size: .84rem; }
 .workspace-heading p { margin: 0; }
 .workspace-form { display: grid; gap: .8rem; max-width: 40rem; }
 .workspace-form label { display: grid; gap: .18rem; }
-.workspace-form input, .workspace-form textarea {
+.workspace-form input, .workspace-form textarea, .workspace-form select {
   background: #0b1421;
   color: var(--text);
   border: 1px solid #607b98;
@@ -297,7 +297,7 @@ small { font-size: .84rem; }
 }
 .workspace-form textarea { resize: vertical; }
 .workspace-page button { width: fit-content; cursor: pointer; font: inherit; }
-.workspace-page :is(input, textarea, button):focus-visible { outline: 3px solid #91e6ff; outline-offset: 3px; }
+.workspace-page :is(input, textarea, select, button):focus-visible { outline: 3px solid #91e6ff; outline-offset: 3px; }
 .project-list, .project-editor, .delete-project { border-block-start: 1px solid #34465d; padding-block-start: .7rem; }
 .project-list li a { display: block; padding-block: .35rem; }
 .project-editor h2 { margin-block-end: .55rem; }
