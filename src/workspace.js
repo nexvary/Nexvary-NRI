@@ -1,4 +1,5 @@
 import { createDocumentHandler, resolveDocumentRoute } from './documents.js';
+import { createSharingHandler, resolveSharingRoute } from './sharing.js';
 import { settingsPage } from './settings.js';
 import { createReportHandler, resolveReportRoute } from './reports.js';
 import { createObservatoryHandler, resolveObservatoryRoute } from './observatory.js';
@@ -31,7 +32,7 @@ export function resolveWorkspaceRoute(pathname) {
   if (pathname === '/workspace') return { kind: 'index' };
   const match = pathname.match(/^\/workspace\/projects\/([0-9a-f-]{36})(\/delete)?$/);
   if (match) return { kind: match[2] ? 'delete' : 'project', id: match[1] };
-  return resolveDocumentRoute(pathname) ?? resolveReferenceRoute(pathname) ?? resolveEvidenceRoute(pathname) ?? resolveReadinessRoute(pathname) ?? resolveEconomicsRoute(pathname) ?? resolveObservatoryRoute(pathname) ?? resolveReportRoute(pathname);
+  return resolveDocumentRoute(pathname) ?? resolveReferenceRoute(pathname) ?? resolveEvidenceRoute(pathname) ?? resolveReadinessRoute(pathname) ?? resolveEconomicsRoute(pathname) ?? resolveObservatoryRoute(pathname) ?? resolveReportRoute(pathname) ?? resolveSharingRoute(pathname);
 }
 
 function acceptsPost(request) {
@@ -73,6 +74,7 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
   const handleNetwork = createNetworkHandler(store);
   const handleObservatory = createObservatoryHandler(store);
   const handleReports = createReportHandler(store, version, reportRenderer);
+  const handleSharing = createSharingHandler(store);
   const handleEconomics = createEconomicsHandler(store);
   const handleReadiness = createReadinessHandler(store);
   const handleEvidence = createEvidenceHandler(store);
@@ -88,7 +90,7 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
     };
     const postOnly = kind === 'delete' || kind === 'logout' || kind === 'delete-document';
     const allowed = postOnly ? ['POST'] : ['GET', 'HEAD'];
-    if (!postOnly && !['download-document', 'reference-projects', 'evidence-projects', 'evidence-export', 'readiness-projects', 'economics-projects', 'economics-export', 'library', 'report-projects'].includes(kind)) allowed.push('POST');
+    if (!postOnly && !['download-document', 'reference-projects', 'evidence-projects', 'evidence-export', 'readiness-projects', 'economics-projects', 'economics-export', 'library', 'report-projects', 'sharing-project'].includes(kind)) allowed.push('POST');
     const method = request.method;
     if (!allowed.includes(method)) {
       reply(405, null, { Allow: allowed.join(', ') });
@@ -158,6 +160,10 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
       return;
     }
 
+    if (kind.startsWith('sharing')) {
+      handleSharing({ request, reply, redirect, route, lang, account, form });
+      return;
+    }
     if (kind === 'settings') {
       if (method === 'POST') {
         if (form.get('intent') !== 'revoke-others') {

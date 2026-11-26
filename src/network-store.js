@@ -22,7 +22,7 @@ export const networkSchema = `
   PRAGMA user_version = 8;
 `;
 
-export function networkStore(db, now, transact) {
+export function networkStore(db, now, transact, revokeShares) {
   const profile = db.prepare('SELECT name, interests, orcid, discoverable FROM researcher_profiles WHERE account_id = ?');
   const save = db.prepare(`INSERT INTO researcher_profiles VALUES (?, ?, ?, ?, ?)
     ON CONFLICT(account_id) DO UPDATE SET name=excluded.name, interests=excluded.interests,
@@ -95,6 +95,7 @@ export function networkStore(db, now, transact) {
           case 'decline': return decide.run(action === 'accept' ? 'accepted' : 'declined', peer, owner).changes === 1;
           case 'block':
             clearPair.run(owner, peer, peer, owner);
+            revokeShares(owner, peer);
             return insert.run(owner, peer, 'block', 'active', now()).changes === 1;
           default: return false;
         }

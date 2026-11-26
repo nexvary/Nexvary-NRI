@@ -4,6 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { bindDocumentKey } from './document-crypto.js';
 import { documentSchema, documentStore } from './document-store.js';
+import { sharingSchema, sharingStore } from './sharing-store.js';
 import { settingsSchema, settingsStore } from './settings.js';
 import { observatorySchema, observatoryStore } from './observatory-store.js';
 import { networkSchema, networkStore } from './network-store.js';
@@ -14,7 +15,7 @@ import { evidenceSchema, evidenceStore } from './evidence-store.js';
 import { referenceSchema, referenceMigrationV4, referenceStore } from './reference-store.js';
 
 export const sessionLifetime = 8 * 60 * 60;
-const schemaVersion = 10;
+const schemaVersion = 11;
 const schema = `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -67,6 +68,7 @@ function initialize(db, path) {
     if (version < 8) db.exec(networkSchema);
     if (version < 9) db.exec(observatorySchema);
     if (version < 10) db.exec(settingsSchema);
+    if (version < 11) db.exec(sharingSchema);
     return bindDocumentKey(db, path);
   });
 }
@@ -113,6 +115,7 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
   const countOthers = db.prepare('SELECT count(*) AS count FROM sessions WHERE account_id = ? AND token_hash <> ? AND expires_at > ?');
   const removeOthers = db.prepare('DELETE FROM sessions WHERE account_id = ? AND token_hash <> ? AND expires_at > ?');
   const settings = settingsStore(db, now);
+  const sharing = sharingStore(db, now, transact);
   const removeSession = db.prepare('DELETE FROM sessions WHERE token_hash = ?');
   const insertProject = db.prepare('INSERT INTO projects VALUES (?, ?, ?, ?, ?)');
   const listProjects = db.prepare('SELECT id, title FROM projects WHERE owner_id = ? ORDER BY updated_at DESC, id');
@@ -135,9 +138,10 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
     readiness,
     economics,
     library: libraryStore(db),
-    network: networkStore(db, now, transact),
+    network: networkStore(db, now, transact, sharing.revokeOnBlock),
     observatory: observatoryStore(db, now),
     settings,
+    sharing,
     close() {
       db.close();
     },

@@ -2,10 +2,11 @@ import { normalizeOrcid } from './public-identifiers.js';
 import { escapeHtml } from './workspace-view.js';
 
 const labels = {
+  invitations: ['Project invitation inbox', 'صندوق دعوات المشاريع'],
   network: ['Research network', 'شبكة الباحثين'],
   collaboration: ['Collaboration requests', 'طلبات التعاون'],
   guidance: ['Profiles are private until you enable discovery by signed-in researchers.', 'تظل الملفات الشخصية خاصة حتى تفعّل ظهورها للباحثين الذين سجّلوا الدخول.'],
-  requestScope: ['Accepting a request records mutual interest. Project permissions can be managed separately in a later release.', 'قبول الطلب يسجّل الاهتمام المتبادل. ستتاح إدارة صلاحيات المشاريع بصورة منفصلة في إصدار لاحق.'],
+  requestScope: ['Accepting a request records mutual interest. Use a project invitation to share a summary.', 'قبول الطلب يسجّل الاهتمام المتبادل. استخدم دعوة مشروع لمشاركة ملخصه.'],
   name: ['Display name', 'الاسم المعروض'],
   interests: ['Research interests', 'الاهتمامات البحثية'],
   orcid: ['ORCID iD (optional, self-reported)', 'معرّف ORCID اختياري يضيفه صاحبه'],
@@ -96,7 +97,8 @@ export function createNetworkHandler(store) {
     reply(invalid ? 422 : 200, {
       title: t(kind), path,
       html: `<section class="surface panel detail workspace-page"><h1>${t(kind)}</h1>
-        <nav class="project-tools"><a href="${href(kind === 'network' ? 'collaboration' : 'network')}">${t(kind === 'network' ? 'collaboration' : 'network')}</a></nav>
+        <nav class="project-tools"><a href="${href(kind === 'network' ? 'collaboration' : 'network')}">${t(kind === 'network' ? 'collaboration' : 'network')}</a>
+          <a href="/workspace/project-invitations?lang=${lang}">${t('invitations')}</a></nav>
         ${invalid ? `<p class="form-error" role="alert">${t('invalid')}</p>` : ''}${content}</section>`,
     });
   };

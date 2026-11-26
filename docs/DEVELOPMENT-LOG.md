@@ -67,3 +67,9 @@
 - P6 merged into main at [`b727312`](https://github.com/nexvary/Nexvary-NRI/commit/b727312602957d4310fd168de266b23176afffd5).
 - Added session controls and a bounded security audit, verified backups/restores, and a read-only CI workflow with real bilingual report rendering. 43/43 tests passed locally with the renderer enabled. Settings screenshots verify Arabic desktop and English mobile.
 - Commercial deployment, billing, verified ORCID OAuth ownership, optional AI, richer manuscript tools and project-scoped collaboration authorization are still open.
+
+## 2026-11-27 · P7b scoped project sharing
+
+- P7 merged into main at [`45bbdde`](https://github.com/nexvary/Nexvary-NRI/commit/45bbddee57d6e36f87d85caedefeb7722c270f44) after [GitHub Actions run 45901615488](https://github.com/nexvary/Nexvary-NRI/actions/runs/45901615488) succeeded.
+- Added explicit summary-reader invitations with acceptance, decline, revoke and block-driven access removal. 44/44 local tests passed, and both locales were exercised in the browser.
+- Shared notes, tasks and wider roles remain pending. Optional AI, verified ORCID OAuth, production identity and billing still need external credentials, defined entitlements or owner operating decisions as applicable.
