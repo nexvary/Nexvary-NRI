@@ -280,3 +280,27 @@ small { font-size: .84rem; }
   .hero-links, .discovery, .shortcuts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .workspace-panels, .dashboard-aside { grid-template-columns: minmax(0, 1fr); }
 }
+
+.workspace-page { display: grid; gap: 1rem; }
+.workspace-heading { display: flex; align-items: start; justify-content: space-between; flex-wrap: wrap; gap: .8rem; }
+.workspace-heading p { margin: 0; }
+.workspace-form { display: grid; gap: .8rem; max-width: 40rem; }
+.workspace-form label { display: grid; gap: .18rem; }
+.workspace-form input, .workspace-form textarea {
+  background: #0b1421;
+  color: var(--text);
+  border: 1px solid #607b98;
+  border-radius: .45rem;
+  padding: .55rem .65rem;
+  font: inherit;
+  min-width: 0;
+}
+.workspace-form textarea { resize: vertical; }
+.workspace-page button { width: fit-content; cursor: pointer; font: inherit; }
+.workspace-page :is(input, textarea, button):focus-visible { outline: 3px solid #91e6ff; outline-offset: 3px; }
+.project-list, .project-editor, .delete-project { border-block-start: 1px solid #34465d; padding-block-start: .7rem; }
+.project-list li a { display: block; padding-block: .35rem; }
+.project-editor h2 { margin-block-end: .55rem; }
+.form-error { color: #ffb1b5; }
+.delete-project { display: flex; align-items: center; flex-wrap: wrap; gap: .7rem; }
+.delete-project .danger { color: #ffe0e3; border-color: #ed8b96; background: #542936; }

@@ -1,11 +1,14 @@
 {
   "name": "nexvary-nri",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=24.16"
+  },
   "scripts": {
     "start": "node src/server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "account:create": "node src/account-cli.js"
   }
 }
