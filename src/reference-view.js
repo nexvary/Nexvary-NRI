@@ -1,5 +1,6 @@
 import { crossrefUrl, resolverUrl } from './crossref.js';
 import { openAlexUrl, safeOpenAccessUrl } from './openalex.js';
+import { orcidUrl, zenodoUrl } from './public-identifiers.js';
 import { escapeHtml, projectReferencesPath, workspacePath } from './workspace-view.js';
 
 const copy = {
@@ -8,20 +9,33 @@ const copy = {
   emptyProjects: ['Create a project to save reference checks.', 'أنشئ مشروعًا لحفظ نتائج التحقق.'],
   workspace: ['Open research workspace', 'افتح إدارة الأبحاث'],
   back: ['Back to the project', 'العودة إلى المشروع'],
-  doi: ['DOI or DOI link', 'معرّف DOI أو رابطه'],
+  doi: ['DOI, DOI link, or ORCID iD', 'معرّف DOI أو رابطه أو معرّف ORCID'],
   lookup: ['Check and save', 'تحقّق واحفظ النتيجة'],
   refresh: ['Check again', 'أعد التحقق'],
   remove: ['Remove', 'أزل المرجع'],
   provider: ['Provider', 'مزوّد البيانات'],
-  disclosure: ['A fresh check sends the entered DOI to the selected provider. Saved results show their original retrieval times.', 'يُرسَل معرّف DOI إلى المزوّد المحدد عند إجراء فحص جديد. تُظهر النتائج المحفوظة وقت جلبها الأصلي.'],
+  disclosure: ['A fresh check sends the entered identifier to the selected provider. Saved results show their original retrieval times.', 'يُرسَل المعرّف المُدخل إلى المزوّد المحدد عند إجراء فحص جديد. تُظهر النتائج المحفوظة وقت جلبها الأصلي.'],
   saved: ['Saved references', 'المراجع المحفوظة'],
-  empty: ['No DOI checks saved for this project.', 'لا توجد نتائج تحقق محفوظة لهذا المشروع.'],
+  empty: ['No identifier checks saved for this project.', 'لا توجد نتائج تحقق محفوظة لهذا المشروع.'],
   source: ['Source', 'المصدر'],
   retrieved: ['Retrieved (UTC)', 'تاريخ الجلب بتوقيت UTC'],
   'found-crossref': ['Metadata found in Crossref', 'عُثِر على البيانات في Crossref'],
   'found-openalex': ['Metadata found in OpenAlex', 'عُثِر على البيانات في OpenAlex'],
   'not-found-crossref': ['Crossref returned no record. DOI status is unknown.', 'لم يُرجع Crossref سجلًا. حالة المعرّف غير معروفة.'],
   'not-found-openalex': ['OpenAlex returned no record. DOI status is unknown.', 'لم يُرجع OpenAlex سجلًا. حالة المعرّف غير معروفة.'],
+  'found-orcid': ['Public record returned by ORCID. Ownership is unverified.', 'أعاد ORCID سجلًا عامًا. ملكية المعرّف غير مؤكدة.'],
+  'found-zenodo': ['Metadata found in Zenodo', 'عُثِر على البيانات في Zenodo'],
+  'not-found-orcid': ['ORCID returned no public record.', 'لم يُرجع ORCID سجلًا عامًا.'],
+  'not-found-zenodo': ['Zenodo returned no record for this DOI.', 'لم يُرجع Zenodo سجلًا لهذا المعرّف.'],
+  'invalid-orcid': ['Enter a valid ORCID iD or orcid.org link.', 'أدخل معرّف ORCID صالحًا أو رابطًا من orcid.org.'],
+  'invalid-zenodo': ['Enter a Zenodo-issued DOI beginning with 10.5281/zenodo.', 'أدخل معرّف DOI صادرًا من Zenodo ويبدأ بـ 10.5281/zenodo.'],
+  'limited-orcid': ['ORCID checks are temporarily limited.', 'التحقق عبر ORCID محدود مؤقتًا.'],
+  'limited-zenodo': ['Zenodo checks are temporarily limited.', 'التحقق عبر Zenodo محدود مؤقتًا.'],
+  'unavailable-orcid': ['ORCID could not be checked. Saved results are still shown.', 'تعذّر التحقق عبر ORCID. تظل النتائج المحفوظة ظاهرة.'],
+  'unavailable-zenodo': ['Zenodo could not be checked. Saved results are still shown.', 'تعذّر التحقق عبر Zenodo. تظل النتائج المحفوظة ظاهرة.'],
+  zenodoType: ['Record type reported by Zenodo', 'نوع السجل بحسب Zenodo'],
+  researcher: ['Researcher name reported by ORCID', 'اسم الباحث بحسب ORCID'],
+  license: ['License', 'الترخيص'],
   compareNote: ['Both providers have been checked. Differences may appear between results.', 'تم التحقق من كلا المزوّدَين. قد تظهر اختلافات.'],
   compareEmpty: ['Check this DOI against the second provider to compare results.', 'تحقق من هذا المعرّف عبر المزوّد الثاني لمقارنة النتائج.'],
   venue: ['Publication', 'الدورية أو جهة النشر'],
@@ -52,13 +66,12 @@ const copy = {
   title: ['Title', 'العنوان'],
 };
 
-function providerUrl(provider, doi) {
-  return provider === 'openalex' ? openAlexUrl(doi) : crossrefUrl(doi);
-}
-
-function providerLabel(provider) {
-  return provider === 'openalex' ? 'OpenAlex' : 'Crossref';
-}
+const providers = {
+  crossref: { label: 'Crossref', url: crossrefUrl },
+  openalex: { label: 'OpenAlex', url: openAlexUrl },
+  zenodo: { label: 'Zenodo', url: zenodoUrl },
+  orcid: { label: 'ORCID', url: orcidUrl },
+};
 
 export function referencePage(lang, options = {}) {
   const t = (key) => (copy[key] ?? ['', ''])[lang === 'ar' ? 1 : 0];
@@ -94,8 +107,8 @@ export function referencePage(lang, options = {}) {
     }).join('')}</ul>`;
   };
 
+  const row = (key, value) => value ? `<div><dt>${t(key)}</dt><dd dir="auto">${escapeHtml(value)}</dd></div>` : '';
   const crossrefMeta = (data) => {
-    const row = (key, value) => value ? `<div><dt>${t(key)}</dt><dd dir="auto">${escapeHtml(value)}</dd></div>` : '';
     const type = data.type === 'posted-content' && data.subtype === 'preprint'
       ? t('preprint') : [data.type, data.subtype].filter(Boolean).join(' · ');
     const authors = data.authors.join(', ') + (data.moreAuthors ? ` · ${t('moreAuthors')}` : '');
@@ -106,7 +119,6 @@ export function referencePage(lang, options = {}) {
   };
 
   const openalexMeta = (data) => {
-    const row = (key, value) => value ? `<div><dt>${t(key)}</dt><dd dir="auto">${escapeHtml(value)}</dd></div>` : '';
     const authors = data.authors.join(', ') + (data.moreAuthors ? ` · ${t('moreAuthors')}` : '');
     const openAccessUrl = safeOpenAccessUrl(data.openAccessUrl);
     return `<dl class="reference-meta">${row('title', data.title)}${row('openalexType', data.type)}${row('venue', data.venue)}${row('publisher', data.publisher)}${row('authors', authors)}${row('issued', data.issued)}</dl>
@@ -116,7 +128,12 @@ export function referencePage(lang, options = {}) {
 
   const renderMeta = (record) => {
     if (!record.metadata) return '';
-    return record.provider === 'openalex' ? openalexMeta(record.metadata) : crossrefMeta(record.metadata);
+    const data = record.metadata;
+    if (record.provider === 'openalex') return openalexMeta(data);
+    if (record.provider === 'crossref') return crossrefMeta(data);
+    if (record.provider === 'orcid') return `<dl class="reference-meta">${row('researcher', data.title)}</dl>`;
+    const authors = data.authors.join(', ') + (data.moreAuthors ? ` · ${t('moreAuthors')}` : '');
+    return `<dl class="reference-meta">${row('title', data.title)}${row('zenodoType', data.type)}${row('authors', authors)}${row('issued', data.issued)}${row('license', data.license)}</dl>`;
   };
 
   const dtFmt = new Intl.DateTimeFormat(lang, { timeZone: 'UTC', dateStyle: 'medium', timeStyle: 'short' });
@@ -130,7 +147,9 @@ export function referencePage(lang, options = {}) {
   const recordsHtml = [...byDoi.entries()].map(([doi, byProvider]) => {
     const crossrefRecord = byProvider.crossref;
     const openalexRecord = byProvider.openalex;
-    const titleText = crossrefRecord?.metadata?.title || openalexRecord?.metadata?.title || doi;
+    const related = Object.keys(providers).map((key) => byProvider[key]).filter(Boolean);
+    const titleText = related.find((record) => record.metadata?.title)?.metadata.title || doi;
+    const identifierUrl = byProvider.orcid ? `https://orcid.org/${doi}` : resolverUrl(doi);
 
     const renderRecord = (record) => {
       if (!record) return '';
@@ -139,7 +158,7 @@ export function referencePage(lang, options = {}) {
       const statusLabel = t(statusKey) || t(record.status);
       return `<div class="provider-block">
         <dl class="reference-meta">
-          <div><dt>${t('source')}</dt><dd><a href="${providerUrl(record.provider, doi)}" lang="en" dir="ltr">${providerLabel(record.provider)}</a></dd></div>
+          <div><dt>${t('source')}</dt><dd><a href="${providers[record.provider].url(doi)}" lang="en" dir="ltr">${providers[record.provider].label}</a></dd></div>
           <div><dt>${t('retrieved')}</dt><dd><time datetime="${d.toISOString()}">${dtFmt.format(d)}</time></dd></div>
         </dl>
         <p class="tag">${statusLabel}</p>
@@ -155,13 +174,13 @@ export function referencePage(lang, options = {}) {
 
     const note = crossrefRecord && openalexRecord
       ? `<p class="comparison-note">${t('compareNote')}</p>`
-      : `<p class="comparison-note secondary">${t('compareEmpty')}</p>`;
+      : crossrefRecord || openalexRecord ? `<p class="comparison-note secondary">${t('compareEmpty')}</p>` : '';
 
     return `<article class="surface panel reference-record">
       <h3 dir="auto">${escapeHtml(titleText)}</h3>
-      <p><a href="${resolverUrl(doi)}" dir="ltr">${escapeHtml(doi)}</a></p>
+      <p><a href="${identifierUrl}" dir="ltr">${escapeHtml(doi)}</a></p>
       ${note}
-      <div class="provider-comparison">${renderRecord(crossrefRecord)}${renderRecord(openalexRecord)}</div>
+      <div class="provider-comparison">${related.map(renderRecord).join('')}</div>
     </article>`;
   }).join('');
 
@@ -175,8 +194,8 @@ export function referencePage(lang, options = {}) {
           <label>${t('doi')}<input name="doi" type="text" dir="ltr" maxlength="1100" value="${escapeHtml(input)}" aria-describedby="doi-disclosure" required></label>
           <fieldset class="provider-select">
             <legend>${t('provider')}</legend>
-            <label><input type="radio" name="provider" value="crossref"${provider !== 'openalex' ? ' checked' : ''}> Crossref</label>
-            <label><input type="radio" name="provider" value="openalex"${provider === 'openalex' ? ' checked' : ''}> OpenAlex</label>
+            ${Object.entries(providers).map(([key, { label }]) =>
+              `<label><input type="radio" name="provider" value="${key}"${provider === key ? ' checked' : ''}> ${label}</label>`).join('')}
           </fieldset>
           <small id="doi-disclosure">${t('disclosure')}</small>
           <button class="action" name="action" value="check">${t('lookup')}</button>

@@ -1,8 +1,9 @@
 import { normalizeDoi } from './crossref.js';
+import { normalizeOrcid, normalizeZenodoDoi } from './public-identifiers.js';
 import { referencePage } from './reference-view.js';
 import { loginPath, projectReferencesPath, workspacePage } from './workspace-view.js';
 
-const allowedProviders = ['crossref', 'openalex'];
+const normalize = { crossref: normalizeDoi, openalex: normalizeDoi, orcid: normalizeOrcid, zenodo: normalizeZenodoDoi };
 
 export function resolveReferenceRoute(pathname) {
   if (pathname === '/workspace/reference-projects') return { kind: 'reference-projects' };
@@ -10,8 +11,7 @@ export function resolveReferenceRoute(pathname) {
   if (match) return { kind: 'references', id: match[1] };
 }
 
-export function createReferenceHandler(store, crossref, openalex) {
-  const adapters = { crossref, openalex };
+export function createReferenceHandler(store, adapters) {
   return async function handle({ request, reply, redirect, route, lang, account, form, stillSignedIn }) {
     const { kind, id } = route;
     const owner = account.id;
@@ -35,16 +35,21 @@ export function createReferenceHandler(store, crossref, openalex) {
       return;
     }
     const input = (form.get('doi') ?? '').slice(0, 1101);
-    const doi = normalizeDoi(input);
+    const provider = form.get('provider') ?? 'crossref';
+    if (!Object.hasOwn(normalize, provider)) {
+      reply(400);
+      return;
+    }
+    const doi = normalize[provider](input);
     if (!doi) {
-      show(422, 'invalid', input, form.get('provider') ?? 'crossref');
+      const error = provider === 'crossref' || provider === 'openalex' ? 'invalid' : 'invalid-' + provider;
+      show(422, error, input, provider);
       return;
     }
     const action = form.get('action') ?? 'check';
-    const selectedProvider = allowedProviders.includes(form.get('provider')) ? form.get('provider') : 'crossref';
 
     if (action === 'remove') {
-      store.references.remove(owner, id, doi, selectedProvider);
+      store.references.remove(owner, id, doi, provider);
       redirect(projectReferencesPath(lang, id));
       return;
     }
@@ -53,22 +58,22 @@ export function createReferenceHandler(store, crossref, openalex) {
       return;
     }
 
-    const adapter = adapters[selectedProvider];
-    const cached = store.references.cached(owner, doi, selectedProvider);
+    const adapter = adapters[provider];
+    const cached = store.references.cached(owner, doi, provider);
     const result = cached ?? await adapter(doi);
     if (!stillSignedIn()) {
       redirect(loginPath(lang));
       return;
     }
     if (result.status === 'limited') {
-      show(429, `limited-${selectedProvider}`, input, selectedProvider, { 'Retry-After': String(result.retryAfter) });
+      show(429, `limited-${provider}`, input, provider, { 'Retry-After': String(result.retryAfter) });
       return;
     }
     if (result.status === 'unavailable') {
-      show(503, `unavailable-${selectedProvider}`, input, selectedProvider);
+      show(503, `unavailable-${provider}`, input, provider);
       return;
     }
-    if (!store.references.save(owner, id, { ...result, doi, provider: selectedProvider }, !cached)) {
+    if (!store.references.save(owner, id, { ...result, doi, provider: provider }, !cached)) {
       missing();
       return;
     }
