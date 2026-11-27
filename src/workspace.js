@@ -1,3 +1,4 @@
+import { handleTeam, resolveTeamRoute } from './teams.js';
 import { createPrivacyHandler } from './privacy.js';
 import { handleMessageModeration } from './moderation.js';
 import { createMfaSettingsHandler } from './mfa-settings.js';
@@ -47,7 +48,7 @@ export function resolveWorkspaceRoute(pathname) {
   if (pathname === '/workspace') return { kind: 'index' };
   const match = pathname.match(/^\/workspace\/projects\/([0-9a-f-]{36})(\/delete)?$/);
   if (match) return { kind: match[2] ? 'delete' : 'project', id: match[1] };
-  return resolveMessageRoute(pathname) ?? resolveDocumentRoute(pathname) ?? resolveReferenceRoute(pathname) ?? resolveEvidenceRoute(pathname) ?? resolveReadinessRoute(pathname) ?? resolveEconomicsRoute(pathname) ?? resolveObservatoryRoute(pathname) ?? resolveReportRoute(pathname) ?? resolveSharingRoute(pathname);
+  return resolveTeamRoute(pathname) ?? resolveMessageRoute(pathname) ?? resolveDocumentRoute(pathname) ?? resolveReferenceRoute(pathname) ?? resolveEvidenceRoute(pathname) ?? resolveReadinessRoute(pathname) ?? resolveEconomicsRoute(pathname) ?? resolveObservatoryRoute(pathname) ?? resolveReportRoute(pathname) ?? resolveSharingRoute(pathname);
 }
 
 function acceptsPost(request) {
@@ -69,11 +70,11 @@ function sessionCookie(token, maxAge) {
   return `${cookieName}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}`;
 }
 
-async function readForm(request) {
+async function readForm(request, limit = formLimit) {
   if (request.headers['content-type']?.split(';', 1)[0].trim().toLowerCase()
     !== 'application/x-www-form-urlencoded') return { status: 415 };
 
-  const body = await readBoundedBody(request, formLimit);
+  const body = await readBoundedBody(request, limit);
   return body ? { fields: new URLSearchParams(body.toString('utf8')) } : { status: 413 };
 }
 
@@ -124,7 +125,7 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
         return;
       }
       if (!['logout', 'documents', 'document', 'analytics'].includes(kind)) {
-        const { status, fields } = await readForm(request);
+        const { status, fields } = await readForm(request, kind === 'team-project' ? 160 * 1024 : formLimit);
         if (status) {
           reply(status);
           return;
@@ -199,6 +200,10 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
     }
     if (kind === 'education') {
       handleEducation({ request, reply, lang, account, form });
+      return;
+    }
+    if (kind.startsWith('team')) {
+      handleTeam({ request, reply, redirect, route, lang, account, form, store });
       return;
     }
     if (kind.startsWith('sharing')) {

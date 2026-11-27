@@ -30,9 +30,15 @@ export function privacyStore(db, workspaceKey, now) {
     messagePreferences: 'SELECT notifications FROM message_preferences WHERE account_id = ?',
     reports: 'SELECT message, category, created_at FROM message_reports WHERE reporter = ?',
     securityActivity: 'SELECT action, recorded_at FROM security_events WHERE account_id = ?',
+    teamMemberships: 'SELECT project_id, role, state FROM project_members WHERE account_id = ?',
+    manuscriptVersions: `SELECT m.id, m.project_id, m.title, v.version, v.author, v.body, v.recorded_at
+      FROM team_manuscript_versions v JOIN team_manuscripts m ON m.id = v.manuscript_id
+      JOIN projects p ON p.id = m.project_id WHERE p.owner_id = :owner OR v.author = :owner`,
+    teamReviews: `SELECT r.* FROM team_reviews r JOIN projects p ON p.id = r.project_id
+      WHERE p.owner_id = :owner OR r.reviewer = :owner`,
     roles: 'SELECT role FROM account_roles WHERE account_id = ?',
   };
-  const sections = Object.entries(queries).map(([name, sql]) => [name, db.prepare(sql)]);
+  const sections = Object.entries(queries).map(([name, sql]) => [name, db.prepare(sql), sql.includes(':owner')]);
 
   function publicRecord(name, row) {
     if (name === 'documents') {
@@ -53,12 +59,12 @@ export function privacyStore(db, workspaceKey, now) {
       if (!identity) return { status: 403 };
       const chunks = [JSON.stringify({ formatVersion: 1, exportedAt: now(), account: identity }).slice(0, -1)];
       let size = Buffer.byteLength(chunks[0]) + 1;
-      for (const [name, statement] of sections) {
+      for (const [name, statement, named] of sections) {
         const heading = ',' + JSON.stringify(name) + ':[';
         chunks.push(heading);
         size += Buffer.byteLength(heading) + 1;
         let delimiter = '';
-        for (const row of statement.iterate(owner)) {
+        for (const row of statement.iterate(named ? { owner } : owner)) {
           const item = delimiter + JSON.stringify(publicRecord(name, row));
           size += Buffer.byteLength(item);
           if (size > maxExportBytes) return { status: 413 };

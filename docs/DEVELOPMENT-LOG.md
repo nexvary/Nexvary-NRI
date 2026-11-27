@@ -127,3 +127,8 @@
 
 - Added password/MFA-confirmed data export and transactional deletion with explicit confirmation.
 - Verified isolation, credential and data removal, and restoration semantics for pre- and post-deletion backups. Chromium exercised export and captured the privacy page.
+
+## 2026-11-27 · NRI-10a project team roles and review
+
+- Added five team roles, version-bound invitations, role-aware contribution and review, and attributable access and version history.
+- 54/54 with real report rendering. Chromium created a manuscript and captured both locales.

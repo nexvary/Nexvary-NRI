@@ -1,10 +1,18 @@
 # Development status
 
+## NRI-10a · Project team permissions and review · 2026-11-27 (Cairo)
+
+Projects have owner, administrator, researcher, reviewer and read-only roles in a dedicated team workspace. Role changes require renewed acceptance, and owner-to-member blocking revokes team access. Manuscript revisions and manuscript/evidence reviews record their participants and timestamps. Stale manuscript edits are rejected.
+
+- 54/54 with the real report renderer. HTTP acceptance covers role delegation, invitation consent, direct URL isolation, version conflicts, attributable reviews, revocation and blocking.
+- Chromium created a manuscript and captured [Arabic desktop](qa/nri-10/team-ar-desktop.webp) and [English mobile](qa/nri-10/team-en-mobile.webp).
+- Team access covers manuscripts and evidence review. The owner workspace continues to govern PDFs, project settings, reports and readiness records.
+
 ## NRI-18c · Account export and deletion · 2026-11-27 (Cairo)
 
 Authenticated users can export their account data and owned PDFs or permanently delete the live account. Both actions require password confirmation and a fresh MFA or recovery code when configured. Deletion also requires typing DELETE. The transaction removes credentials, sessions, owned projects, linked documents and messaging data. The [retention and recovery policy](RECOVERY.md#account-deletion-and-retention) describes backup behavior.
 
-- HTTP coverage verifies MFA replay rejection, explicit confirmation, cross-origin and cross-account isolation, credential and private data cleanup, and restores from before and after deletion.
+- 53/53 with the real report renderer. HTTP coverage verifies MFA replay rejection, explicit confirmation, cross-origin and cross-account isolation, credential and private data cleanup, and restores from before and after deletion.
 - Chromium exercised the export and captured [Arabic desktop](qa/nri-18/privacy-ar-desktop.webp) and [English mobile](qa/nri-18/privacy-en-mobile.webp).
 
 ## NRI-18b · Scoped message moderation · 2026-11-27 (Cairo)
@@ -214,15 +222,15 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | ID | Status | Implemented evidence and remaining acceptance |
 |---|---|---|
 | NRI-01 | Partial | Verified real private project, PDF, reference and evidence counts, recent activity, sign-in/empty states and account isolation. Network, ORCID profile and metered cost metrics remain. |
-| NRI-02 | Partial | Personal project CRUD, project PDF versions, project DOI records and access denial are verified. Rich manuscript records, authors, tags, search, notes, tasks, collaboration and publication status remain. |
+| NRI-02 | Partial | Personal project CRUD, project PDF versions, project DOI records and access denial are verified. The team workspace adds versioned manuscripts and author attribution. Tags, search, notes, tasks and publication status remain. |
 | NRI-03 | Partial | Project-bound PDF upload, metadata, encrypted persistence, version downloads and deletion are verified. Cross-project search and type filtering for PDFs and saved sources are verified. Other formats, collections, reading and annotation, citation import/export and deduplication remain. |
 | NRI-04 | Partial | Crossref and OpenAlex DOI lookups, dated per-provider source links, correction/retraction metadata, per-provider local cache, rate limits and unknown/failure outcomes are verified. Side-by-side provider comparison view implemented. Agency resolution, additional providers, claim-to-source mapping and evidence review remain. |
-| NRI-05 | Partial | Claims, dated source snapshots, study type, limitations, conflicting evidence, owner review and JSON export are verified. Team reviewer roles and review revisions remain. |
+| NRI-05 | Partial | Claims, dated source snapshots, study type, limitations, conflicting evidence, owner review and JSON export are verified. Team reviewers can file attributable reviews alongside immutable review history. |
 | NRI-06 | Partial | Six ordered dimensions, four qualitative categories, project evidence links, revision history, reviewer and safety/authorization blockers are verified. Independent team reviewer roles remain. |
 | NRI-07 | Verified | One-year operating model with explicit assumptions, currency, units, capacity, sensitivity, scenario comparison and reproducible JSON export. |
 | NRI-08 | Verified | NRI-08a exercises private saved-source review, provenance and retraction/editorial warnings in `test/assistant.test.js`. NRI-08b adds private encrypted BYOK storage, offline/provider selection and model settings in `test/assistant-settings.test.js`. NRI-08c verifies mocked local cited answers, cancellation and bounded caching in `test/assistant-answer.test.js`. NRI-08d verifies external consent, mocked OpenAI requests and durable reservations in the same test suite. |
 | NRI-09 | Partial | Opt-in profiles, search, follow and block, bounded requests and private profile isolation verified. Verified ORCID ownership, posts, groups, publication sharing and moderation remain. |
-| NRI-10 | Partial | Collaboration requests and scoped project-summary invitations, acceptance/decline, revoke and access history are verified. Broader roles, notifications, shared notes and tasks remain. |
+| NRI-10 | Partial | Collaboration requests and scoped project-summary invitations, acceptance/decline, revoke and access history are verified. Team invitations, five roles, revocation, audit history and manuscript/evidence review are verified. Team notifications, shared notes and tasks remain. |
 | NRI-11 | Verified | Private direct conversations, independent unread state, in-app notification preferences, reports, participant and origin checks, blocking, encrypted message bodies and rate limits verified in `test/messages.test.js` and Chromium. |
 | NRI-12 | Verified | Private watchlists, saved library searches, date-stamped manual updates, filters and provider provenance. |
 | NRI-13 | Verified | Bounded UTF-8 CSV import, numeric validation, descriptive metrics, histogram, IQR outlier flags, units and reproducible JSON export. |
@@ -230,7 +238,7 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | NRI-15 | Verified | Versioned Arabic/English PDF and DOCX downloads with citations, evidence, L-READY findings and limitations. Requires the documented local renderer. |
 | NRI-16 | Partial | System About view shows the purpose, framework wording, build version and documentation links. Changelog, licensing, privacy, terms and support content remain. |
 | NRI-17 | Partial | Separate developer view identifies Nexvary Inc. and links to the official company site. Dedicated confirmed contact information remains. |
-| NRI-18 | Partial | Local authentication, session revocation, account audit, authorization, encrypted PDF bytes, RTL/LTR and verified recovery are implemented. NRI-18a adds optional MFA and one-use recovery codes. NRI-18b adds the operator-managed message moderator role and scoped report review. Team RBAC, password/account recovery, accessibility audit and broader administration remain. |
+| NRI-18 | Partial | Local authentication, session revocation, account audit, authorization, encrypted PDF bytes, RTL/LTR and verified recovery are implemented. NRI-18a adds optional MFA and one-use recovery codes. NRI-18b adds the operator-managed message moderator role and scoped report review. Project team RBAC is verified for manuscripts and evidence review. Password/account recovery, accessibility audit and broader administration remain. |
 | NRI-19 | Partial | Local restore and regression workflow configuration are implemented. Entitlements, approved hosting, operational monitoring and billing remain. |
 
-Next milestone: project roles, collaborative manuscript and evidence workflows, and commercial readiness.
+Next milestone: local commercial entitlements and secure operator controls.

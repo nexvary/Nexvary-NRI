@@ -1,3 +1,4 @@
+import { teamSchema, teamStore } from './team-store.js';
 import { privacyStore } from './privacy-store.js';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { closeSync, mkdirSync, openSync } from 'node:fs';
@@ -21,7 +22,7 @@ import { evidenceSchema, evidenceStore } from './evidence-store.js';
 import { referenceSchema, referenceMigrationV4, referenceStore } from './reference-store.js';
 
 export const sessionLifetime = 8 * 60 * 60;
-const schemaVersion = 17;
+const schemaVersion = 18;
 const schema = `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -81,6 +82,7 @@ function initialize(db, path) {
     if (version < 15) db.exec(messageSchema);
     if (version < 16) db.exec(mfaSchema);
     if (version < 17) db.exec(moderationSchema);
+    if (version < 18) db.exec(teamSchema);
     return bindDocumentKey(db, path);
   });
 }
@@ -155,12 +157,15 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
   }
 
   const mfa = mfaStore(db, workspaceKey, now, transact, revokeOthers);
+  const teams = teamStore(db, now, transact);
   const privacy = privacyStore(db, workspaceKey, now);
   return {
     privacyAction(owner, token, code, action) {
+      if (action !== 'export' && action !== 'delete') return { status: 422 };
       return mfa.authorizePrivacy(owner, code, () => getSession.get(tokenHash(token), now())?.id === owner, () =>
         action === 'export' ? privacy.export(owner) : { status: privacy.delete(owner) ? 303 : 403 });
     },
+    teams,
     assistantSettings,
     mfa,
     messages: messageStore(db, workspaceKey, now, transact),
@@ -171,7 +176,10 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
     readiness,
     economics,
     library: libraryStore(db),
-    network: networkStore(db, now, transact, sharing.revokeOnBlock),
+    network: networkStore(db, now, transact, (first, second) => {
+      sharing.revokeOnBlock(first, second);
+      teams.revokeOnBlock(first, second);
+    }),
     observatory: observatoryStore(db, now),
     settings,
     sharing,

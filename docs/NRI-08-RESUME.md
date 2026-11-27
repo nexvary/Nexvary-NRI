@@ -20,4 +20,6 @@ NRI-18b adds the local operator-managed message moderator role and report decisi
 
 NRI-18c adds credential-confirmed account export/deletion in `src/privacy.js` and `src/privacy-store.js`. `test/privacy.test.js` covers isolation, deletion and restore behavior. Keep the backup policy in [RECOVERY.md](RECOVERY.md#account-deletion-and-retention) aligned with future data stores.
 
-Next: add project RBAC and expand invitations from summary-only to attributable, role-scoped access. Preserve existing summary-only grants, verify direct URL denial, and integrate immutable manuscript and evidence review history. Continue commercial readiness and remaining items from the [functional matrix](STATUS.md#functional-acceptance).
+NRI-10a adds project team roles, invitation consent, manuscript versions, and manuscript/evidence review. See `src/team-store.js`, `src/teams.js` and `test/teams.test.js`. Full regression: 54/54 with real report rendering.
+
+Next: implement local commercial plans and operator-managed entitlements against the existing SQLite and Assistant usage infrastructure. Keep external billing disabled. Then extend team collaboration and operational readiness using the [functional matrix](STATUS.md#functional-acceptance).

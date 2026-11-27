@@ -182,6 +182,22 @@ try {
         assert.equal(store.messages.report(peer, thread, reported.id, 'other'), 303);
       }
       if ((lang === 'ar' && name === 'desktop') || (lang === 'en' && name === 'mobile')) {
+        const teamUrl = origin + '/workspace/projects/' + project + '/team?lang=' + lang;
+        if (lang === 'ar') {
+          await send('Page.navigate', { url: teamUrl });
+          await waitFor(() => inspect(send, 'Boolean(document.querySelector("button[value=save]"))'), 'manuscript form');
+          await inspect(send, `(() => {
+            const button = document.querySelector('button[value=save]');
+            button.form.elements.title.value = 'Illustrative methods draft';
+            button.form.elements.body.value = 'Verify each source and record the retrieval date.';
+            setTimeout(() => button.form.requestSubmit(button), 0);
+          })()`);
+        } else {
+          const [draft] = store.teams.view(id, project).manuscripts;
+          await send('Page.navigate', { url: teamUrl + '&manuscript=' + draft.id });
+        }
+        await waitFor(() => inspect(send, 'location.search.includes("manuscript=") && document.body?.textContent.includes("Verify each source")'), 'saved manuscript version');
+        await captureLayout(send, 'team', lang, name, width, height);
         await send('Page.navigate', { url: origin + '/workspace/settings/mfa?lang=' + lang });
         await waitFor(() => inspect(send, 'Boolean(document.querySelector("button[value=begin]"))'), 'MFA settings');
         await captureLayout(send, 'mfa', lang, name, width, height);
