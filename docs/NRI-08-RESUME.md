@@ -28,4 +28,6 @@ NRI-01a adds private dashboard collaborator counts, self-reported ORCID and dail
 
 NRI-10b adds role-scoped team notes and tasks, attributable task transitions, and pending invitation notices. See `src/team-work.js`, `src/team-store.js` and `test/teams.test.js`. Full regression: 56/56.
 
-Next: extend the team manuscript catalog with search, authors, tags and publication metadata. Preserve existing versions and direct URL authorization. Follow with library collections/annotations and remaining priorities in the [functional matrix](STATUS.md#functional-acceptance).
+NRI-02a adds manuscript catalog search, authors, tags, publication status, DOI and attributable metadata revisions. See `src/team-store.js`, `src/teams.js` and `test/teams.test.js`. Full regression: 56/56.
+
+Next: implement owner-scoped collections, bookmarks and document annotations using `src/library.js`, `src/document-store.js` and the authenticated workspace routes. Verify direct URL denial and stable references to document versions. Include owned annotations in account export and deletion coverage. Continue with the [functional matrix](STATUS.md#functional-acceptance).

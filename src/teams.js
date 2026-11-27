@@ -1,4 +1,4 @@
-import { teamRoles } from './team-store.js';
+import { publicationStages, teamRoles } from './team-store.js';
 import { escapeHtml } from './workspace-view.js';
 
 const inbox = '/workspace/team-invitations';
@@ -14,6 +14,7 @@ const roles = {
 const statusLabels = {
   pending: ['Pending', 'قيد الانتظار'], accepted: ['Accepted', 'مقبول'], declined: ['Declined', 'مرفوض'],
   revoked: ['Revoked', 'ملغى'], invited: ['Invited', 'تمت الدعوة'], blocked: ['Blocked', 'محظور'],
+  metadata: ['Catalog metadata revised', 'تم تحديث بيانات الفهرس'],
   note: ['Note added', 'أُضيفت ملاحظة'], task: ['Task added', 'أُضيفت مهمة'],
   'task-open': ['Task reopened', 'أُعيد فتح المهمة'], 'task-done': ['Task completed', 'اكتملت المهمة'],
   version: ['Manuscript version', 'إصدار المخطوطة'], review: ['Review', 'مراجعة'],
@@ -33,6 +34,8 @@ export function handleTeam({ request, reply, redirect, route, account, form, lan
   const link = (path) => path + '?lang=' + lang;
   const actor = account.id;
   const id = route.id;
+  const stageLabels = { draft: ['Draft', 'مسودة'], submitted: ['Submitted', 'مقدّمة'], published: ['Published', 'منشورة'] };
+  const stageLabel = (stage) => t(...stageLabels[stage]);
   const { teams } = store;
   const intent = form?.get('intent');
   const params = new URL(request.url, 'http://localhost').searchParams;
@@ -77,6 +80,16 @@ export function handleTeam({ request, reply, redirect, route, account, form, lan
       });
       return typeof result === 'string' ? redirect(action + '&manuscript=' + result) : reply(result);
     }
+    if (intent === 'metadata') {
+      const manuscript = form.get('manuscript') ?? '';
+      if (!uuid.test(manuscript)) return reply(404);
+      const list = (name) => [...new Set((form.get(name) ?? '').split(/\r?\n/).map((item) => item.trim()).filter(Boolean))];
+      const result = teams.updateMetadata(actor, id, {
+        manuscript, base: Number(form.get('base')), authors: list('authors'), tags: list('tags'),
+        stage: form.get('stage'), doi: (form.get('doi') ?? '').trim(),
+      });
+      return result === 303 ? redirect(action + '&manuscript=' + manuscript) : reply(result);
+    }
     if (intent === 'review') {
       const version = form.get('version') ?? '';
       if (version && !/^[1-9]\d{0,14}$/.test(version)) return reply(422);
@@ -87,7 +100,11 @@ export function handleTeam({ request, reply, redirect, route, account, form, lan
     }
     return reply(422);
   }
-  const current = teams.view(actor, id, selected);
+  const query = (params.get('q') ?? '').trim().slice(0,150);
+  const stage = publicationStages.includes(params.get('stage')) ? params.get('stage') : '';
+  const offsetField = params.get('offset') ?? '';
+  const offset = /^\d{1,8}$/.test(offsetField) ? Number(offsetField) : 0;
+  const current = teams.view(actor, id, selected, { query, stage, offset });
   if (!current || (selected && !current.versions.length)) return reply(404);
   const when = (timestamp) => new Intl.DateTimeFormat(lang, { dateStyle: 'medium', timeStyle: 'short' }).format(timestamp);
   const author = (owner) => escapeHtml(owner ?? t('Deleted account', 'حساب محذوف'));
@@ -101,6 +118,10 @@ export function handleTeam({ request, reply, redirect, route, account, form, lan
     <label>${t('Review note', 'ملاحظة المراجعة')}<textarea name="note" required maxlength="2000" dir="auto"></textarea></label>
     ${button('review', t('Record review', 'سجّل المراجعة'))}</form>`;
   const latest = current.versions[0];
+  const meta = current.metadata[0];
+  const more = (next) => action + '&amp;' + escapeHtml(new URLSearchParams({ q: query, stage, offset: next }).toString());
+  const lines = (value) => value ? JSON.parse(value).join('\n') : '';
+  const listLabels = (value) => value ? JSON.parse(value).join(' · ') : '';
   return page(t('Project team', 'فريق المشروع'), path, `
     <nav class="project-tools">${tab(inboxTitle,inbox)} ${tab(t('Notes and tasks','الملاحظات والمهام'),path + '/work')}</nav><h2 dir="auto">${escapeHtml(current.title)}</h2><p>${roleLabel(current.role)}</p>
     ${manage ? `<h2>${t('Team access', 'صلاحيات الفريق')}</h2>
@@ -113,7 +134,34 @@ export function handleTeam({ request, reply, redirect, route, account, form, lan
       ${['pending','accepted'].includes(member.state) && (member.role !== 'administrator' || current.role === 'owner') ?
         `<form class="project-tools" method="post" action="${action}">${hidden('peer',member.account_id)}${button('revoke', t('Revoke access', 'ألغِ الوصول'))}</form>` : ''}</li>`).join('')}</ul>` : ''}
     <h2>${t('Manuscripts', 'المخطوطات')}</h2>
-    <ul class="project-list">${current.manuscripts.map((item) => `<li><a href="${action}&amp;manuscript=${item.id}"><bdi>${escapeHtml(item.title)}</bdi> · v${item.version}</a></li>`).join('')}</ul>
+    <form class="workspace-form" method="get" action="${path}">
+      ${hidden('lang',lang)}
+      <label>${t('Search titles, authors, tags or DOI', 'ابحث بالعناوين أو المؤلفين أو الوسوم أو DOI')}<input name="q" maxlength="150" dir="auto" value="${escapeHtml(query)}"></label>
+      <label>${t('Publication status', 'حالة النشر')}<select name="stage"><option value="">${t('All statuses', 'كل الحالات')}</option>
+      ${publicationStages.map((item) => `<option value="${item}"${stage === item ? ' selected' : ''}>${stageLabel(item)}</option>`).join('')}</select></label>
+      <button class="action">${t('Search catalog', 'ابحث في الفهرس')}</button>
+    </form>
+    <ul class="project-list">${current.manuscripts.map((item) => `<li><a href="${action}&amp;manuscript=${item.id}"><bdi>${escapeHtml(item.title)}</bdi> · v${item.version}</a><small>${stageLabel(item.stage)}${item.authors ? ` · <bdi>${escapeHtml(listLabels(item.authors))}</bdi>` : ''}</small></li>`).join('')}</ul>
+    ${offset || current.manuscripts.length === 50 ? `<nav class="project-tools">
+      ${offset ? `<a href="${more(Math.max(0,offset - 50))}">${t('Previous results', 'النتائج السابقة')}</a>` : ''}
+      ${current.manuscripts.length === 50 ? `<a href="${more(offset + 50)}">${t('More results', 'مزيد من النتائج')}</a>` : ''}
+    </nav>` : ''}
+    ${latest ? `<details${meta ? ' open' : ''}><summary>${t('Manuscript catalog metadata', 'بيانات فهرس المخطوطة')}</summary>
+      <p>${stageLabel(meta?.stage ?? 'draft')} ${meta?.doi ? `· <a href="https://doi.org/${encodeURIComponent(meta.doi)}"><bdi>${escapeHtml(meta.doi)}</bdi></a>` : ''}</p>
+      ${meta ? `<p dir="auto">${escapeHtml(listLabels(meta.authors))}</p><p dir="auto">${escapeHtml(listLabels(meta.tags))}</p>` : ''}
+      ${write ? `<form class="workspace-form" method="post" action="${action}">
+        ${hidden('manuscript',selected)}${hidden('base',meta?.revision ?? 0)}
+        <label>${t('Authors, one per line', 'المؤلفون، اسم في كل سطر')}<textarea name="authors" maxlength="2020" dir="auto">${escapeHtml(lines(meta?.authors))}</textarea></label>
+        <label>${t('Tags, one per line', 'الوسوم، وسم في كل سطر')}<textarea name="tags" maxlength="820" dir="auto">${escapeHtml(lines(meta?.tags))}</textarea></label>
+        <label>${t('Publication status', 'حالة النشر')}<select name="stage">${publicationStages.map((item) =>
+          `<option value="${item}"${item === (meta?.stage ?? 'draft') ? ' selected' : ''}>${stageLabel(item)}</option>`).join('')}</select></label>
+        <label>DOI<input name="doi" dir="ltr" maxlength="253" value="${escapeHtml(meta?.doi ?? '')}"></label>
+        ${button('metadata',t('Save catalog revision','احفظ مراجعة الفهرس'))}</form>` : ''}
+      ${current.metadata.length ? `<details><summary>${t('Catalog revision history', 'سجل مراجعات الفهرس')}</summary>
+        <ol class="activity">${current.metadata.map((entry) => `<li>v${entry.revision} · ${stageLabel(entry.stage)} ·
+          <bdi>${author(entry.editor)}</bdi> · ${when(entry.recorded_at)}
+          <p dir="auto">${escapeHtml([listLabels(entry.authors),listLabels(entry.tags),entry.doi].filter(Boolean).join(' · '))}</p></li>`).join('')}</ol></details>` : ''}
+    </details>` : ''}
     ${write ? `<form class="workspace-form" method="post" action="${action}">
       ${latest ? hidden('manuscript',selected) + hidden('base',latest.version) : `<label>${t('Title', 'العنوان')}<input name="title" maxlength="150" required dir="auto"></label>`}
       <label>${t('Manuscript text', 'نص المخطوطة')}<textarea name="body" rows="5" maxlength="12000" required dir="auto">${escapeHtml(latest?.body ?? '')}</textarea></label>

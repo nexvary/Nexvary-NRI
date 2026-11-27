@@ -1,5 +1,12 @@
 # Development status
 
+## NRI-02a · Manuscript catalog and metadata revisions · 2026-11-27 (Cairo)
+
+The team catalog supports author and tag lists, DOI validation, publication status, search and status filtering. Authorized editors save metadata revisions with attribution. Stale updates are rejected. Existing text versions remain independently reviewable.
+
+- 56/56 with real report rendering. HTTP checks cover authorization, rejected DOI, version conflicts, filtered results and attribution.
+- Chromium submitted catalog metadata and captured [Arabic desktop](qa/nri-02/catalog-ar-desktop.webp) and [English mobile](qa/nri-02/catalog-en-mobile.webp).
+
 ## NRI-10b · Shared work and invitation notices · 2026-11-27 (Cairo)
 
 Project team members can read shared notes and tasks. Owners, administrators and researchers can add notes/tasks and change task status. Updates record their actor and reject stale state changes. The authenticated navigation shows pending team invitations.
@@ -244,7 +251,7 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | ID | Status | Implemented evidence and remaining acceptance |
 |---|---|---|
 | NRI-01 | Partial | Verified real private project, PDF, reference and evidence counts, recent activity, sign-in/empty states and account isolation. Accepted collaborator counts, self-reported ORCID and metered cost are verified. Verified ORCID ownership remains. |
-| NRI-02 | Partial | Personal project CRUD, project PDF versions, project DOI records and access denial are verified. The team workspace adds versioned manuscripts and author attribution. Tags, search, notes, tasks and publication status remain. |
+| NRI-02 | Partial | Personal project CRUD, project PDF versions, project DOI records and access denial are verified. The team workspace adds versioned manuscripts and author attribution. Catalog search, authors, tags, DOI and publication revisions are verified, alongside team notes and tasks. Wider document integration remains. |
 | NRI-03 | Partial | Project-bound PDF upload, metadata, encrypted persistence, version downloads and deletion are verified. Cross-project search and type filtering for PDFs and saved sources are verified. Other formats, collections, reading and annotation, citation import/export and deduplication remain. |
 | NRI-04 | Partial | Crossref and OpenAlex DOI lookups, dated per-provider source links, correction/retraction metadata, per-provider local cache, rate limits and unknown/failure outcomes are verified. Side-by-side provider comparison view implemented. Agency resolution, additional providers, claim-to-source mapping and evidence review remain. |
 | NRI-05 | Partial | Claims, dated source snapshots, study type, limitations, conflicting evidence, owner review and JSON export are verified. Team reviewers can file attributable reviews alongside immutable review history. |
@@ -263,4 +270,4 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | NRI-18 | Partial | Local authentication, session revocation, account audit, authorization, encrypted PDF bytes, RTL/LTR and verified recovery are implemented. NRI-18a adds optional MFA and one-use recovery codes. NRI-18b adds the operator-managed message moderator role and scoped report review. Project team RBAC is verified for manuscripts and evidence review. Password/account recovery, accessibility audit and broader administration remain. |
 | NRI-19 | Partial | Local restore and regression workflow configuration are implemented. Local plans, entitlement limits, an MFA-protected operator console, migration/restore drills and schema health checks are verified. Approved hosting, production security and monitoring, and optional billing remain. |
 
-Next milestone: manuscript catalog search, authors, tags and publication metadata.
+Next milestone: owner-scoped library collections, bookmarks and annotations.

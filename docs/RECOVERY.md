@@ -22,7 +22,7 @@ The app has no scheduled backup retention on a local workspace. The operator con
 
 Account export is a sensitive JSON download and includes owned PDF versions as base64. It includes the user's sent message bodies and excludes other participants' message bodies, credential material, recovery codes, session tokens and provider API keys. The response has a 64 MiB limit. Large documents can also be downloaded individually through the owned project library.
 
-Team manuscripts, reviews, notes and tasks belong to their project. Deleting a contributor removes their memberships and clears their identity on surviving project contributions and audit records. Deleting the project owner removes those projects and team records. An export includes manuscript versions, review records, notes and tasks from owned projects or authored by the exporting account.
+Team manuscripts, reviews, notes and tasks belong to their project. Deleting a contributor removes their memberships and clears their identity on surviving project contributions and audit records. Deleting the project owner removes those projects and team records. An export includes manuscript text and metadata revisions, review records, notes and tasks from owned projects or authored by the exporting account.
 
 ## Local release and recovery drill
 

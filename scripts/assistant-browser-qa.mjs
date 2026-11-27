@@ -209,6 +209,18 @@ try {
         }
         await waitFor(() => inspect(send, 'location.search.includes("manuscript=") && document.body?.textContent.includes("Verify each source")'), 'saved manuscript version');
         await captureLayout(send, 'team', lang, name, width, height);
+        if (lang === 'ar') {
+          await inspect(send, `(() => {
+            const button = document.querySelector('button[value=metadata]');
+            button.closest('details').open = true;
+            button.form.elements.authors.value = 'Sample team';
+            button.form.elements.tags.value = 'research methods';
+            button.form.elements.stage.value = 'submitted';
+            setTimeout(() => button.form.requestSubmit(button), 0);
+          })()`);
+        }
+        await waitFor(() => inspect(send, 'Boolean(document.querySelector("textarea[name=authors]")?.value.includes("Sample team"))'), 'saved manuscript metadata');
+        await captureLayout(send, 'catalog', lang, name, width, height);
         await send('Page.navigate', { url: origin + '/workspace/projects/' + project + '/team/work?lang=' + lang });
         await waitFor(() => inspect(send, 'Boolean(document.querySelector("button[value=task]"))'), 'team task form');
         if (lang === 'ar') {

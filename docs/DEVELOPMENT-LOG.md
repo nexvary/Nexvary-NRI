@@ -147,3 +147,8 @@
 
 - Added team notes, concurrent-safe task status changes, attributable audit events, and pending invitation notices.
 - 56/56 with real report rendering. Chromium created a task and captured both locales.
+
+## 2026-11-27 · NRI-02a manuscript catalog
+
+- Added searchable authors, tags, publication status and DOI with independently attributable metadata revisions.
+- 56/56 with real report rendering. Chromium saved catalog metadata and captured Arabic desktop and English mobile.

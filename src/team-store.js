@@ -1,3 +1,4 @@
+import { normalizeDoi } from './crossref.js';
 import { randomUUID } from 'node:crypto';
 
 export const teamSchema = `
@@ -55,6 +56,18 @@ export const teamWorkSchema = `
   PRAGMA user_version = 20;
 `;
 
+export const manuscriptCatalogSchema = `
+  CREATE TABLE IF NOT EXISTS manuscript_metadata (
+    id INTEGER PRIMARY KEY, manuscript_id TEXT NOT NULL REFERENCES team_manuscripts(id) ON DELETE CASCADE,
+    revision INTEGER NOT NULL, editor TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+    authors TEXT NOT NULL, tags TEXT NOT NULL, stage TEXT NOT NULL CHECK(stage IN ('draft','submitted','published')),
+    doi TEXT, recorded_at INTEGER NOT NULL, UNIQUE(manuscript_id, revision)
+  ) STRICT;
+  PRAGMA user_version = 21;
+`;
+
+export const publicationStages = ['draft', 'submitted', 'published'];
+
 export const teamRoles = ['administrator', 'researcher', 'reviewer', 'read-only'];
 const rights = {
   owner: ['manage', 'write', 'review', 'audit'],
@@ -94,9 +107,19 @@ export function teamStore(db, now, transact) {
   const blockedGrants = db.prepare(`SELECT m.project_id, m.account_id FROM project_members m JOIN projects p ON p.id = m.project_id
     WHERE m.state IN ('pending','accepted') AND ((p.owner_id = ? AND m.account_id = ?) OR (p.owner_id = ? AND m.account_id = ?))`);
   const addManuscript = db.prepare('INSERT INTO team_manuscripts VALUES (?, ?, ?)');
-  const manuscripts = db.prepare(`SELECT m.id, m.title, max(v.version) AS version
+  const manuscripts = db.prepare(`SELECT m.id, m.title, max(v.version) AS version,
+      COALESCE(x.stage,'draft') AS stage, x.authors,x.tags,x.doi
     FROM team_manuscripts m JOIN team_manuscript_versions v ON v.manuscript_id=m.id
-    WHERE m.project_id=? GROUP BY m.id ORDER BY m.title,m.id LIMIT 100`);
+    LEFT JOIN manuscript_metadata x ON x.id=(SELECT id FROM manuscript_metadata WHERE manuscript_id=m.id ORDER BY revision DESC LIMIT 1)
+    WHERE m.project_id=:project AND (:stage='' OR COALESCE(x.stage,'draft')=:stage) AND
+      (:query='' OR instr(lower(m.title),lower(:query))>0 OR instr(lower(COALESCE(x.authors,'')),lower(:query))>0 OR
+        instr(lower(COALESCE(x.tags,'')),lower(:query))>0 OR instr(lower(COALESCE(x.doi,'')),lower(:query))>0)
+    GROUP BY m.id ORDER BY m.title,m.id LIMIT 50 OFFSET :offset`);
+  const metadata = db.prepare(`SELECT x.revision,x.editor,x.authors,x.tags,x.stage,x.doi,x.recorded_at
+    FROM manuscript_metadata x JOIN team_manuscripts m ON m.id=x.manuscript_id
+    WHERE m.project_id=? AND m.id=? ORDER BY x.revision DESC LIMIT 20`);
+  const addMetadata = db.prepare(`INSERT INTO manuscript_metadata(manuscript_id,revision,editor,authors,tags,stage,doi,recorded_at)
+    VALUES (?,?,?,?,?,?,?,?)`);
   const versions = db.prepare(`SELECT v.id, v.version, v.author, v.body, v.recorded_at FROM team_manuscript_versions v
     JOIN team_manuscripts m ON m.id=v.manuscript_id WHERE m.project_id=? AND m.id=? ORDER BY v.version DESC LIMIT 50`);
   const latest = db.prepare(`SELECT max(v.version) AS version FROM team_manuscript_versions v
@@ -195,15 +218,31 @@ export function teamStore(db, now, transact) {
         return true;
       });
     },
-    view(actor, id, manuscript) {
+    view(actor, id, manuscript, { query = '', stage = '', offset = 0 } = {}) {
       const current = access(actor, id);
       if (!current) return undefined;
       return {
-        ...current, manuscripts: manuscripts.all(id), versions: manuscript ? versions.all(id, manuscript) : [],
+        ...current, manuscripts: manuscripts.all({ project: id, query, stage, offset }),
+        versions: manuscript ? versions.all(id, manuscript) : [],
+        metadata: manuscript ? metadata.all(id, manuscript) : [],
         evidence: evidence.all(id), reviews: reviews.all(id),
         members: current.rights.includes('manage') ? members.all(id) : [],
         events: current.rights.includes('audit') ? audit.all(id) : [],
       };
+    },
+    updateMetadata(actor, id, { manuscript, base, authors, tags, stage, doi }) {
+      return transact(db, () => {
+        if (!access(actor, id)?.rights.includes('write')) return 403;
+        if (latest.get(id, manuscript).version === null) return 404;
+        const previous = metadata.get(id, manuscript)?.revision ?? 0;
+        if (previous !== base) return 409;
+        const identifier = doi ? normalizeDoi(doi) : null;
+        if (!publicationStages.includes(stage) || (doi && !identifier) ||
+            authors.length > 20 || tags.length > 20 || authors.some((name) => name.length > 100) || tags.some((tag) => tag.length > 40)) return 422;
+        addMetadata.run(manuscript, previous + 1, actor, JSON.stringify(authors), JSON.stringify(tags), stage, identifier, now());
+        record(id, actor, null, 'metadata', manuscript + ':' + (previous + 1));
+        return 303;
+      });
     },
     save(actor, id, { manuscript, title, body, base }) {
       return transact(db, () => {
