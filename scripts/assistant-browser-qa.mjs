@@ -19,6 +19,15 @@ store.references.save(id, project, {
   doi: '10.0000/visual-example', provider: 'crossref', status: 'found',
   checkedAt: Date.UTC(2026, 10, 26), metadata: { title: 'Illustrative reference snapshot' },
 });
+const peerEmail = 'coauthor@example.test';
+store.addAccount(peerEmail, { salt: Buffer.alloc(16), hash: Buffer.alloc(32) });
+const peer = store.credentials(peerEmail).id;
+store.network.save(id, { name: 'NRI Researcher', interests: '', orcid: '', discoverable: true });
+store.network.save(peer, { name: 'NRI Coauthor', interests: '', orcid: '', discoverable: true });
+store.network.interact(id, peer, 'request');
+store.network.interact(peer, id, 'accept');
+const thread = store.messages.open(id, peer);
+store.messages.send(peer, thread, 'Could we verify the reference metadata before submitting the report?');
 const app = createApp(store);
 await new Promise((resolve) => app.listen(0, '127.0.0.1', resolve));
 const origin = 'http://127.0.0.1:' + app.address().port;
@@ -66,6 +75,26 @@ async function waitFor(check, description, attempts = 50) {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   throw new Error('Browser condition timed out: ' + description);
+}
+
+async function captureLayout(send, kind, lang, name, width, height) {
+  const layout = await inspect(send, `document.fonts.ready.then(() => ({
+    lang: document.documentElement.lang, direction: document.documentElement.dir,
+    viewport: window.innerWidth, client: document.documentElement.clientWidth,
+    page: document.documentElement.scrollWidth,
+    svg: Boolean(document.querySelector('nav svg'))
+  }))`);
+  assert.equal(layout.page, layout.client, kind + ' layout has no horizontal overflow');
+  assert.deepEqual({ lang: layout.lang, direction: layout.direction, viewport: layout.viewport, svg: layout.svg },
+    { lang, direction: lang === 'ar' ? 'rtl' : 'ltr', viewport: width, svg: true });
+  const { cssContentSize } = await send('Page.getLayoutMetrics');
+  const contentHeight = Math.ceil(cssContentSize.height);
+  const capture = contentHeight > height ? {
+    captureBeyondViewport: true,
+    clip: { x: 0, y: 0, width, height: contentHeight, scale: 1 },
+  } : {};
+  const { data } = await send('Page.captureScreenshot', { format: 'webp', quality: 83, ...capture });
+  await writeFile(join(output, `${kind}-${lang}-${name}.webp`), Buffer.from(data, 'base64'));
 }
 
 const chrome = spawn(process.env.NRI_CHROME ?? 'google-chrome', [
@@ -125,23 +154,18 @@ try {
         return Boolean(field.value);
       })()`), true);
       await waitFor(() => inspect(send, 'Boolean(document.body?.innerText.includes("Illustrative reference snapshot"))'), 'saved source result');
-      const layout = await inspect(send, `document.fonts.ready.then(() => ({
-        lang: document.documentElement.lang, direction: document.documentElement.dir,
-        viewport: window.innerWidth, client: document.documentElement.clientWidth,
-        page: document.documentElement.scrollWidth,
-        svg: Boolean(document.querySelector('nav svg'))
-      }))`);
-      assert.equal(layout.page, layout.client, 'Assistant layout has no horizontal overflow');
-      assert.deepEqual({ lang: layout.lang, direction: layout.direction, viewport: layout.viewport, svg: layout.svg },
-        { lang, direction: lang === 'ar' ? 'rtl' : 'ltr', viewport: width, svg: true });
-      const { cssContentSize } = await send('Page.getLayoutMetrics');
-      const contentHeight = Math.ceil(cssContentSize.height);
-      const capture = contentHeight > height ? {
-        captureBeyondViewport: true,
-        clip: { x: 0, y: 0, width, height: contentHeight, scale: 1 },
-      } : {};
-      const { data } = await send('Page.captureScreenshot', { format: 'webp', quality: 83, ...capture });
-      await writeFile(join(output, `assistant-${lang}-${name}.webp`), Buffer.from(data, 'base64'));
+      await captureLayout(send, 'assistant', lang, name, width, height);
+      await send('Page.navigate', { url: origin + '/workspace/messages/' + thread + '?lang=' + lang });
+      await waitFor(() => inspect(send, 'Boolean(document.querySelector(".message-list")?.textContent.includes("verify the reference metadata"))'), 'private message thread');
+      if (lang === 'ar' && name === 'desktop') {
+        await inspect(send, `(() => {
+          const field = document.querySelector('textarea[name=text]');
+          field.value = 'I checked the saved snapshot and its retrieval date.';
+          field.form.requestSubmit(field.form.querySelector('button'));
+        })()`);
+      }
+      await waitFor(() => inspect(send, 'Boolean(document.querySelector(".message-list")?.textContent.includes("checked the saved snapshot"))'), 'sent private message');
+      await captureLayout(send, 'messages', lang, name, width, height);
       client.socket.close();
     }
   }

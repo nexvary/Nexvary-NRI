@@ -1,5 +1,13 @@
 # Development status
 
+## NRI-11 · Private researcher messaging · 2026-11-27 (Cairo)
+
+Accepted collaborators can open a shared private thread. Each participant has independent unread state and a preference for in-app unread notifications. Both block directions prevent sends. Users can report received messages by category. Message bodies are encrypted in SQLite with a purpose-specific key derived from the paired workspace key.
+
+- 50/50 regression tests with the PDF/DOCX renderer. HTTP acceptance covers participant and origin authorization, account isolation, encrypted storage, reporting privacy, read markers, notification preferences, blocking and rate limiting.
+- Real Chromium exercised sending and rendering a message in four viewports using illustrative accounts. Captures: [Arabic desktop](qa/nri-11/messages-ar-desktop.webp), [Arabic mobile](qa/nri-11/messages-ar-mobile.webp), [English desktop](qa/nri-11/messages-en-desktop.webp), [English mobile](qa/nri-11/messages-en-mobile.webp).
+- Reports are persisted for the pending NRI-18 moderation console.
+
 ## NRI-08d · External consent and usage limits · 2026-11-27 (Cairo)
 
 OpenAI chat completions are opt-in through an operator-configured model and rate policy. Each request requires explicit consent for the current question and displayed source metadata. The SQLite ledger reserves per-account daily tokens and estimated USD cost before sending, and records usage reported by the provider. Input tokens and cost are estimates based on configured rates. Reservations remain charged against the internal limit when provider usage is unavailable.
@@ -194,7 +202,7 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | NRI-08 | Verified | NRI-08a exercises private saved-source review, provenance and retraction/editorial warnings in `test/assistant.test.js`. NRI-08b adds private encrypted BYOK storage, offline/provider selection and model settings in `test/assistant-settings.test.js`. NRI-08c verifies mocked local cited answers, cancellation and bounded caching in `test/assistant-answer.test.js`. NRI-08d verifies external consent, mocked OpenAI requests and durable reservations in the same test suite. |
 | NRI-09 | Partial | Opt-in profiles, search, follow and block, bounded requests and private profile isolation verified. Verified ORCID ownership, posts, groups, publication sharing and moderation remain. |
 | NRI-10 | Partial | Collaboration requests and scoped project-summary invitations, acceptance/decline, revoke and access history are verified. Broader roles, notifications, shared notes and tasks remain. |
-| NRI-11 | Not started | Conversations, notification preferences and authorization remain. |
+| NRI-11 | Verified | Private direct conversations, independent unread state, in-app notification preferences, reports, participant and origin checks, blocking, encrypted message bodies and rate limits verified in `test/messages.test.js` and Chromium. |
 | NRI-12 | Verified | Private watchlists, saved library searches, date-stamped manual updates, filters and provider provenance. |
 | NRI-13 | Verified | Bounded UTF-8 CSV import, numeric validation, descriptive metrics, histogram, IQR outlier flags, units and reproducible JSON export. |
 | NRI-14 | Verified | Bilingual starter lessons, quizzes, model-backed illustrative simulation and private progress. |
@@ -204,4 +212,4 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | NRI-18 | Partial | Local authentication, session revocation, account audit, authorization, encrypted PDF bytes, RTL/LTR and verified recovery are implemented. Team RBAC, MFA, account recovery, export/deletion, accessibility audit and administration remain. |
 | NRI-19 | Partial | Local restore and regression workflow configuration are implemented. Entitlements, approved hosting, operational monitoring and billing remain. |
 
-Next milestone: NRI-11 private messaging and notification preferences.
+Next milestone: NRI-18 MFA and recovery codes, followed by RBAC and moderation.

@@ -343,3 +343,7 @@ small { font-size: .84rem; }
 @media (max-width: 600px) {
   .provider-comparison { grid-template-columns: 1fr; }
 }
+
+.message-list { padding-inline-start: 0; list-style: none; }
+.message-list p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.language { display: flex; flex-wrap: wrap; justify-content: end; gap: .35rem; }

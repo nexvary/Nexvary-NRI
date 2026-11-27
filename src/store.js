@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { closeSync, mkdirSync, openSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { messageSchema, messageStore } from './message-store.js';
 import { assistantUsageSchema, assistantUsageStore } from './assistant-usage.js';
 import { assistantSettingsSchema, assistantSettingsStore } from './assistant-settings.js';
 import { bindDocumentKey } from './document-crypto.js';
@@ -18,7 +19,7 @@ import { evidenceSchema, evidenceStore } from './evidence-store.js';
 import { referenceSchema, referenceMigrationV4, referenceStore } from './reference-store.js';
 
 export const sessionLifetime = 8 * 60 * 60;
-const schemaVersion = 14;
+const schemaVersion = 15;
 const schema = `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -75,6 +76,7 @@ function initialize(db, path) {
     if (version < 12) db.exec(educationSchema);
     if (version < 13) db.exec(assistantSettingsSchema);
     if (version < 14) db.exec(assistantUsageSchema);
+    if (version < 15) db.exec(messageSchema);
     return bindDocumentKey(db, path);
   });
 }
@@ -94,6 +96,7 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
   }
 
   const db = new DatabaseSync(path, { enableForeignKeyConstraints: true, timeout: 3000 });
+  let workspaceKey;
   let assistantSettings;
   let documents;
   let references;
@@ -101,7 +104,7 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
   let readiness;
   let economics;
   try {
-    const workspaceKey = initialize(db, path);
+    workspaceKey = initialize(db, path);
     documents = documentStore(db, workspaceKey, now, transact);
     assistantSettings = assistantSettingsStore(db, workspaceKey);
     references = referenceStore(db, now, transact);
@@ -142,6 +145,7 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
 
   return {
     assistantSettings,
+    messages: messageStore(db, workspaceKey, now, transact),
     assistantUsage: assistantUsageStore(db, now, transact),
     documents,
     references,

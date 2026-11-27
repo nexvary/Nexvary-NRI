@@ -63,7 +63,14 @@ export function networkStore(db, now, transact, revokeShares) {
   const pruneEvents = db.prepare('DELETE FROM researcher_request_events WHERE account_id=? AND created_at <= ?');
   const requestEvent = db.prepare('INSERT INTO researcher_request_events VALUES (?, ?)');
 
+  function block(owner, peer) {
+    clearPair.run(owner, peer, peer, owner);
+    revokeShares(owner, peer);
+    return insert.run(owner, peer, 'block', 'active', now()).changes === 1;
+  }
+
   return {
+    blockParticipant: (owner, peer) => transact(db, () => block(owner, peer)),
     profile: (owner) => profile.get(owner),
     discover: (owner, search) => discover.all(owner, owner, owner, owner, owner, search, search, search),
     incoming: (owner) => incoming.all(owner, owner, owner, owner),
@@ -93,10 +100,7 @@ export function networkStore(db, now, transact, revokeShares) {
           }
           case 'accept':
           case 'decline': return decide.run(action === 'accept' ? 'accepted' : 'declined', peer, owner).changes === 1;
-          case 'block':
-            clearPair.run(owner, peer, peer, owner);
-            revokeShares(owner, peer);
-            return insert.run(owner, peer, 'block', 'active', now()).changes === 1;
+          case 'block': return block(owner, peer);
           default: return false;
         }
       });

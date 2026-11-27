@@ -107,3 +107,8 @@
 
 - Added opt-in OpenAI transport, consent tied to disclosed reference snapshots, daily reservations and provider-reported usage. Mocked tests verify consent and budget denial, citation results and cache hits.
 - No live OpenAI calls were made. NRI-11 is the next acceptance milestone.
+
+## 2026-11-27 · NRI-11 private researcher messages
+
+- Added participant-scoped direct threads, encrypted text, read markers, an in-app notification preference, blocking, reporting and send/report limits. Conversation creation uses accepted collaboration relationships.
+- 50/50 with real report rendering. Chromium sent a message and captured both languages at desktop and mobile sizes. See [STATUS.md](STATUS.md) for the captures and next milestone.

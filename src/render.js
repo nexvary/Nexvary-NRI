@@ -9,7 +9,7 @@ const shortcuts = ['research', 'evidence', 'l-ready', 'economics', 'assistant', 
 const additional = ['references', 'messages', 'observatory', 'analytics', 'education'];
 const repo = 'https://github.com/nexvary/Nexvary-NRI';
 
-export function render({ lang, view, version, page, workspace }) {
+export function render({ lang, view, version, page, workspace, unread = 0 }) {
   const tr = (pair) => pair[lang === 'ar' ? 1 : 0];
   const t = (key) => tr(copy[key]);
   const href = (target, language = lang) => `/?lang=${language}&amp;view=${target}`;
@@ -115,6 +115,7 @@ export function render({ lang, view, version, page, workspace }) {
   <header class="topbar">
     <a class="wordmark" href="${href('dashboard')}" lang="en" dir="ltr">NEXVARY <em>NRI</em><span>Research Intelligence</span></a>
     <nav class="language" aria-label="${t('language')}">
+      ${unread ? `<a href="${href('messages')}">${icon('💬')}${tr(['Unread messages', 'الرسائل غير المقروءة'])} · ${new Intl.NumberFormat(lang).format(unread)}</a>` : ''}
       <a href="${languageLink}" hreflang="${otherLanguage}" lang="${otherLanguage}" dir="auto">${icon('🌐')}${otherLanguage === 'ar' ? 'العربية' : 'English'}</a>
     </nav>
   </header>

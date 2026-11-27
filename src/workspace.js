@@ -1,3 +1,4 @@
+import { handleMessages, resolveMessageRoute } from './messages.js';
 import { createAssistantAnswerHandler } from './assistant-answer.js';
 import { handleAssistantSettings } from './assistant-settings.js';
 import { showAssistant } from './assistant.js';
@@ -40,7 +41,7 @@ export function resolveWorkspaceRoute(pathname) {
   if (pathname === '/workspace') return { kind: 'index' };
   const match = pathname.match(/^\/workspace\/projects\/([0-9a-f-]{36})(\/delete)?$/);
   if (match) return { kind: match[2] ? 'delete' : 'project', id: match[1] };
-  return resolveDocumentRoute(pathname) ?? resolveReferenceRoute(pathname) ?? resolveEvidenceRoute(pathname) ?? resolveReadinessRoute(pathname) ?? resolveEconomicsRoute(pathname) ?? resolveObservatoryRoute(pathname) ?? resolveReportRoute(pathname) ?? resolveSharingRoute(pathname);
+  return resolveMessageRoute(pathname) ?? resolveDocumentRoute(pathname) ?? resolveReferenceRoute(pathname) ?? resolveEvidenceRoute(pathname) ?? resolveReadinessRoute(pathname) ?? resolveEconomicsRoute(pathname) ?? resolveObservatoryRoute(pathname) ?? resolveReportRoute(pathname) ?? resolveSharingRoute(pathname);
 }
 
 function acceptsPost(request) {
@@ -170,6 +171,10 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
       return;
     }
 
+    if (kind.startsWith('messages')) {
+      handleMessages({ request, reply, redirect, route, lang, account, form, store });
+      return;
+    }
     if (kind === 'assistant-answer') {
       await handleAssistantAnswer({ request, reply, lang, form, account, stillSignedIn: () => store.session(token)?.id === account.id });
       return;

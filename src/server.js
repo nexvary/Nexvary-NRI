@@ -44,14 +44,17 @@ export function createApp(store = openWorkspaceStore(), {
     };
 
     const sendPage = (status, view, page, headers, dashboard) => {
-      const answer = request.method === 'HEAD' ? undefined : render({ lang, view, version, page, workspace: dashboard });
+      const session = store.session(readSessionCookie(request.headers.cookie));
+      const unread = session && store.messages.notifications(session.id) ? store.messages.unread(session.id) : 0;
+      const answer = request.method === 'HEAD' ? undefined : render({ lang, view, version, page, workspace: dashboard, unread });
       response.writeHead(status, {
         ...securityHeaders, 'Content-Type': 'text/html; charset=utf-8', 'Content-Language': lang, ...headers,
+        ...(session ? { 'Cache-Control': 'no-store' } : {}),
       }).end(answer);
     };
 
     if (route) {
-      const section = { reference: 'references', evidence: 'evidence', readiness: 'l-ready', economics: 'economics', library: 'library', network: 'network', collaboration: 'collaboration', analytics: 'analytics', observatory: 'observatory', report: 'reports', settings: 'settings', sharing: 'collaboration', education: 'education', assistant: 'assistant' };
+      const section = { reference: 'references', evidence: 'evidence', readiness: 'l-ready', economics: 'economics', library: 'library', network: 'network', collaboration: 'collaboration', analytics: 'analytics', observatory: 'observatory', report: 'reports', settings: 'settings', sharing: 'collaboration', education: 'education', assistant: 'assistant', messages: 'messages' };
       const view = Object.entries(section).find(([key]) => route.kind.startsWith(key))?.[1] ?? 'research';
       const reply = (status, page, headers, body) => {
         const privateHeaders = { 'Cache-Control': 'no-store', ...headers };
@@ -85,7 +88,7 @@ export function createApp(store = openWorkspaceStore(), {
       redirect(`/workspace/report-projects?lang=${lang}`);
       return;
     }
-    if (pathname === '/' && ['network', 'collaboration', 'analytics', 'observatory', 'settings', 'education', 'assistant'].includes(view)) {
+    if (pathname === '/' && ['network', 'collaboration', 'analytics', 'observatory', 'settings', 'education', 'assistant', 'messages'].includes(view)) {
       redirect(`/workspace/${view}?lang=${lang}`);
       return;
     }
