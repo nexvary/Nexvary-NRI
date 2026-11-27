@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { after, before, test } from 'node:test';
+import { totp } from '../src/mfa.js';
 import { createApp } from '../src/server.js';
 import { openWorkspaceStore } from '../src/store.js';
 
@@ -287,11 +288,17 @@ test('validates, previews, versions and isolates private UTF-8 documents', async
   assert.equal((await request(documentsPath(), { body: upload(Uint8Array.of(0xc3, 0x28)) })).status, 422);
   assert.equal((await request(documentsPath(), { body: upload('Binary\0data') })).status, 422);
   assert.equal((await request(documentsPath(), { body: upload(Buffer.alloc(256 * 1024 + 1, 65)) })).status, 413);
-  const operator = store.credentials(alice).id;
+  const operator = store.credentials(bob).id;
   store.licensing.setOperator(operator, true);
+  store.mfa.begin(operator);
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  const bits = [...store.mfa.pending(operator)].map((character) => alphabet.indexOf(character).toString(2).padStart(5, '0')).join('');
+  const secret = Buffer.from(bits.match(/.{8}/g).map((byte) => parseInt(byte, 2)));
+  const counter = Math.floor(Date.now() / 30_000);
+  assert.equal(store.mfa.confirm(operator, totp(secret, counter), bobCookie.slice('nri_session='.length)).length, 8);
   try {
-    store.licensing.save(operator, 'txt-test', 100, 0, 0);
-    store.licensing.assign(operator, alice, 'txt-test', null);
+    assert.equal(store.licensing.save(operator, 'txt-test', 100, 0, 0), 303);
+    assert.equal(store.licensing.assign(operator, alice, 'txt-test', null), 303);
     assert.equal((await request(history, { body: upload('Over quota') })).status, 429);
   } finally {
     store.licensing.setOperator(operator, false);
