@@ -1,0 +1,17 @@
+[Unit]
+Description=Reconcile expired NEXVARY NRI subscriptions
+RequiresMountsFor=/var/lib/nri
+
+[Service]
+Type=oneshot
+User=nri
+Group=nri
+Environment=NRI_DB_PATH=/var/lib/nri/workspace.sqlite
+ExecStart=/opt/nri/runtime/bin/node /opt/nri/current/src/subscription-reconcile-cli.js
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/nri

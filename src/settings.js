@@ -62,6 +62,7 @@ const labels = {
 
 export function settingsPage(store, lang, account, token) {
   const t = (key) => labels[key][lang === 'ar' ? 1 : 0];
+  const renewal = store.licensing.renewalNotice(account.id);
   const recent = store.settings.list(account.id);
   const count = store.otherSessions(account.id, token);
   const current = new Intl.NumberFormat(lang).format(count);
@@ -79,6 +80,10 @@ export function settingsPage(store, lang, account, token) {
         <div><dt>${t('other')}</dt><dd>${current}</dd></div></dl>
       ${count ? `<form method="post" action="/workspace/settings?lang=${lang}">
         <button class="action" name="intent" value="revoke-others">${t('revoke')}</button></form>` : ''}
+      ${renewal ? `<p><strong>${renewal.expired
+        ? (lang === 'ar' ? 'انتهى اشتراكك' : 'Your subscription expired')
+        : (lang === 'ar' ? 'ينتهي اشتراكك قريبًا' : 'Your subscription expires soon')}</strong>
+        · <time>${date.format(renewal.at)} UTC</time></p>` : ''}
       <h2>${t('events')}</h2>
       ${recent.length ? `<ul class="activity">${recent.map((event) => `<li>${t(event.action)}
         <time datetime="${new Date(event.recordedAt).toISOString()}">${date.format(event.recordedAt)} UTC</time></li>`).join('')}</ul>`

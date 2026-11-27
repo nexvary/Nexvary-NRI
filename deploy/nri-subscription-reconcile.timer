@@ -1,0 +1,9 @@
+[Unit]
+Description=Reconcile NEXVARY NRI subscription expiry hourly
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+
+[Install]
+WantedBy=timers.target

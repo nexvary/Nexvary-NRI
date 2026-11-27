@@ -109,6 +109,14 @@ export const planPricingSchema = `
 `;
 
 const currencies = new Set(Intl.supportedValuesOf('currency'));
+export const lifecycleScheduleSchema = `
+  CREATE INDEX IF NOT EXISTS license_assignment_expiry
+    ON license_assignments(expires_at);
+  CREATE INDEX IF NOT EXISTS license_institution_expiry
+    ON license_organization_subscriptions(expires_at) WHERE state IN ('trial','active','grace');
+  PRAGMA user_version = 38;
+`;
+
 const subscriptionTransitions = Object.freeze({
   trial: ['active', 'expired', 'suspended', 'cancelled', 'revoked'],
   active: ['grace', 'past_due', 'expired', 'suspended', 'cancelled', 'revoked'],
@@ -206,6 +214,12 @@ export function licensingStore(db, now, transact) {
   const clearModules = db.prepare('DELETE FROM license_plan_modules WHERE plan=?');
   const addModule = db.prepare('INSERT INTO license_plan_modules VALUES (?,?)');
   const updateSubscription = db.prepare('UPDATE license_assignments SET state=?,expires_at=? WHERE account_id=?');
+  const dueAccounts = db.prepare(`SELECT account_id,plan,state,expires_at FROM license_assignments
+    WHERE state IN ('trial','active','grace') AND expires_at<=? ORDER BY expires_at,account_id LIMIT 500`);
+  const dueInstitutions = db.prepare(`SELECT organization,state,expires_at FROM license_organization_subscriptions
+    WHERE state IN ('trial','active','grace') AND expires_at<=? ORDER BY expires_at,organization LIMIT 500`);
+  const accountExpiry = db.prepare(`SELECT state,expires_at FROM (${effectiveAssignment})`);
+
   function stateAt(current, timestamp) {
     if (usableStates.has(current.state) && current.expires_at !== null && current.expires_at <= timestamp) return 'expired';
     return current.state;
@@ -381,6 +395,33 @@ export function licensingStore(db, now, transact) {
         institutionalAudit.run(actor, code, account.id, allocate ? 'seat-allocated' : 'seat-revoked', timestamp);
         return 303;
       });
+    },
+    reconcileExpirations() {
+      return transact(db, () => {
+        const timestamp = now();
+        const accounts = dueAccounts.all(timestamp);
+        const organizations = dueInstitutions.all(timestamp);
+        for (const current of accounts) {
+          updateSubscription.run('expired', current.expires_at, current.account_id);
+          record.run(null, current.account_id, current.plan, 'expiry:' + current.state + ':expired', timestamp);
+        }
+        for (const current of organizations) {
+          setInstitutionalState.run('expired', current.expires_at, current.organization);
+          institutionalAudit.run(null, current.organization, null, 'expiry:' + current.state + ':expired', timestamp);
+        }
+        return { accounts: accounts.length, organizations: organizations.length };
+      });
+    },
+    renewalNotice(account) {
+      const current = accountExpiry.get({ account });
+      if (!current || current.expires_at === null) return undefined;
+      const timestamp = now();
+      const state = stateAt(current, timestamp);
+      if (state === 'expired') return { expired: true, at: current.expires_at };
+      if (usableStates.has(state) && current.expires_at <= timestamp + 7 * dayMs) {
+        return { expired: false, at: current.expires_at };
+      }
+      return undefined;
     },
     canDeliverReport(owner) {
       return limits(owner).reports > 0;

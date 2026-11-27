@@ -284,3 +284,8 @@
 - Schema v37 projects signed sandbox events into provider-scoped invoices, line items, allocations and refunds. Linked operations and their audit events commit atomically. Retries and object collisions are distinguished, and overpayments, excess refunds and currency mismatches are rejected.
 - Existing invoice events are backfilled with a single total line. Historical payments without an explicit invoice reference remain visible in the event ledger and are not inferred as allocations.
 - Signed-in billing reviewers with MFA can open bilingual invoice balances and download PDFs through the existing local renderer. Access is rechecked before delivery.
+
+## 2026-11-27 · Scheduled subscription expiry
+
+- Added an hourly unprivileged systemd timer and an idempotent local command for trial, active and grace expiration. Each batch stores effective expiry and attributable system audit rows within one SQLite transaction.
+- Account settings surface an upcoming or past expiry to the account holder. Renewal remains operator-managed and the scheduler sends no external messages or charges.

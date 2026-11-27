@@ -100,7 +100,15 @@ test('institutional subscriptions require a seat and preserve ownership and data
   assert.equal(licensing.changeInstitutionMember(operator.id, code, runnerUp.email, false), 303);
   assert.equal((await request(runnerUp, paths.get(runnerUp))).status, 403);
   assert.equal(licensing.changeInstitutionSeat(operator.id, code, winner.email, true), 303);
+  assert.equal(licensing.assign(operator.id, outsider.email, 'research', expire, 'trial'), 303);
+  assert.deepEqual(licensing.renewalNotice(winner.id), { expired: false, at: expire });
+  assert.deepEqual(licensing.reconcileExpirations(), { accounts: 0, organizations: 0 });
   now = expire;
+  assert.deepEqual(licensing.renewalNotice(winner.id), { expired: true, at: expire });
+  assert.deepEqual(licensing.reconcileExpirations(), { accounts: 1, organizations: 1 });
+  assert.deepEqual(licensing.reconcileExpirations(), { accounts: 0, organizations: 0 });
+  assert.match(await (await request(winner, '/workspace/settings?lang=en')).text(), /Your subscription expired/);
+  assert.equal(licensing.dashboard(operator.id).recent.filter(({ action }) => action === 'expiry:trial:expired').length, 1);
   assert.equal((await request(winner, paths.get(winner))).status, 403);
   const exportReply = await request(winner, '/workspace/settings/privacy', { intent: 'export', password });
   assert.equal(exportReply.status, 200);
@@ -133,4 +141,10 @@ test('institutional subscriptions require a seat and preserve ownership and data
   assert.ok(dashboard.institutionalHistory.some(({ action }) => action === 'seat-revoked'));
   assert.ok(dashboard.institutionalHistory.some(({ action }) => action === 'subscription:expired:active'));
   assert.match(await (await request(operator, '/control-center?lang=ar')).text(), /المؤسسات والمقاعد/);
+  const graceEnd = now + 30_000;
+  assert.equal(licensing.transitionInstitution(operator.id, code, 'active', 'grace', graceEnd), 303);
+  now = graceEnd;
+  assert.deepEqual(licensing.reconcileExpirations(), { accounts: 0, organizations: 1 });
+  assert.equal((await request(winner, paths.get(winner))).status, 200);
+  assert.equal(licensing.dashboard(operator.id).institutionalHistory[0].action, 'expiry:grace:expired');
 });

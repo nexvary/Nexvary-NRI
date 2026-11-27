@@ -50,3 +50,7 @@ Run `node scripts/workspace-load.mjs 24 20` and `node scripts/workspace-load.mjs
 | 48 | 2,880 | 1,280 | 57 ms | 46 ms | 46 ms | 211 MiB | 847,872 B |
 
 Measured on 2026-11-27 using Node.js 24.22.3 in the development environment. Both runs completed with all expected results and cross-account denials. RSS includes the client and server in the same process. These short runs support retaining SQLite for the measured workload. On the target host, repeat with realistic data volume, concurrent report rendering and uploads, HTTPS, backups, and a sustained workload before setting capacity limits or evaluating a different database.
+
+### Scheduled subscription expiry
+
+Install `deploy/nri-subscription-reconcile.service` and its companion timer alongside the existing NRI units when provisioning a target host. Enable the timer with `systemctl enable --now nri-subscription-reconcile.timer` after the workspace is initialized. The unprivileged job records due trial, active and grace expirations and their audit entries, processing up to 500 accounts and 500 organizations each run. Expiry is already enforced on requests at the stored timestamp. The job does not charge, initiate renewals, or alter research data.
