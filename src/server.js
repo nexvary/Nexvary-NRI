@@ -14,6 +14,14 @@ import { referenceProjectsPath, workspacePath } from './workspace-view.js';
 
 const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 const stylesheet = readFileSync(new URL('../public/styles.css', import.meta.url));
+const pdfAssets = new URL('../node_modules/pdfjs-dist/', import.meta.url);
+function readerAssets(path) {
+  if (path === '/pdf-reader.mjs') return new URL('../public/pdf-reader.mjs', import.meta.url);
+  const module = /^\/pdf-assets\/(pdf(?:\.worker)?\.mjs)$/.exec(path);
+  if (module) return new URL('build/' + module[1], pdfAssets);
+  const font = /^\/pdf-assets\/(cmaps\/[a-z0-9-]+\.bcmap|standard_fonts\/[a-z0-9_.-]+\.(?:ttf|pfb))$/i.exec(path);
+  return font ? new URL(font[1], pdfAssets) : undefined;
+}
 const securityHeaders = {
   'Content-Security-Policy': "default-src 'none'; style-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
   'X-Content-Type-Options': 'nosniff',
@@ -47,6 +55,20 @@ export function createApp(store = openWorkspaceStore(), {
       response.writeHead(healthy ? 200 : 503, {
         ...securityHeaders, 'Cache-Control': 'no-store', 'Content-Type': 'application/json; charset=utf-8',
       }).end(request.method === 'HEAD' ? undefined : JSON.stringify({ status: healthy ? 'ok' : 'unavailable' }));
+      return;
+    }
+    const asset = readerAssets(pathname);
+    if (asset && ['GET','HEAD'].includes(request.method)) {
+      try {
+        const bytes = readFileSync(asset);
+        const type = pathname.endsWith('.mjs') ? 'text/javascript; charset=utf-8' : 'application/octet-stream';
+        response.writeHead(200, { ...securityHeaders, 'Content-Type': type,
+          'Content-Security-Policy': "default-src 'none'; connect-src 'self'; frame-ancestors 'none'" })
+          .end(request.method === 'HEAD' ? undefined : bytes);
+      } catch (error) {
+        if (error.code !== 'ENOENT') throw error;
+        response.writeHead(404,securityHeaders).end();
+      }
       return;
     }
     const route = resolveWorkspaceRoute(pathname);

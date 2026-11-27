@@ -18,9 +18,27 @@ store.addAccount(email, await hashPassword(fixturePassword));
 const { id } = store.credentials(email);
 const session = store.newSession(id);
 const project = store.createProject(id, { title: 'Source review sample', description: '' });
-const sampleDocument = store.documents.create(id, project, {
-  name: 'Reference review.pdf', bytes: Buffer.from('%PDF-1.4\nIllustrative data\n%%EOF\n'),
+const pages = ['NRI READING SAMPLE', 'VERSION-SCOPED ANNOTATIONS'].map((line) =>
+  '0.08 0.22 0.40 rg 20 95 300 36 re f 1 g BT /F1 16 Tf 30 108 Td (' + line + ') Tj ET');
+const contents = (stream) => '<< /Length ' + stream.length + ' >>\nstream\n' + stream + '\nendstream';
+const objects = [
+  '<< /Type /Catalog /Pages 2 0 R >>',
+  '<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>',
+  ...[6, 7].map((stream) => `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 340 150] /Resources << /Font << /F1 5 0 R >> >> /Contents ${stream} 0 R >>`),
+  '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ...pages.map(contents),
+];
+let fixturePdf = '%PDF-1.4\n';
+const offsets = objects.map((object, index) => {
+  const offset = fixturePdf.length;
+  fixturePdf += (index + 1) + ' 0 obj\n' + object + '\nendobj\n';
+  return offset;
 });
+const xref = fixturePdf.length;
+fixturePdf += 'xref\n0 8\n0000000000 65535 f \n' + offsets.map((offset) =>
+  String(offset).padStart(10, '0') + ' 00000 n \n').join('') +
+  'trailer\n<< /Size 8 /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF\n';
+const sampleDocument = store.documents.create(id, project, { name: 'Reference review.pdf', bytes: Buffer.from(fixturePdf) });
 const collection = store.organization.create(id, 'Research methods');
 store.organization.membership(id, project, sampleDocument, collection, true);
 store.references.save(id, project, {
@@ -249,7 +267,16 @@ try {
           })()`);
         }
         await waitFor(() => inspect(send, 'Boolean(document.querySelector(".message-list")?.textContent.includes("Record the review date."))'), 'saved reading annotation');
-        await captureLayout(send, 'reading', lang, name, width, height);
+        const renderedPdf = () => inspect(send, `(() => {
+          const canvas = document.querySelector('[data-pdf-reader] canvas');
+          if (!canvas || canvas.hidden) return false;
+          const pixel = canvas.getContext('2d').getImageData(Math.round(canvas.width * .91), Math.round(canvas.height * .32), 1, 1).data;
+          return pixel[0] < 100 && pixel[1] < 140 && pixel[2] > pixel[0];
+        })()`);
+        await waitFor(renderedPdf, 'rendered PDF pixels');
+        await inspect(send, 'document.querySelector("[data-next]").click()');
+        await waitFor(() => inspect(send, 'new URL(location.href).searchParams.get("page") === "2"'), 'reader second page');
+        await captureLayout(send, 'pdf-reader', lang, name, width, height);
         await send('Page.navigate', { url: origin + '/workspace/projects/' + project + '/citations?lang=' + lang });
         await waitFor(() => inspect(send, 'Boolean(document.querySelector("button[value=import]"))'), 'citation import form');
         if (lang === 'ar') {

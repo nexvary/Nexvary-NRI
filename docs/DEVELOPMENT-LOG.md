@@ -162,3 +162,8 @@
 
 - Added private BibTeX/RIS exchange, source provenance, DOI and provider identifier grouping and controlled merges.
 - 59/59 with real report rendering. Chromium imported a citation in the running app.
+
+## 2026-11-27 · NRI-03c embedded PDF versions
+
+- Added local PDF.js rendering, version selection, page navigation and reading mark links.
+- 59/59 with real report rendering. Chromium verified actual page pixels and navigation, and npm audit found no reported vulnerabilities in installed dependencies.

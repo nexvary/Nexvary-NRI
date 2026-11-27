@@ -34,4 +34,6 @@ NRI-03a adds private PDF collections, bookmarks and annotations with stable vers
 
 NRI-03b adds BibTeX/RIS exchange, DOI and provider identifier grouping, title candidates and audited merges, with source preservation. See `src/citation-formats.js`, `src/citation-store.js` and `test/citations.test.js`. Full regression: 59/59.
 
-Next: embed owner-scoped PDF versions and integrate page bookmarks and annotations. Follow with project resource sharing and production readiness in the [functional matrix](STATUS.md#functional-acceptance).
+NRI-03c adds embedded PDF versions and page-linked reading marks. Install pinned browser assets with `npm ci --omit=optional --ignore-scripts`. See `public/pdf-reader.mjs`, `src/library-organization.js`, and `test/library.test.js`. Full regression: 59/59.
+
+Next: extend project team access with explicit owner-controlled grants on documents, reference snapshots, reports and readiness. Cover direct URL and download authorization for every role and after revocation. Continue production readiness from the [functional matrix](STATUS.md#functional-acceptance).

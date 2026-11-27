@@ -87,3 +87,8 @@ An operator with access to the workspace database can run `npm run account:role 
 Enroll an authenticator on the operator account, then run `npm run account:role -- operator@example.test grant-license-operator` against the local workspace. **Account security → Plans and entitlements** lets that operator define a plan, assign it to an account and record an optional expiry date. Expiry takes effect at the start of that date in UTC. Plans cap owned project count and daily external AI tokens. An expired assignment blocks new projects and external AI requests. Existing data can still be accessed and exported. An unassigned account uses the workspace defaults.
 
 The stricter of the plan token limit and the workspace provider budget governs the Assistant. A zero-token plan disables external AI. Plans and assignments are local records with no payment integration. Use `revoke-license-operator` to remove console access and [the recovery guide](docs/RECOVERY.md#local-release-and-recovery-drill) for migration and rollback drills.
+
+
+### Embedded PDF reader
+
+Run `npm ci --omit=optional --ignore-scripts` before starting NRI to install the pinned browser PDF.js assets. The reading page renders documents in a local worker. Select a version to read it or use a bookmark or annotation to open its recorded page. Authorized downloads remain available.

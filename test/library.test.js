@@ -121,6 +121,12 @@ test('library collections and reading marks remain owner-scoped and tied to PDF 
   assert.ok(store.documents.append(owner.id, project, document, { name: 'Revision.pdf', bytes: Buffer.from('%PDF-1.4\nsecond') }));
   const html = await (await request(owner, reading)).text();
   assert.match(html, /Annotation · v1/);
+  assert.match(html, /reading\?lang=en&amp;version=1&amp;page=2/);
+  const selected = await request(owner, reading + '&version=1&page=2');
+  assert.match(selected.headers.get('content-security-policy'), /worker-src 'self'/);
+  assert.match(await selected.text(), /data-pdf-reader="[^"]+\/versions\/1\?lang=en" data-page="2"/);
+  assert.equal((await request(owner, reading + '&version=99')).status, 404);
+  assert.equal((await request(other, reading + '&version=1&page=2')).status, 404);
   assert.match(html, /Bookmark · v1/);
   assert.match(html, /&lt;script&gt;Review methods&lt;\/script&gt;/);
   assert.equal((await request(owner, location, { intent: 'remove', collection })).status, 303);

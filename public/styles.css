@@ -347,3 +347,6 @@ small { font-size: .84rem; }
 .message-list { padding-inline-start: 0; list-style: none; }
 .message-list p { white-space: pre-wrap; overflow-wrap: anywhere; }
 .language { display: flex; flex-wrap: wrap; justify-content: end; gap: .35rem; }
+
+.pdf-reader { display: grid; gap: .75rem; min-width: 0; }
+.pdf-reader canvas { max-width: 100%; height: auto; justify-self: center; background-color: white; }

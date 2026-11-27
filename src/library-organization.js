@@ -107,7 +107,7 @@ export function handleOrganization({ request, reply, redirect, route, lang, acco
   const pagination = (items, suffix = '') => offset || items.length > 50 ? `<nav class="project-tools">
     ${offset ? `<a href="${base}${suffix}&amp;offset=${Math.max(0,offset - 50)}">${t('Previous', 'السابق')}</a>` : ''}
     ${items.length > 50 ? `<a href="${base}${suffix}&amp;offset=${offset + 50}">${t('Next', 'التالي')}</a>` : ''}</nav>` : '';
-  const page = (title, body) => reply(200, { title, path, html: `<section class="surface panel detail workspace-page"><h1>${title}</h1>${body}</section>` });
+  const page = (title, body, headers) => reply(200, { title, path, html: `<section class="surface panel detail workspace-page"><h1>${title}</h1>${body}</section>` }, headers);
   if (!id) {
     const selected = params.get('collection') ?? '';
     const item = selected ? library.collection(owner, selected, offset) : undefined;
@@ -145,11 +145,30 @@ export function handleOrganization({ request, reply, redirect, route, lang, acco
     return saved ? redirect(base) : reply(422);
   }
   const versions = store.documents.versions(owner,id,document);
+  const requestedVersion = Number(params.get('version')) || versions[0]?.number;
+  if (!versions.some((version) => version.number === requestedVersion)) return reply(404);
+  const requestedPage = Math.max(1, Math.min(100000, Math.trunc(Number(params.get('page')) || 1)));
+  const download = (version) => path.replace(/\/reading$/,'') + '/versions/' + version + '?lang=' + lang;
   const marker = (kind) => kind === 'bookmark' ? t('Bookmark', 'إشارة مرجعية') : t('Annotation', 'تعليق');
   return page(t('Reading notes', 'ملاحظات القراءة'), `
     <nav class="project-tools"><a href="${documentsPath(lang,id,document)}">${t('Document versions', 'إصدارات المستند')}</a>
     <a href="${index}?lang=${lang}">${t('Library collections', 'مجموعات المكتبة')}</a></nav>
     <h2 dir="auto">${escapeHtml(entry.title)}</h2>
+    <form class="project-tools" method="get" action="${path}">
+      ${hidden('lang',lang)}<label>${t('Open PDF version','افتح إصدار PDF')}
+      <select name="version">${versions.map((item) => `<option value="${item.number}"${item.number === requestedVersion ? ' selected' : ''}>v${item.number}</option>`).join('')}</select></label>
+      <button class="action">${t('Read version','اقرأ الإصدار')}</button>
+      <a href="${download(requestedVersion)}">${t('Download this version','نزّل هذا الإصدار')}</a>
+    </form>
+    <section class="pdf-reader" data-pdf-reader="${download(requestedVersion)}" data-page="${requestedPage}" data-version="${requestedVersion}"
+      data-error="${t('Preview unavailable. Download this version to read it.','المعاينة غير متاحة. نزّل الإصدار لقراءته.')}">
+      <p role="status">${t('Loading PDF…','جارٍ تحميل PDF…')}</p>
+      <canvas hidden aria-label="${t('Rendered PDF page','صفحة PDF المعروضة')}"></canvas>
+      <div class="project-tools"><button type="button" class="action" data-previous disabled>${t('Previous page','الصفحة السابقة')}</button>
+      <button type="button" class="action" data-next disabled>${t('Next page','الصفحة التالية')}</button></div>
+      <noscript><p>${t('Enable JavaScript for the preview, or download the PDF.','فعّل جافاسكريبت للمعاينة، أو نزّل ملف PDF.')}</p></noscript>
+    </section>
+    <script type="module" src="/pdf-reader.mjs"></script>
     <h2>${t('Collections', 'المجموعات')}</h2>
     ${entry.collections.length ? `<ul class="project-list">${entry.collections.map((group) => `<li>
       <form class="project-tools" method="post" action="${base}">${hidden('collection',group.id)}
@@ -157,14 +176,16 @@ export function handleOrganization({ request, reply, redirect, route, lang, acco
       </form></li>`).join('')}</ul>` : `<p>${t('Create a collection to organize this PDF.', 'أنشئ مجموعة لتنظيم ملف PDF هذا.')}</p>`}
     <h2>${t('Bookmarks and annotations', 'الإشارات والتعليقات')}</h2>
     <form class="workspace-form" method="post" action="${base}">
-      <label>${t('Document version', 'إصدار المستند')}<select name="version" required>${versions.map((version) => `<option value="${version.number}">v${version.number}</option>`).join('')}</select></label>
-      <label>${t('PDF page', 'صفحة PDF')}<input name="page" type="number" min="1" max="100000" required></label>
+      <label>${t('Document version', 'إصدار المستند')}<select name="version" required>${versions.map((version) => `<option value="${version.number}"${version.number === requestedVersion ? ' selected' : ''}>v${version.number}</option>`).join('')}</select></label>
+      <label>${t('PDF page', 'صفحة PDF')}<input name="page" type="number" min="1" max="100000" value="${requestedPage}" required></label>
       <label>${t('Type', 'النوع')}<select name="kind"><option value="bookmark">${marker('bookmark')}</option><option value="annotation">${marker('annotation')}</option></select></label>
       <label>${t('Note or bookmark label', 'نص التعليق أو اسم الإشارة')}<textarea name="text" maxlength="2000" dir="auto"></textarea></label>
       ${button('add-mark',t('Save reading mark','احفظ علامة القراءة'))}</form>
     <ol class="project-list message-list">${entry.marks.slice(0,50).map((mark) => `<li class="provider-block">
-      <p><a href="${path.replace(/\/reading$/,'')}/versions/${mark.version}?lang=${lang}">${marker(mark.kind)} · v${mark.version}</a>
+      <p><a href="${base}&amp;version=${mark.version}&amp;page=${mark.page}">${marker(mark.kind)} · v${mark.version}</a>
       · ${t('Page','صفحة')} ${mark.page}</p><p dir="auto">${escapeHtml(mark.text)}</p>
       <form class="project-tools" method="post" action="${base}">${hidden('mark',mark.id)}${button('delete-mark',t('Remove mark','احذف العلامة'))}</form>
-    </li>`).join('')}</ol>${pagination(entry.marks)}`);
+    </li>`).join('')}</ol>${pagination(entry.marks)}`, {
+      'Content-Security-Policy': "default-src 'none'; style-src 'self'; script-src 'self'; worker-src 'self'; connect-src 'self'; font-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+    });
 }
