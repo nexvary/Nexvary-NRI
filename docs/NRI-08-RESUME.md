@@ -47,3 +47,5 @@ Next: close the remaining [functional acceptance items](STATUS.md#functional-acc
 Release acceptance increment from `596c855`: DOI registration agency lookups through Crossref, bilingual System and Developer pages, and 64/64 tests with real bilingual exports. See the [acceptance matrix and Chromium captures](STATUS.md#functional-acceptance). Continue with owner-authenticated ORCID, document and manuscript integration, secure recovery and key rotation. Final NRI legal documents remain pending owner review.
 
 Operator recovery increment: `npm run account:reset -- researcher@example.org` requires a private terminal and the existing workspace database. Migration preserves security history and password reset preserves MFA. Self-service recovery and workspace key rotation remain open.
+
+Encrypted backup increment: use `workspace:export` and `workspace:import` with a separate private 32-byte key file. The restore integration test covers authentication and PDF recovery. See [RECOVERY.md](RECOVERY.md) and the optional timer in [DEPLOYMENT.md](DEPLOYMENT.md). Key rotation must account for existing MFA recovery digests as well as encrypted records.

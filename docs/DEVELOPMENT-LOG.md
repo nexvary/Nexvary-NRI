@@ -193,3 +193,8 @@
 
 - Added private-terminal operator password reset with per-account session revocation, stale-credential rejection and a user-visible security event.
 - Verified v26 migration, existing audit history and cross-account isolation. Full local suite with the real bilingual renderer passes 65/65.
+
+## 2026-11-27 · Encrypted workspace backup
+
+- Added authenticated archive export and restore, preserving local paired bundles for compatibility.
+- Verified preservation of PDF content and isolation of failed restores, with 66/66 local tests. Added optional systemd backup units with syntax verification.

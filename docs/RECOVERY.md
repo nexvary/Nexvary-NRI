@@ -1,5 +1,22 @@
 # Local workspace recovery
 
+## Encrypted export and restore
+
+Generate a separate random 32-byte backup key on a trusted operator host. Keep it on restricted, encrypted storage, with an independently protected recovery copy. The key file must have owner-only access. Set only its **path** in the environment.
+
+```sh
+(umask 077 && set -C && openssl rand 32 > /private/nri-backup.key)
+export NRI_BACKUP_KEY_FILE=/private/nri-backup.key
+NRI_DB_PATH=/path/to/workspace.sqlite npm run workspace:export -- /private/workspace.nribak
+npm run workspace:import -- /private/workspace.nribak /private/new-restore
+```
+
+The versioned archive uses AES-256-GCM with a random nonce and a full-length authentication tag. It protects both SQLite metadata and the paired workspace key. Retain access to the backup key used for each archive. Import authenticates the archive and checks SQLite integrity and key pairing before making the database available. Active sessions are removed from snapshots. Import and export refuse to overwrite destinations.
+
+Use a protected, encrypted volume for the destination parent directory. Temporary decrypted data lives inside a private staging directory there. A process killed mid-operation may leave a `.nri-recovery-*` directory or an incomplete restore directory. With the process stopped, remove those leftovers and retry with a new destination. Use only a database returned by a successful import. Each archive supports up to 32 GiB of plaintext payload. Allow space for the working snapshot and archive to coexist.
+
+## Local paired backup directories
+
 Run recovery commands from the project directory against a workspace you administer. They create a new directory and reject an existing destination.
 
 ```sh
@@ -18,7 +35,7 @@ The default preview binds to loopback. Direct HTTPS staging is available through
 
 Account deletion requires the current password, an authenticator or recovery code when MFA is enabled, and the typed confirmation. In the live SQLite workspace, one transaction removes the account, credentials, all sessions, owned projects and document versions, private collections and reading marks, conversation history for both participants, moderation reports attached to those conversations, and account-scoped records. Decisions on surviving reports retain their outcome and timestamp with a blank reviewer if the reviewer account is deleted. SQLite secure deletion overwrites deleted records in the active database. Existing filesystem copies, journals, snapshots and user downloads have separate retention.
 
-The app has no scheduled backup retention on a local workspace. The operator controls existing copies and removes expired bundles under their retention policy. A backup taken before deletion can restore the account and its credentials into a separate workspace. Before promoting an older backup, reconcile previously processed deletions. A backup taken after deletion excludes that account and its deleted data. Every restore invalidates stored sessions.
+The optional backup timer exports encrypted archives. Retention remains operator-managed. The operator controls existing copies and removes expired bundles under their retention policy. A backup taken before deletion can restore the account and its credentials into a separate workspace. Before promoting an older backup, reconcile previously processed deletions. A backup taken after deletion excludes that account and its deleted data. Every restore invalidates stored sessions.
 
 Account export is a sensitive JSON download and includes owned PDF versions as base64. It includes the user's sent message bodies and excludes other participants' message bodies, credential material, recovery codes, session tokens and provider API keys. The response has a 64 MiB limit. Large documents can also be downloaded individually through the owned project library.
 

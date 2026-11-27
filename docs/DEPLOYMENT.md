@@ -27,3 +27,9 @@ Run one application process per SQLite database. Use direct TLS in this configur
 - The database and paired workspace key use owner-only file permissions in HTTPS mode on Unix-like hosts. Protect and back up the key with its database. The paired key is required for documents and encrypted account secrets. Key rotation and external key management require a separately tested migration.
 - Rehearse upgrade and rollback on a restored copy, check ownership and export paths, and verify PDF/DOCX generation before promoting a release. Concurrent TLS tests exercise 48 reads across eight accounts and verify access isolation. Use representative staging load before setting production capacity and alert thresholds.
 - Billing stays disabled. A production endpoint, alert destination and retention settings need operator approval and environment-specific verification.
+
+## Optional encrypted backup timer
+
+On Debian or Ubuntu with systemd credentials support, install `deploy/nri-backup.service` and `deploy/nri-backup.timer` beside the application unit. Create `/var/backups/nri` on a protected encrypted volume with ownership `nri:nri` and mode `0700`. Provision a separate 32-byte archive key at `/etc/nri/backup.key` using the [recovery guide](RECOVERY.md#encrypted-export-and-restore). Keep the key accessible to systemd with owner-only permissions. Adjust paths for the selected host.
+
+After installation, run `systemctl start nri-backup.service`, inspect its journal and restore the archive to a separate staging directory. Enable recurring exports with `systemctl enable --now nri-backup.timer` after the restore drill. Monitor failed units and the age of the latest successful archive using the host's alerting. Set retention and off-host replication with the operator. Keep backup keys separate from replicated archives.

@@ -55,7 +55,7 @@ NRI_REPORT_PYTHON="$(command -v python)" npm test
 
 Open a project, choose **Report studio**, then select PDF or DOCX. The local renderer receives the selected project's report data and uses no network resources.
 
-- [Local backup and recovery](docs/RECOVERY.md)
+- [Encrypted backups and local recovery](docs/RECOVERY.md)
 - [Product charter](docs/PROJECT.md)
 - [Functional acceptance baseline](docs/REQUIREMENTS.md)
 - [Visual reference](docs/VISUAL.md)
