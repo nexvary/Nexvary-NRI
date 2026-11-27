@@ -35,6 +35,10 @@ export function privacyStore(db, workspaceKey, now) {
     manuscriptVersions: `SELECT m.id, m.project_id, m.title, v.version, v.author, v.body, v.recorded_at
       FROM team_manuscript_versions v JOIN team_manuscripts m ON m.id = v.manuscript_id
       JOIN projects p ON p.id = m.project_id WHERE p.owner_id = :owner OR v.author = :owner`,
+    teamNotes: `SELECT n.* FROM team_notes n JOIN projects p ON p.id = n.project_id
+      WHERE p.owner_id = :owner OR n.author = :owner`,
+    teamTasks: `SELECT t.* FROM team_tasks t JOIN projects p ON p.id = t.project_id
+      WHERE p.owner_id = :owner OR t.author = :owner`,
     teamReviews: `SELECT r.* FROM team_reviews r JOIN projects p ON p.id = r.project_id
       WHERE p.owner_id = :owner OR r.reviewer = :owner`,
     roles: 'SELECT role FROM account_roles WHERE account_id = ?',

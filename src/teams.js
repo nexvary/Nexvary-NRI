@@ -14,14 +14,16 @@ const roles = {
 const statusLabels = {
   pending: ['Pending', 'قيد الانتظار'], accepted: ['Accepted', 'مقبول'], declined: ['Declined', 'مرفوض'],
   revoked: ['Revoked', 'ملغى'], invited: ['Invited', 'تمت الدعوة'], blocked: ['Blocked', 'محظور'],
+  note: ['Note added', 'أُضيفت ملاحظة'], task: ['Task added', 'أُضيفت مهمة'],
+  'task-open': ['Task reopened', 'أُعيد فتح المهمة'], 'task-done': ['Task completed', 'اكتملت المهمة'],
   version: ['Manuscript version', 'إصدار المخطوطة'], review: ['Review', 'مراجعة'],
   'changes-requested': ['Changes requested', 'تعديلات مطلوبة'],
 };
 
 export function resolveTeamRoute(path) {
   if (path === inbox) return { kind: 'team-inbox' };
-  const match = path.match(/^\/workspace\/projects\/([a-f0-9-]{36})\/team$/);
-  if (match && uuid.test(match[1])) return { kind: 'team-project', id: match[1] };
+  const match = path.match(/^\/workspace\/projects\/([a-f0-9-]{36})\/team(\/work)?$/);
+  if (match && uuid.test(match[1])) return { kind: match[2] ? 'team-work' : 'team-project', id: match[1] };
 }
 
 export function handleTeam({ request, reply, redirect, route, account, form, lang, store }) {
@@ -100,7 +102,7 @@ export function handleTeam({ request, reply, redirect, route, account, form, lan
     ${button('review', t('Record review', 'سجّل المراجعة'))}</form>`;
   const latest = current.versions[0];
   return page(t('Project team', 'فريق المشروع'), path, `
-    <p>${tab(inboxTitle,inbox)}</p><h2 dir="auto">${escapeHtml(current.title)}</h2><p>${roleLabel(current.role)}</p>
+    <nav class="project-tools">${tab(inboxTitle,inbox)} ${tab(t('Notes and tasks','الملاحظات والمهام'),path + '/work')}</nav><h2 dir="auto">${escapeHtml(current.title)}</h2><p>${roleLabel(current.role)}</p>
     ${manage ? `<h2>${t('Team access', 'صلاحيات الفريق')}</h2>
     <p>${t('Accepted team roles can read manuscripts and evidence. A changed role requires renewed acceptance.', 'يمكن لأعضاء الفريق الذين قبلوا أدوارهم قراءة المخطوطات والأدلة. يتطلب تغيير الدور قبولًا جديدًا.')}</p>
     ${peers.length ? `<form class="workspace-form" method="post" action="${action}">

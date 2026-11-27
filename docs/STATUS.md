@@ -1,5 +1,12 @@
 # Development status
 
+## NRI-10b · Shared work and invitation notices · 2026-11-27 (Cairo)
+
+Project team members can read shared notes and tasks. Owners, administrators and researchers can add notes/tasks and change task status. Updates record their actor and reject stale state changes. The authenticated navigation shows pending team invitations.
+
+- 56/56 with real report rendering. HTTP checks verify notice clearing, role enforcement, direct route isolation, escaped notes and attributable task changes.
+- Chromium created a task and captured [Arabic desktop](qa/nri-10/team-work-ar-desktop.webp) and [English mobile](qa/nri-10/team-work-en-mobile.webp).
+
 ## NRI-01a · Private dashboard metrics · 2026-11-27 (Cairo)
 
 The signed-in dashboard shows accepted collaborators, self-reported ORCID, provider-reported tokens and estimated cost for the current UTC day. Data is queried for the active account.
@@ -245,7 +252,7 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | NRI-07 | Verified | One-year operating model with explicit assumptions, currency, units, capacity, sensitivity, scenario comparison and reproducible JSON export. |
 | NRI-08 | Verified | NRI-08a exercises private saved-source review, provenance and retraction/editorial warnings in `test/assistant.test.js`. NRI-08b adds private encrypted BYOK storage, offline/provider selection and model settings in `test/assistant-settings.test.js`. NRI-08c verifies mocked local cited answers, cancellation and bounded caching in `test/assistant-answer.test.js`. NRI-08d verifies external consent, mocked OpenAI requests and durable reservations in the same test suite. |
 | NRI-09 | Partial | Opt-in profiles, search, follow and block, bounded requests and private profile isolation verified. Verified ORCID ownership, posts, groups, publication sharing and moderation remain. |
-| NRI-10 | Partial | Collaboration requests and scoped project-summary invitations, acceptance/decline, revoke and access history are verified. Team invitations, five roles, revocation, audit history and manuscript/evidence review are verified. Team notifications, shared notes and tasks remain. |
+| NRI-10 | Partial | Collaboration requests and scoped project-summary invitations, acceptance/decline, revoke and access history are verified. Team invitations, five roles, revocation, audit history and manuscript/evidence review are verified. NRI-10b verifies in-app invitation notices, shared notes and tasks. Team access scope remains manuscripts, evidence and shared work. |
 | NRI-11 | Verified | Private direct conversations, independent unread state, in-app notification preferences, reports, participant and origin checks, blocking, encrypted message bodies and rate limits verified in `test/messages.test.js` and Chromium. |
 | NRI-12 | Verified | Private watchlists, saved library searches, date-stamped manual updates, filters and provider provenance. |
 | NRI-13 | Verified | Bounded UTF-8 CSV import, numeric validation, descriptive metrics, histogram, IQR outlier flags, units and reproducible JSON export. |
@@ -256,4 +263,4 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | NRI-18 | Partial | Local authentication, session revocation, account audit, authorization, encrypted PDF bytes, RTL/LTR and verified recovery are implemented. NRI-18a adds optional MFA and one-use recovery codes. NRI-18b adds the operator-managed message moderator role and scoped report review. Project team RBAC is verified for manuscripts and evidence review. Password/account recovery, accessibility audit and broader administration remain. |
 | NRI-19 | Partial | Local restore and regression workflow configuration are implemented. Local plans, entitlement limits, an MFA-protected operator console, migration/restore drills and schema health checks are verified. Approved hosting, production security and monitoring, and optional billing remain. |
 
-Next milestone: project team notes, tasks and invitation notifications.
+Next milestone: manuscript catalog search, authors, tags and publication metadata.

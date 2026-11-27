@@ -39,6 +39,22 @@ export const teamSchema = `
   PRAGMA user_version = 18;
 `;
 
+export const teamWorkSchema = `
+  CREATE TABLE IF NOT EXISTS team_notes (
+    id INTEGER PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    author TEXT REFERENCES accounts(id) ON DELETE SET NULL, body TEXT NOT NULL, recorded_at INTEGER NOT NULL
+  ) STRICT;
+  CREATE INDEX IF NOT EXISTS team_notes_project ON team_notes(project_id, id DESC);
+  CREATE TABLE IF NOT EXISTS team_tasks (
+    id INTEGER PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    title TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN ('open','done')),
+    author TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+    updated_by TEXT REFERENCES accounts(id) ON DELETE SET NULL, recorded_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+  ) STRICT;
+  CREATE INDEX IF NOT EXISTS team_tasks_project ON team_tasks(project_id, id DESC);
+  PRAGMA user_version = 20;
+`;
+
 export const teamRoles = ['administrator', 'researcher', 'reviewer', 'read-only'];
 const rights = {
   owner: ['manage', 'write', 'review', 'audit'],
@@ -67,6 +83,14 @@ export function teamStore(db, now, transact) {
     ORDER BY m.role, m.account_id`);
   const event = db.prepare('INSERT INTO team_events(project_id,actor,subject,action,target,recorded_at) VALUES (?,?,?,?,?,?)');
   const audit = db.prepare('SELECT actor,subject,action,target,recorded_at FROM team_events WHERE project_id = ? ORDER BY id DESC LIMIT 50');
+  const pending = db.prepare("SELECT count(*) AS total FROM project_members WHERE account_id = ? AND state = 'pending'");
+  const notes = db.prepare('SELECT * FROM team_notes WHERE project_id = ? ORDER BY id DESC LIMIT 50 OFFSET ?');
+  const tasks = db.prepare('SELECT * FROM team_tasks WHERE project_id = ? ORDER BY id DESC LIMIT 50 OFFSET ?');
+  const addNote = db.prepare('INSERT INTO team_notes(project_id,author,body,recorded_at) VALUES (?,?,?,?)');
+  const addTask = db.prepare(`INSERT INTO team_tasks(project_id,title,state,author,updated_by,recorded_at,updated_at)
+    VALUES (?,?,'open',?,?,?,?)`);
+  const changeTask = db.prepare(`UPDATE team_tasks SET state = ?, updated_by = ?, updated_at = ?
+    WHERE project_id = ? AND id = ? AND state = ?`);
   const blockedGrants = db.prepare(`SELECT m.project_id, m.account_id FROM project_members m JOIN projects p ON p.id = m.project_id
     WHERE m.state IN ('pending','accepted') AND ((p.owner_id = ? AND m.account_id = ?) OR (p.owner_id = ? AND m.account_id = ?))`);
   const addManuscript = db.prepare('INSERT INTO team_manuscripts VALUES (?, ?, ?)');
@@ -107,6 +131,31 @@ export function teamStore(db, now, transact) {
   return {
     access,
     inbox: (actor) => inbox.all(actor),
+    pending: (actor) => pending.get(actor).total,
+    work(actor, id, offset) {
+      const current = access(actor, id);
+      if (!current) return undefined;
+      return { ...current, notes: notes.all(id, offset), tasks: tasks.all(id, offset) };
+    },
+    addWork(actor, id, kind, text) {
+      return transact(db, () => {
+        if (!access(actor, id)?.rights.includes('write')) return 403;
+        if (!['note','task'].includes(kind) || !text || (kind === 'note' ? text.length > 2000 : text.length > 150)) return 422;
+        const at = now();
+        const inserted = kind === 'note' ? addNote.run(id, actor, text, at) : addTask.run(id, text, actor, actor, at, at);
+        record(id, actor, null, kind, String(inserted.lastInsertRowid));
+        return 303;
+      });
+    },
+    changeTask(actor, id, task, from, to) {
+      return transact(db, () => {
+        if (!access(actor, id)?.rights.includes('write')) return 403;
+        if (!['open','done'].includes(from) || !['open','done'].includes(to) || from === to) return 422;
+        if (!changeTask.run(to, actor, now(), id, task, from).changes) return 409;
+        record(id, actor, null, 'task-' + to, String(task));
+        return 303;
+      });
+    },
     revokeOnBlock(first, second) {
       for (const grant of blockedGrants.all(first, second, second, first)) {
         transition.run('revoked', grant.project_id, grant.account_id);

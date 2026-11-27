@@ -209,6 +209,17 @@ try {
         }
         await waitFor(() => inspect(send, 'location.search.includes("manuscript=") && document.body?.textContent.includes("Verify each source")'), 'saved manuscript version');
         await captureLayout(send, 'team', lang, name, width, height);
+        await send('Page.navigate', { url: origin + '/workspace/projects/' + project + '/team/work?lang=' + lang });
+        await waitFor(() => inspect(send, 'Boolean(document.querySelector("button[value=task]"))'), 'team task form');
+        if (lang === 'ar') {
+          await inspect(send, `(() => {
+            const button = document.querySelector('button[value=task]');
+            button.form.elements.text.value = 'Verify the source metadata';
+            setTimeout(() => button.form.requestSubmit(button), 0);
+          })()`);
+        }
+        await waitFor(() => inspect(send, 'document.body?.textContent.includes("Verify the source metadata")'), 'created team task');
+        await captureLayout(send, 'team-work', lang, name, width, height);
         await send('Page.navigate', { url: origin + '/workspace/settings/mfa?lang=' + lang });
         await waitFor(() => inspect(send, 'Boolean(document.querySelector("button[value=begin]"))'), 'MFA settings');
         await captureLayout(send, 'mfa', lang, name, width, height);

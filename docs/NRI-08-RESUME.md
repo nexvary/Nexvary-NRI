@@ -26,4 +26,6 @@ NRI-19a adds local plan assignments, project and daily external AI limits, an MF
 
 NRI-01a adds private dashboard collaborator counts, self-reported ORCID and daily metered usage. See `test/library.test.js`. Full regression: 56/56.
 
-Next: continue collaboration with shared notes, tasks and invitation notifications. Reuse team permission checks, audit events, and account deletion retention behavior. Continue through the [functional matrix](STATUS.md#functional-acceptance).
+NRI-10b adds role-scoped team notes and tasks, attributable task transitions, and pending invitation notices. See `src/team-work.js`, `src/team-store.js` and `test/teams.test.js`. Full regression: 56/56.
+
+Next: extend the team manuscript catalog with search, authors, tags and publication metadata. Preserve existing versions and direct URL authorization. Follow with library collections/annotations and remaining priorities in the [functional matrix](STATUS.md#functional-acceptance).

@@ -1,3 +1,4 @@
+import { handleTeamWork } from './team-work.js';
 import { handleLicensing } from './licensing.js';
 import { handleTeam, resolveTeamRoute } from './teams.js';
 import { createPrivacyHandler } from './privacy.js';
@@ -202,6 +203,10 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
     }
     if (kind === 'education') {
       handleEducation({ request, reply, lang, account, form });
+      return;
+    }
+    if (kind === 'team-work') {
+      handleTeamWork({ request, reply, redirect, route, lang, account, form, store });
       return;
     }
     if (kind.startsWith('team')) {

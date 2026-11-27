@@ -58,7 +58,7 @@ export function createApp(store = openWorkspaceStore(), {
     const sendPage = (status, view, page, headers, dashboard) => {
       const session = store.session(readSessionCookie(request.headers.cookie));
       const unread = session && store.messages.notifications(session.id) ? store.messages.unread(session.id) : 0;
-      const answer = request.method === 'HEAD' ? undefined : render({ lang, view, version, page, workspace: dashboard, unread });
+      const answer = request.method === 'HEAD' ? undefined : render({ lang, view, version, page, workspace: dashboard, unread, invitations: session ? store.teams.pending(session.id) : 0 });
       response.writeHead(status, {
         ...securityHeaders, 'Content-Type': 'text/html; charset=utf-8', 'Content-Language': lang, ...headers,
         ...(session ? { 'Cache-Control': 'no-store' } : {}),

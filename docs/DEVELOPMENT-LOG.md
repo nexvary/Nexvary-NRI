@@ -142,3 +142,8 @@
 
 - Connected accepted collaborator counts, the user’s self-reported ORCID and metered usage to the signed-in dashboard.
 - 56/56 with real report rendering. Chromium captured Arabic desktop and English mobile.
+
+## 2026-11-27 · NRI-10b project work and invitations
+
+- Added team notes, concurrent-safe task status changes, attributable audit events, and pending invitation notices.
+- 56/56 with real report rendering. Chromium created a task and captured both locales.
