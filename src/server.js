@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { createAssistantProvider } from './assistant-provider.js';
 import { createCrossrefClient } from './crossref.js';
 import { createOpenAlexClient } from './openalex.js';
 import { createOrcidClient, createZenodoClient } from './public-identifiers.js';
@@ -25,8 +26,9 @@ export function createApp(store = openWorkspaceStore(), {
   orcid = createOrcidClient(),
   zenodo = createZenodoClient(),
   reportRenderer = createLocalReportRenderer(),
+  assistantProvider = createAssistantProvider(),
 } = {}) {
-  const workspace = createWorkspaceHandler(store, { crossref, openalex, orcid, zenodo }, version, reportRenderer);
+  const workspace = createWorkspaceHandler(store, { crossref, openalex, orcid, zenodo }, version, reportRenderer, assistantProvider);
 
   async function handle(request, response) {
     if (!request.url?.startsWith('/')) {

@@ -97,3 +97,8 @@
 - Added bilingual provider/model settings and account-bound encryption for OpenAI keys using the existing paired workspace key. Saving preferences makes no provider requests.
 - Full regression with real reports: 47/47. Recaptured the Assistant after adding the settings link.
 - Browser QA can discover Chrome through DevToolsActivePort and checks overflow independently of vertical scrollbar width.
+
+## 2026-11-27 · NRI-08c optional local cited answers
+
+- Added bounded loopback generation with saved-source citation matching and unsupported citation warnings, plus a short scoped cache, cancellation and deadline.
+- 48/48 with real report rendering. Provider checks used only mocked responses. External generation and the durable usage and cost ledger remain.

@@ -1,11 +1,19 @@
 # Development status
 
+## NRI-08c · Local cited answers · 2026-11-27 (Cairo)
+
+An optional loopback OpenAI-compatible model can answer questions from saved reference titles and provenance in Arabic and English. Answers display matched saved identifiers and flag unsupported citation IDs. A citation match verifies the saved record, while scientific support remains a human review step. Offline source review continues to work without a model.
+
+- 48/48 regression tests pass with the bilingual PDF/DOCX renderer. Mocked integration covers provider request bounds, project isolation, citation matching, escaped output, cache hits, and cancellation.
+- Local requests have a 512-token output cap, a 15-second deadline, and a bounded five-minute process cache. Project names, descriptions, and documents are excluded from provider requests.
+- External OpenAI generation, explicit sharing consent, and durable usage and cost controls are pending.
+
 ## NRI-08b · Private provider settings · 2026-11-27 (Cairo)
 
 The Assistant has a bilingual, account-scoped provider settings page with Offline, OpenAI, and local OpenAI-compatible model selections. The OpenAI key is encrypted in SQLite with an account-bound AES-256-GCM key derived from the existing workspace key. The form never echoes the key. Switching to Offline or Local removes the stored OpenAI credential.
 
 - 47/47 with the bilingual PDF/DOCX renderer enabled. The new HTTP regression covers origin enforcement, account isolation, model update, persistence, key removal, and plaintext absence in the database.
-- The configuration form performs zero provider calls. Provider connectivity and answer generation are pending.
+- The configuration form performs zero provider calls. The OpenAI credential remains inactive pending external request controls.
 
 ## NRI-08a · Local source review · 2026-11-27 (Cairo)
 
@@ -176,7 +184,7 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | NRI-05 | Partial | Claims, dated source snapshots, study type, limitations, conflicting evidence, owner review and JSON export are verified. Team reviewer roles and review revisions remain. |
 | NRI-06 | Partial | Six ordered dimensions, four qualitative categories, project evidence links, revision history, reviewer and safety/authorization blockers are verified. Independent team reviewer roles remain. |
 | NRI-07 | Verified | One-year operating model with explicit assumptions, currency, units, capacity, sensitivity, scenario comparison and reproducible JSON export. |
-| NRI-08 | Partial | NRI-08a exercises private saved-source review, provenance and retraction/editorial warnings in `test/assistant.test.js`. NRI-08b adds private encrypted BYOK storage, offline/provider selection and model settings in `test/assistant-settings.test.js`. Provider requests, consent, cited generation, cancellation, caching, and usage/cost accounting remain. |
+| NRI-08 | Partial | NRI-08a exercises private saved-source review, provenance and retraction/editorial warnings in `test/assistant.test.js`. NRI-08b adds private encrypted BYOK storage, offline/provider selection and model settings in `test/assistant-settings.test.js`. NRI-08c verifies mocked local cited answers, cancellation and bounded caching in `test/assistant-answer.test.js`. External provider requests, consent and durable usage/cost accounting remain. |
 | NRI-09 | Partial | Opt-in profiles, search, follow and block, bounded requests and private profile isolation verified. Verified ORCID ownership, posts, groups, publication sharing and moderation remain. |
 | NRI-10 | Partial | Collaboration requests and scoped project-summary invitations, acceptance/decline, revoke and access history are verified. Broader roles, notifications, shared notes and tasks remain. |
 | NRI-11 | Not started | Conversations, notification preferences and authorization remain. |

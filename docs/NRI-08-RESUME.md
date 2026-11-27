@@ -8,4 +8,6 @@ Owner authorization to resume arrived on 2026-11-27 (Cairo). Keep [draft PR #19]
 
 NRI-08b adds encrypted per-account OpenAI credentials and offline, OpenAI, or local model settings. `NRI_REPORT_PYTHON=<renderer-python> npm test` passes all 47 tests. Start with `src/assistant-settings.js` and `test/assistant-settings.test.js`.
 
-Next: wire the OpenAI and loopback-compatible providers with mocked requests. Require specific consent for external payloads and enforce configured budgets before enabling generation. Add cited replies with verification and unsupported-claim warnings, usage accounting, cancellation, timeouts and caching. Resume NRI-11 after NRI-08 acceptance.
+NRI-08c wires optional loopback answers in `src/assistant-answer.js` and `src/assistant-provider.js`. `NRI_REPORT_PYTHON=<renderer-python> npm test` passes 48/48. The mocked integration test covers account isolation, citation matching, caching and cancellation. Set `NRI_LOCAL_AI_PORT` to the port of an existing loopback OpenAI-compatible server to exercise with a local model.
+
+Next: add an external OpenAI transport behind explicit per-request consent to the displayed metadata and question. Enforce token and cost controls before outbound calls, account for usage in a durable ledger, and extend the existing citation, cancellation, timeout and caching tests to cover the external path. Keep the default Offline and mock outbound requests in tests. Resume NRI-11 after NRI-08 acceptance.

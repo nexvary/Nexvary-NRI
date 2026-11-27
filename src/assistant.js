@@ -18,6 +18,7 @@ const labels = {
     'These records show what each provider returned on the date shown. Check the original work and its relevance before citing it.',
     'تعرض هذه السجلات ما أعاده كل مزوّد في التاريخ الموضح. راجع العمل الأصلي وصلته بموضوع البحث قبل الاستشهاد به.',
   ],
+  answer: ['Generate a research answer', 'ولّد إجابة بحثية'],
   references: ['Open reference validator', 'افتح مدقّق المراجع'],
   unavailable: ['Project unavailable.', 'المشروع غير متاح.'],
   empty: ['No saved references match this filter.', 'لا توجد مراجع محفوظة تطابق عامل التصفية.'],
@@ -47,7 +48,7 @@ export function showAssistant({ reply, request, lang, store, account }) {
   const result = selected ? `
     <h2>${escapeHtml(selected.title)}</h2>
     <p>${t('provenance')}</p>
-    <p><a href="${projectReferencesPath(lang, selected.id)}">${t('references')}</a></p>
+    <p><a href="${projectReferencesPath(lang, selected.id)}">${t('references')}</a> · <a href="${path}/answer?lang=${lang}&amp;project=${encodeURIComponent(selected.id)}">${t('answer')}</a></p>
     ${sources.length ? `<ol class="project-list">${sources.slice(0, limit).map((source) => `<li>
       <strong dir="auto">${escapeHtml(source.metadata?.title || source.doi)}</strong>
       <small><bdi>${escapeHtml(source.doi)}</bdi> · <bdi>${escapeHtml(source.provider)}</bdi> · ${date.format(source.checkedAt)}</small>

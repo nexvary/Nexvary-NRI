@@ -54,3 +54,10 @@ Open a project, choose **Report studio**, then select PDF or DOCX. The local ren
 - [Functional acceptance baseline](docs/REQUIREMENTS.md)
 - [Visual reference](docs/VISUAL.md)
 - [Development status](docs/STATUS.md)
+
+
+### Optional local research answers
+
+Offline source review works with no model or provider credentials. For local generation, start an existing loopback OpenAI-compatible server and set `NRI_LOCAL_AI_PORT` when starting NRI. In Assistant provider settings select Local and enter the server’s model ID. Open a project with saved reference metadata, select **Generate a research answer**, and submit a question. The request includes the question and displayed reference metadata. Use a local model that returns JSON in its chat completion content.
+
+The answer identifies saved citations and flags unknown or missing citation IDs. Verify scientific claims against the original work. OpenAI credentials can be saved for later use. External generation is pending.
