@@ -29,6 +29,7 @@ export function settingsStore(db, now) {
 }
 
 const labels = {
+  mfa: ['Two-step verification', 'التحقق بخطوتين'],
   title: ['Account security', 'أمان الحساب'],
   email: ['Signed-in account', 'الحساب الحالي'],
   other: ['Other active sessions', 'الجلسات النشطة الأخرى'],
@@ -51,6 +52,7 @@ export function settingsPage(store, lang, account, token) {
     title: t('title'), path: '/workspace/settings',
     html: `<section class="surface panel detail workspace-page"><h1>${t('title')}</h1>
       <a href="${workspacePath(lang)}">${t('back')}</a>
+      <a href="/workspace/settings/mfa?lang=${lang}">${t('mfa')}</a>
       <dl class="reference-meta"><div><dt>${t('email')}</dt><dd><bdi>${escapeHtml(account.email)}</bdi></dd></div>
         <div><dt>${t('other')}</dt><dd>${current}</dd></div></dl>
       ${count ? `<form method="post" action="/workspace/settings?lang=${lang}">

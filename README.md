@@ -71,3 +71,8 @@ The answer identifies saved citations and flags unknown or missing citation IDs.
 | `NRI_OPENAI_DAILY_MICROUSD` | Per-account daily estimated spend ceiling, in millionths of a dollar |
 
 Select OpenAI and the enabled model in provider settings and save an API key. Each request requires consent to share the question and displayed reference metadata. NRI estimates prompt tokens from UTF-8 bytes plus framing, reserves the maximum output allowance, and accounts for reported usage when available. Reservations count toward the daily ceiling even if usage is unavailable. Provider invoices depend on actual usage and pricing.
+
+
+### Optional account MFA
+
+From **Account security → Two-step verification**, confirm the current password, add the displayed key to a time-based authenticator, and confirm with a current six-digit code. Save the eight recovery codes shown during activation. Each code can be used once in place of an authenticator code during sign-in. Changing MFA signs out other active sessions. The existing workspace backup includes the encrypted seed and paired workspace key.

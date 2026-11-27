@@ -2,8 +2,9 @@ const labels = {
   signIn: ['Sign in', 'تسجيل الدخول'],
   signOut: ['Sign out', 'تسجيل الخروج'],
   email: ['Email address', 'البريد الإلكتروني'],
+  mfaCode: ['Authenticator or recovery code (if enabled)', 'رمز المصادقة أو الاسترداد، إذا كان التحقق مفعّلًا'],
   password: ['Password', 'كلمة المرور'],
-  credentials: ['The email address or password is incorrect.', 'البريد الإلكتروني أو كلمة المرور غير صحيحة.'],
+  credentials: ['The sign-in details are incorrect.', 'بيانات تسجيل الدخول غير صحيحة.'],
   rateLimit: ['Too many attempts. Try again shortly.', 'محاولات كثيرة. جرّب مجددًا بعد قليل.'],
   workspace: ['Research workspace', 'إدارة الأبحاث'],
   projects: ['My projects', 'مشاريعي'],
@@ -83,6 +84,7 @@ export function workspacePage(lang, kind, options = {}) {
         <form method="post" action="${loginPath(lang)}" class="workspace-form">
           <label>${t('email')}<input name="email" type="email" dir="ltr" autocomplete="username" maxlength="254" required></label>
           <label>${t('password')}<input name="password" type="password" dir="ltr" autocomplete="current-password" maxlength="128" required></label>
+          <label>${t('mfaCode')}<input name="mfa-code" dir="ltr" autocomplete="one-time-code" maxlength="19"></label>
           <button class="action" type="submit">${t('signIn')}</button>
         </form>
       </section>`);

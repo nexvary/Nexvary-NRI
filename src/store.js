@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { closeSync, mkdirSync, openSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { mfaSchema, mfaStore } from './mfa.js';
 import { messageSchema, messageStore } from './message-store.js';
 import { assistantUsageSchema, assistantUsageStore } from './assistant-usage.js';
 import { assistantSettingsSchema, assistantSettingsStore } from './assistant-settings.js';
@@ -19,7 +20,7 @@ import { evidenceSchema, evidenceStore } from './evidence-store.js';
 import { referenceSchema, referenceMigrationV4, referenceStore } from './reference-store.js';
 
 export const sessionLifetime = 8 * 60 * 60;
-const schemaVersion = 15;
+const schemaVersion = 16;
 const schema = `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -77,6 +78,7 @@ function initialize(db, path) {
     if (version < 13) db.exec(assistantSettingsSchema);
     if (version < 14) db.exec(assistantUsageSchema);
     if (version < 15) db.exec(messageSchema);
+    if (version < 16) db.exec(mfaSchema);
     return bindDocumentKey(db, path);
   });
 }
@@ -135,6 +137,12 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
   const updateProject = db.prepare('UPDATE projects SET title = ?, description = ?, updated_at = ? WHERE owner_id = ? AND id = ?');
   const deleteProject = db.prepare('DELETE FROM projects WHERE owner_id = ? AND id = ?');
 
+  function revokeOthers(owner, token) {
+    const removed = removeOthers.run(owner, tokenHash(token), now()).changes;
+    if (removed) settings.record(owner, 'revoke-others');
+    return removed;
+  }
+
   function issueSession(accountId) {
     const token = randomBytes(32).toString('base64url');
     const issuedAt = now();
@@ -145,6 +153,7 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
 
   return {
     assistantSettings,
+    mfa: mfaStore(db, workspaceKey, now, transact, revokeOthers),
     messages: messageStore(db, workspaceKey, now, transact),
     assistantUsage: assistantUsageStore(db, now, transact),
     documents,
@@ -188,11 +197,7 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
       return countOthers.get(owner, tokenHash(token), now()).count;
     },
     revokeOtherSessions(owner, token) {
-      return transact(db, () => {
-        const removed = removeOthers.run(owner, tokenHash(token), now()).changes;
-        if (removed) settings.record(owner, 'revoke-others');
-        return removed;
-      });
+      return transact(db, () => revokeOthers(owner, token));
     },
     listProjects(owner) {
       return listProjects.all(owner);

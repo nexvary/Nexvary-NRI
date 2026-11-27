@@ -166,6 +166,11 @@ try {
       }
       await waitFor(() => inspect(send, 'Boolean(document.querySelector(".message-list")?.textContent.includes("checked the saved snapshot"))'), 'sent private message');
       await captureLayout(send, 'messages', lang, name, width, height);
+      if ((lang === 'ar' && name === 'desktop') || (lang === 'en' && name === 'mobile')) {
+        await send('Page.navigate', { url: origin + '/workspace/settings/mfa?lang=' + lang });
+        await waitFor(() => inspect(send, 'Boolean(document.querySelector("button[value=begin]"))'), 'MFA settings');
+        await captureLayout(send, 'mfa', lang, name, width, height);
+      }
       client.socket.close();
     }
   }

@@ -112,3 +112,8 @@
 
 - Added participant-scoped direct threads, encrypted text, read markers, an in-app notification preference, blocking, reporting and send/report limits. Conversation creation uses accepted collaboration relationships.
 - 50/50 with real report rendering. Chromium sent a message and captured both languages at desktop and mobile sizes. See [STATUS.md](STATUS.md) for the captures and next milestone.
+
+## 2026-11-27 · NRI-18a optional authenticator MFA
+
+- Added password-confirmed setup and deactivation, encrypted TOTP seeds, one-use recovery codes, and transactional revocation of other sessions whenever MFA changes.
+- 51/51 with real report rendering. Real browser captures cover bilingual security settings.

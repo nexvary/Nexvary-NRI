@@ -65,7 +65,7 @@ test('requires a session and serves a localized login with generic credential er
   for (const email of [alice, 'unknown@example.test']) {
     const denied = await post('/login?lang=en', { email, password: 'incorrect' });
     assert.equal(denied.status, 401);
-    assert.match(await denied.text(), /email address or password is incorrect/);
+    assert.match(await denied.text(), /sign-in details are incorrect/);
     assert.equal(denied.headers.get('set-cookie'), null);
   }
 });

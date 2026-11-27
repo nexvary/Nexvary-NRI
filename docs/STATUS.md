@@ -1,5 +1,12 @@
 # Development status
 
+## NRI-18a · Account MFA and recovery codes · 2026-11-27 (Cairo)
+
+Signed-in accounts can enable time-based authenticator codes after password re-verification. The secret is encrypted at rest and setup expires in ten minutes. Enrollment issues eight one-use recovery codes. Login rejects replayed authenticator and recovery codes. Activation and deactivation revoke other sessions in the same transaction.
+
+- 51/51 with real report rendering. HTTP coverage includes legacy password sign-in, setup confirmation, authentication code reuse, recovery code use and replay, new session issuance and revocation.
+- Real Chromium capture of [Arabic desktop](qa/nri-18/mfa-ar-desktop.webp) and [English mobile](qa/nri-18/mfa-en-mobile.webp) settings.
+
 ## NRI-11 · Private researcher messaging · 2026-11-27 (Cairo)
 
 Accepted collaborators can open a shared private thread. Each participant has independent unread state and a preference for in-app unread notifications. Both block directions prevent sends. Users can report received messages by category. Message bodies are encrypted in SQLite with a purpose-specific key derived from the paired workspace key.
@@ -209,7 +216,7 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | NRI-15 | Verified | Versioned Arabic/English PDF and DOCX downloads with citations, evidence, L-READY findings and limitations. Requires the documented local renderer. |
 | NRI-16 | Partial | System About view shows the purpose, framework wording, build version and documentation links. Changelog, licensing, privacy, terms and support content remain. |
 | NRI-17 | Partial | Separate developer view identifies Nexvary Inc. and links to the official company site. Dedicated confirmed contact information remains. |
-| NRI-18 | Partial | Local authentication, session revocation, account audit, authorization, encrypted PDF bytes, RTL/LTR and verified recovery are implemented. Team RBAC, MFA, account recovery, export/deletion, accessibility audit and administration remain. |
+| NRI-18 | Partial | Local authentication, session revocation, account audit, authorization, encrypted PDF bytes, RTL/LTR and verified recovery are implemented. NRI-18a adds optional MFA and one-use recovery codes. Team RBAC, password/account recovery, export/deletion, accessibility audit and administration remain. |
 | NRI-19 | Partial | Local restore and regression workflow configuration are implemented. Entitlements, approved hosting, operational monitoring and billing remain. |
 
-Next milestone: NRI-18 MFA and recovery codes, followed by RBAC and moderation.
+Next milestone: scoped RBAC and the message-report moderation console.

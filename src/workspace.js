@@ -1,3 +1,4 @@
+import { createMfaSettingsHandler } from './mfa-settings.js';
 import { handleMessages, resolveMessageRoute } from './messages.js';
 import { createAssistantAnswerHandler } from './assistant-answer.js';
 import { handleAssistantSettings } from './assistant-settings.js';
@@ -33,6 +34,7 @@ export function resolveWorkspaceRoute(pathname) {
   if (pathname === '/workspace/assistant/settings') return { kind: 'assistant-settings' };
   if (pathname === '/workspace/assistant') return { kind: 'assistant' };
   if (pathname === '/workspace/education') return { kind: 'education' };
+  if (pathname === '/workspace/settings/mfa') return { kind: 'settings-mfa' };
   if (pathname === '/workspace/settings') return { kind: 'settings' };
   if (pathname === '/workspace/analytics') return { kind: 'analytics' };
   if (pathname === '/workspace/network') return { kind: 'network' };
@@ -79,6 +81,7 @@ function projectFields(form) {
 }
 
 export function createWorkspaceHandler(store, providers, version, reportRenderer, assistantProvider) {
+  const handleMfaSettings = createMfaSettingsHandler(store);
   const handleAssistantAnswer = createAssistantAnswerHandler(store, assistantProvider);
   const handleDocuments = createDocumentHandler(store);
   const handleNetwork = createNetworkHandler(store);
@@ -149,7 +152,9 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
         const password = form.get('password') ?? '';
         const credentials = email ? store.credentials(email) : undefined;
         const valid = await verifyPassword(password.slice(0, 128), credentials);
-        if (!valid || password.length > 128) {
+        const code = (form.get('mfa-code') ?? '').slice(0, 32);
+        if (!valid || password.length > 128 ||
+          (store.mfa.enabled(credentials.id) && !store.mfa.verify(credentials.id, code))) {
           show(401, 'login', { error: 'credentials' });
           return;
         }
@@ -193,6 +198,10 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
     }
     if (kind.startsWith('sharing')) {
       handleSharing({ request, reply, redirect, route, lang, account, form });
+      return;
+    }
+    if (kind === 'settings-mfa') {
+      await handleMfaSettings({ reply, redirect, lang, account, token, form });
       return;
     }
     if (kind === 'settings') {
