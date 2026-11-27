@@ -30,4 +30,6 @@ NRI-10b adds role-scoped team notes and tasks, attributable task transitions, an
 
 NRI-02a adds manuscript catalog search, authors, tags, publication status, DOI and attributable metadata revisions. See `src/team-store.js`, `src/teams.js` and `test/teams.test.js`. Full regression: 56/56.
 
-Next: implement owner-scoped collections, bookmarks and document annotations using `src/library.js`, `src/document-store.js` and the authenticated workspace routes. Verify direct URL denial and stable references to document versions. Include owned annotations in account export and deletion coverage. Continue with the [functional matrix](STATUS.md#functional-acceptance).
+NRI-03a adds private PDF collections, bookmarks and annotations with stable version references. See `src/library-organization.js`, `test/library.test.js` and `test/privacy.test.js`. Full regression: 57/57.
+
+Next: implement account-scoped BibTeX/RIS citation exchange for saved project references, with bounded imports, provenance retention and DOI/provider deduplication. Start from `src/reference-store.js` and `src/library.js`. Scope import and export to authenticated project ownership, test cross-account direct requests, and continue through the [functional matrix](STATUS.md#functional-acceptance).

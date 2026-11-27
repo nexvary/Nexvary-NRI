@@ -18,6 +18,11 @@ store.addAccount(email, await hashPassword(fixturePassword));
 const { id } = store.credentials(email);
 const session = store.newSession(id);
 const project = store.createProject(id, { title: 'Source review sample', description: '' });
+const sampleDocument = store.documents.create(id, project, {
+  name: 'Reference review.pdf', bytes: Buffer.from('%PDF-1.4\nIllustrative data\n%%EOF\n'),
+});
+const collection = store.organization.create(id, 'Research methods');
+store.organization.membership(id, project, sampleDocument, collection, true);
 store.references.save(id, project, {
   doi: '10.0000/visual-example', provider: 'crossref', status: 'found',
   checkedAt: Date.UTC(2026, 10, 26), metadata: { title: 'Illustrative reference snapshot' },
@@ -232,6 +237,19 @@ try {
         }
         await waitFor(() => inspect(send, 'document.body?.textContent.includes("Verify the source metadata")'), 'created team task');
         await captureLayout(send, 'team-work', lang, name, width, height);
+        await send('Page.navigate', { url: origin + '/workspace/projects/' + project + '/documents/' + sampleDocument + '/reading?lang=' + lang });
+        await waitFor(() => inspect(send, 'Boolean(document.querySelector("button[value=add-mark]"))'), 'reading marks form');
+        if (lang === 'ar') {
+          await inspect(send, `(() => {
+            const button = document.querySelector('button[value=add-mark]');
+            button.form.elements.page.value = 1;
+            button.form.elements.kind.value = 'annotation';
+            button.form.elements.text.value = 'Record the review date.';
+            setTimeout(() => button.form.requestSubmit(button), 0);
+          })()`);
+        }
+        await waitFor(() => inspect(send, 'Boolean(document.querySelector(".message-list")?.textContent.includes("Record the review date."))'), 'saved reading annotation');
+        await captureLayout(send, 'reading', lang, name, width, height);
         await send('Page.navigate', { url: origin + '/workspace/settings/mfa?lang=' + lang });
         await waitFor(() => inspect(send, 'Boolean(document.querySelector("button[value=begin]"))'), 'MFA settings');
         await captureLayout(send, 'mfa', lang, name, width, height);

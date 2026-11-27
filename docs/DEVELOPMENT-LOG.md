@@ -152,3 +152,8 @@
 
 - Added searchable authors, tags, publication status and DOI with independently attributable metadata revisions.
 - 56/56 with real report rendering. Chromium saved catalog metadata and captured Arabic desktop and English mobile.
+
+## 2026-11-27 · NRI-03a collections and reading marks
+
+- Added private PDF collections, bookmarks, and version-specific reading annotations. Included all three in account export and deletion coverage.
+- 57/57 with real report rendering. Chromium saved an annotation and captured both locales.

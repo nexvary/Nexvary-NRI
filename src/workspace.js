@@ -1,3 +1,4 @@
+import { handleOrganization, resolveOrganizationRoute } from './library-organization.js';
 import { handleTeamWork } from './team-work.js';
 import { handleLicensing } from './licensing.js';
 import { handleTeam, resolveTeamRoute } from './teams.js';
@@ -51,7 +52,7 @@ export function resolveWorkspaceRoute(pathname) {
   if (pathname === '/workspace') return { kind: 'index' };
   const match = pathname.match(/^\/workspace\/projects\/([0-9a-f-]{36})(\/delete)?$/);
   if (match) return { kind: match[2] ? 'delete' : 'project', id: match[1] };
-  return resolveTeamRoute(pathname) ?? resolveMessageRoute(pathname) ?? resolveDocumentRoute(pathname) ?? resolveReferenceRoute(pathname) ?? resolveEvidenceRoute(pathname) ?? resolveReadinessRoute(pathname) ?? resolveEconomicsRoute(pathname) ?? resolveObservatoryRoute(pathname) ?? resolveReportRoute(pathname) ?? resolveSharingRoute(pathname);
+  return resolveOrganizationRoute(pathname) ?? resolveTeamRoute(pathname) ?? resolveMessageRoute(pathname) ?? resolveDocumentRoute(pathname) ?? resolveReferenceRoute(pathname) ?? resolveEvidenceRoute(pathname) ?? resolveReadinessRoute(pathname) ?? resolveEconomicsRoute(pathname) ?? resolveObservatoryRoute(pathname) ?? resolveReportRoute(pathname) ?? resolveSharingRoute(pathname);
 }
 
 function acceptsPost(request) {
@@ -261,6 +262,10 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
     }
     if (kind === 'network' || kind === 'collaboration') {
       handleNetwork({ request, reply, redirect, route, lang, account, form });
+      return;
+    }
+    if (kind.startsWith('library-')) {
+      handleOrganization({ request, reply, redirect, route, lang, account, form, store });
       return;
     }
     if (kind === 'library') {

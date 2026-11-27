@@ -12,6 +12,10 @@ export function privacyStore(db, workspaceKey, now) {
     documents: `SELECT d.id, d.project_id, d.title, v.number, v.filename, v.created_at, v.size, v.nonce, v.tag, v.ciphertext
       FROM document_versions v JOIN documents d ON d.id = v.document_id JOIN projects p ON p.id = d.project_id
       WHERE p.owner_id = ? ORDER BY d.id, v.number`,
+    collections: 'SELECT id,name FROM library_collections WHERE owner_id = ?',
+    collectionDocuments: `SELECT d.* FROM collection_documents d JOIN library_collections c ON c.id=d.collection_id WHERE c.owner_id = ?`,
+    readingMarks: `SELECT m.* FROM document_marks m JOIN documents d ON d.id=m.document_id
+      JOIN projects p ON p.id=d.project_id WHERE p.owner_id = ?`,
     references: 'SELECT r.* FROM project_references r JOIN projects p ON p.id = r.project_id WHERE p.owner_id = ?',
     claims: 'SELECT c.* FROM claims c JOIN projects p ON p.id = c.project_id WHERE p.owner_id = ?',
     evidence: `SELECT e.* FROM evidence_items e JOIN claims c ON c.id = e.claim_id

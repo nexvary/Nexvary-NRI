@@ -80,7 +80,8 @@ export function libraryPage(lang, url, store, owner) {
   return {
     title: t('title'), path: '/workspace/library',
     html: `<section class="surface panel detail workspace-page">
-      <h1>${t('title')}</h1><a href="${workspacePath(lang)}">${t('workspace')}</a>
+      <h1>${t('title')}</h1><nav class="project-tools"><a href="${workspacePath(lang)}">${t('workspace')}</a>
+      <a href="/workspace/library/collections?lang=${lang}">${lang === 'ar' ? 'مجموعات المكتبة' : 'Library collections'}</a></nav>
       <form class="workspace-form" action="/workspace/library" method="get">
         <input type="hidden" name="lang" value="${lang}">
         <label>${t('search')}<input name="q" maxlength="200" dir="auto" value="${escapeHtml(search)}"></label>

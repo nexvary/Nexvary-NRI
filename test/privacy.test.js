@@ -29,6 +29,9 @@ test('reauthenticates private exports and deletion, isolates accounts, and prese
   const other = store.createProject(peer, { title: 'Other private project', description: '' });
   const pdf = Buffer.from('%PDF-1.4\nPrivate fixture');
   const document = store.documents.create(owner, project, { name: 'Study.pdf', bytes: pdf });
+  const collection = store.organization.create(owner, 'Study materials');
+  assert.ok(store.organization.membership(owner, project, document, collection, true));
+  assert.ok(store.organization.addMark(owner, project, document, { version: 1, page: 1, kind: 'annotation', text: 'Private reading note' }));
   const key = 'mock-secret-api-key';
   store.assistantSettings.save(owner, 'openai', 'fixture', key);
   for (const id of [owner, peer]) store.network.save(id, { name: id, interests: '', orcid: '', discoverable: true });
@@ -68,6 +71,8 @@ test('reauthenticates private exports and deletion, isolates accounts, and prese
     const record = JSON.parse(text);
     assert.equal(record.account.email, email);
     assert.deepEqual(Buffer.from(record.documents[0].content, 'base64'), pdf);
+    assert.equal(record.readingMarks[0].text, 'Private reading note');
+    assert.equal(record.collections[0].name, 'Study materials');
     assert.equal(record.sentMessages[0].text, 'Owner sent message');
     assert.equal((await post({ intent: 'delete', confirm: 'DELETE', code: recovery[0] })).status, 401);
     const deleted = await post({ intent: 'delete', confirm: 'DELETE', code: recovery[1], account: peer });
@@ -79,6 +84,7 @@ test('reauthenticates private exports and deletion, isolates accounts, and prese
     assert.equal(store.assistantSettings.configuration(owner), undefined);
     assert.equal(store.documents.download(owner, project, document, 1), undefined);
     assert.equal(store.messages.thread(peer, conversation), undefined);
+    assert.equal(store.organization.collection(owner, collection, 0), undefined);
     assert.equal(store.getProject(peer, other).title, 'Other private project');
     assert.ok(store.session(peerToken));
 

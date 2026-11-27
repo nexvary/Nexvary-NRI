@@ -83,3 +83,49 @@ test('dashboard isolates accepted collaborator counts, self-reported ORCID and m
   assert.doesNotMatch(unlinked, /0000-0002-1825-0097|\$0\.125|>511</);
   assert.match(await view(owner, 'ar'), /المتعاونون المقبولون/);
 });
+
+test('library collections and reading marks remain owner-scoped and tied to PDF versions', async (t) => {
+  const store = openWorkspaceStore();
+  const [owner, other] = ['owner', 'other'].map((name) => {
+    const email = name + '@organization.test';
+    store.addAccount(email, { salt: Buffer.alloc(16), hash: Buffer.alloc(32) });
+    const id = store.credentials(email).id;
+    return { id, cookie: 'nri_session=' + store.newSession(id) };
+  });
+  const project = store.createProject(owner.id, { title: 'Owner project', description: '' });
+  const document = store.documents.create(owner.id, project, { name: 'Methods.pdf', bytes: Buffer.from('%PDF-1.4\nfixture') });
+  const app = createApp(store);
+  await new Promise((resolve) => app.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise((resolve) => app.close(resolve)));
+  const origin = 'http://127.0.0.1:' + app.address().port;
+  const index = '/workspace/library/collections?lang=en';
+  const reading = '/workspace/projects/' + project + '/documents/' + document + '/reading?lang=en';
+  const request = (user, path, fields, source = origin) => fetch(origin + path, {
+    redirect: 'manual', headers: { cookie: user.cookie, ...(fields ? { origin: source } : {}) },
+    ...(fields ? { method: 'POST', body: new URLSearchParams(fields) } : {}),
+  });
+  const created = await request(owner, index, { intent: 'create', name: 'Methods folder' });
+  assert.equal(created.status, 303);
+  const location = created.headers.get('location');
+  const collection = new URL(origin + location).searchParams.get('collection');
+  assert.equal((await request(other, location)).status, 404);
+  assert.equal((await request(other, index, { intent: 'remove', collection })).status, 404);
+  assert.equal((await request(other, reading)).status, 404);
+  assert.equal((await request(owner, reading, { intent: 'link', collection }, 'https://foreign.test')).status, 403);
+  assert.equal((await request(owner, reading, { intent: 'link', collection })).status, 303);
+  assert.match(await (await request(owner, location)).text(), /Methods\.pdf/);
+  const mark = { intent: 'add-mark', kind: 'annotation', page: 2, version: 1, text: '<script>Review methods</script>' };
+  assert.equal((await request(owner, reading, { ...mark, version: 9 })).status, 422);
+  assert.equal((await request(owner, reading, mark)).status, 303);
+  assert.equal((await request(owner, reading, { ...mark, kind: 'bookmark', text: '' })).status, 303);
+  assert.ok(store.documents.append(owner.id, project, document, { name: 'Revision.pdf', bytes: Buffer.from('%PDF-1.4\nsecond') }));
+  const html = await (await request(owner, reading)).text();
+  assert.match(html, /Annotation · v1/);
+  assert.match(html, /Bookmark · v1/);
+  assert.match(html, /&lt;script&gt;Review methods&lt;\/script&gt;/);
+  assert.equal((await request(owner, location, { intent: 'remove', collection })).status, 303);
+  assert.ok(store.documents.get(owner.id, project, document));
+  assert.equal(store.organization.reading(owner.id, project, document, 0).marks.length, 2);
+  assert.ok(store.documents.delete(owner.id, project, document));
+  assert.equal((await request(owner, reading)).status, 404);
+});

@@ -131,6 +131,7 @@ export function workspacePage(lang, kind, options = {}) {
       <section class="surface panel detail workspace-page">
         <a href="${documentsPath(lang, id)}">${t('backToDocuments')}</a>
         <h1 dir="auto">${escapeHtml(document.title)}</h1>
+        <p><a href="${path}/reading?lang=${lang}">${lang === 'ar' ? 'ملاحظات القراءة' : 'Reading notes'}</a></p>
         <section class="project-list">
           <h2>${t('history')}</h2>
           <ol class="document-history">

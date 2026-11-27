@@ -1,3 +1,4 @@
+import { organizationSchema, organizationStore } from './library-organization.js';
 import { licenseSchema, licensingStore } from './licensing-store.js';
 import { manuscriptCatalogSchema, teamSchema, teamStore, teamWorkSchema } from './team-store.js';
 import { privacyStore } from './privacy-store.js';
@@ -23,7 +24,7 @@ import { evidenceSchema, evidenceStore } from './evidence-store.js';
 import { referenceSchema, referenceMigrationV4, referenceStore } from './reference-store.js';
 
 export const sessionLifetime = 8 * 60 * 60;
-const schemaVersion = 21;
+const schemaVersion = 22;
 const schema = `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -87,6 +88,7 @@ function initialize(db, path) {
     if (version < 19) db.exec(licenseSchema);
     if (version < 20) db.exec(teamWorkSchema);
     if (version < 21) db.exec(manuscriptCatalogSchema);
+    if (version < 22) db.exec(organizationSchema);
     return bindDocumentKey(db, path);
   });
 }
@@ -183,6 +185,7 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
     readiness,
     economics,
     library: libraryStore(db),
+    organization: organizationStore(db, now, transact),
     network: networkStore(db, now, transact, (first, second) => {
       sharing.revokeOnBlock(first, second);
       teams.revokeOnBlock(first, second);
