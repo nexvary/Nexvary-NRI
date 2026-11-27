@@ -1,9 +1,10 @@
+import { documentFormat, documentHeaders } from './documents.js';
 import { renderLicensedReport } from './licensing-store.js';
 import { buildReport } from './reports.js';
 import { escapeHtml } from './workspace-view.js';
 
 const kinds = {
-  document: ['PDF version', 'إصدار PDF'],
+  document: ['Document version', 'إصدار المستند'],
   reference: ['Reference snapshot', 'لقطة مرجع'],
   readiness: ['Readiness revision', 'مراجعة الجاهزية'],
   report: ['Report snapshot', 'لقطة تقرير'],
@@ -55,11 +56,12 @@ export function createResourceHandler(store,release,renderReport) {
       const row = store.resources.get(actor,id,grant);
       if (!row) return reply(404);
       const { data } = row;
-      if (row.kind === 'document' && params.get('download') === 'pdf') {
+      if (row.kind === 'document' && ['pdf', 'document'].includes(params.get('download'))) {
         const file = store.documents.download(row.owner,id,data.document,data.version);
         if (!file) return reply(404);
-        return reply(200,null,{ 'Content-Type':formats.pdf, 'Content-Length':file.bytes.length,
-          'Content-Disposition':'attachment; filename="shared-document.pdf"' },file.bytes);
+        const headers = documentHeaders(file, data.version);
+        if (documentFormat(file.name) === 'pdf') headers['Content-Disposition'] = 'attachment; filename="shared-document.pdf"';
+        return reply(200,null,headers,file.bytes);
       }
       if (form) {
         const format = form.get('format');
@@ -80,7 +82,7 @@ export function createResourceHandler(store,release,renderReport) {
       let detail;
       if (row.kind === 'document') {
         if (!store.documents.get(row.owner,id,data.document)) return reply(404);
-        detail = `<a class="action" href="${link(grant)}&amp;download=pdf">${t('Download shared PDF version','نزّل إصدار PDF المشترك')}</a>`;
+        detail = `<a class="action" href="${link(grant)}&amp;download=document">${t('Download shared document version','نزّل إصدار المستند المشترك')}</a>`;
       } else if (row.kind === 'reference') {
         detail = `<p><bdi>${escapeHtml(data.provider)} · ${escapeHtml(data.doi)}</bdi> · ${when.format(data.checkedAt)} UTC</p>
           <p dir="auto">${escapeHtml((data.metadata.authors ?? []).join(' · '))}</p>

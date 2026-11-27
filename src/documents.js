@@ -1,19 +1,28 @@
 import { readBoundedBody } from './request-body.js';
-import { documentsPath, workspacePage } from './workspace-view.js';
+import { documentsPath, escapeHtml, workspacePage } from './workspace-view.js';
 
 const maxFileSize = 8 * 1024 * 1024;
+const maxTextSize = 256 * 1024;
+const utf8 = new TextDecoder('utf-8', { fatal: true });
+
+export function documentFormat(name) {
+  return /\.txt$/iu.test(name) ? 'txt' : 'pdf';
+}
+
+const contentTypes = { pdf: 'application/pdf', txt: 'text/plain; charset=utf-8' };
+
 const maxUploadBody = maxFileSize + 64 * 1024;
 
 export function resolveDocumentRoute(pathname) {
-  const match = pathname.match(/^\/workspace\/projects\/([0-9a-f-]{36})\/documents(?:\/([0-9a-f-]{36})(?:(\/delete)|\/versions\/([1-9][0-9]{0,14}))?)?$/);
+  const match = pathname.match(/^\/workspace\/projects\/([0-9a-f-]{36})\/documents(?:\/([0-9a-f-]{36})(?:(\/delete)|\/versions\/([1-9][0-9]{0,14})(\/preview)?)?)?$/);
   if (!match) return;
-  const [, id, documentId, deleting, number] = match;
+  const [, id, documentId, deleting, number, preview] = match;
   if (deleting) return { kind: 'delete-document', id, documentId };
-  if (number) return { kind: 'download-document', id, documentId, number: Number(number) };
+  if (number) return { kind: preview ? 'preview-document' : 'download-document', id, documentId, number: Number(number) };
   return { kind: documentId ? 'document' : 'documents', id, documentId };
 }
 
-async function readPdf(request) {
+async function readDocument(request) {
   const type = request.headers['content-type'] ?? '';
   if (!/^multipart\/form-data\s*;/i.test(type)) return { status: 415, error: 'invalidPdf' };
   const body = await readBoundedBody(request, maxUploadBody);
@@ -25,15 +34,27 @@ async function readPdf(request) {
     if (!(error instanceof TypeError)) throw error;
     return { status: 400, error: 'invalidPdf' };
   }
-  const candidates = form.getAll('pdf');
+  const legacyPdf = form.has('pdf');
+  const candidates = [...form.getAll('file'), ...form.getAll('pdf')];
   const file = candidates[0];
   if (candidates.length !== 1 || !(file instanceof File)) return { status: 422, error: 'invalidPdf' };
   if (file.size > maxFileSize) return { status: 413, error: 'largePdf' };
   const name = file.name.normalize('NFC').trim();
-  if (name.length > 180 || !/\.pdf$/iu.test(name) || /[\/\\\p{Cc}\u202a-\u202e\u2066-\u2069]/u.test(name)) {
+  if (name.length > 180 || !/\.(?:pdf|txt)$/iu.test(name) || /[\/\\\p{Cc}\u202a-\u202e\u2066-\u2069]/u.test(name)) {
     return { status: 422, error: 'invalidPdf' };
   }
+  if (legacyPdf && documentFormat(name) !== 'pdf') return { status: 422, error: 'invalidPdf' };
+  if (documentFormat(name) === 'txt' && file.size > maxTextSize) return { status: 413, error: 'largeText' };
   const bytes = Buffer.from(await file.arrayBuffer());
+  if (documentFormat(name) === 'txt') {
+    try {
+      const content = utf8.decode(bytes);
+      if (!content.trim() || /[^\P{Cc}\t\n\r]/u.test(content)) return { status: 422, error: 'invalidText' };
+    } catch {
+      return { status: 422, error: 'invalidText' };
+    }
+    return { file: { name, bytes } };
+  }
   const header = bytes.subarray(0, 10).toString('latin1');
   const ending = bytes.subarray(-1024).toString('latin1');
   if (!/^%PDF-(?:1\.[0-7]|2\.0)[\r\n]/.test(header) || !/%%EOF[\r\n\t ]*$/.test(ending)) {
@@ -42,11 +63,16 @@ async function readPdf(request) {
   return { file: { name, bytes } };
 }
 
-function disposition(name, version) {
-  const encoded = encodeURIComponent(name).replace(/[!'()*]/g, (character) => (
+export function documentHeaders(file, version) {
+  const encoded = encodeURIComponent(file.name).replace(/[!'()*]/g, (character) => (
     '%' + character.charCodeAt(0).toString(16).toUpperCase()
   ));
-  return `attachment; filename="document-v${version}.pdf"; filename*=UTF-8''${encoded}`;
+  const format = documentFormat(file.name);
+  return {
+    'Content-Type': contentTypes[format],
+    'Content-Length': file.bytes.length,
+    'Content-Disposition': `attachment; filename="document-v${version}.${format}"; filename*=UTF-8''${encoded}`,
+  };
 }
 
 export function createDocumentHandler(store) {
@@ -62,17 +88,27 @@ export function createDocumentHandler(store) {
       return;
     }
 
-    if (kind === 'download-document') {
+    if (kind === 'download-document' || kind === 'preview-document') {
       const file = store.documents.download(account.id, id, documentId, number);
       if (!file) {
         missing();
         return;
       }
-      reply(200, null, {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': disposition(file.name, number),
-        'Content-Length': file.bytes.length,
-      }, file.bytes);
+      if (kind === 'preview-document') {
+        if (documentFormat(file.name) !== 'txt') return missing();
+        const title = lang === 'ar' ? 'معاينة المستند' : 'Document preview';
+        const path = documentsPath(lang, id, documentId).split('?')[0] + '/versions/' + number + '/preview';
+        reply(200, {
+          title, path,
+          html: `<section class="surface panel detail workspace-page">
+            <a href="${documentsPath(lang, id, documentId)}">${lang === 'ar' ? 'سجل الإصدارات' : 'Version history'}</a>
+            <h1>${title}</h1><p dir="auto">${escapeHtml(file.name)}</p>
+            <pre class="document-text-preview" dir="auto">\n${escapeHtml(utf8.decode(file.bytes))}</pre>
+          </section>`,
+        });
+        return;
+      }
+      reply(200, null, documentHeaders(file, number), file.bytes);
       return;
     }
 
@@ -99,13 +135,17 @@ export function createDocumentHandler(store) {
     }
     uploads++;
     try {
-      const { status, file, error } = await readPdf(request);
+      const { status, file, error } = await readDocument(request);
       if (!stillSignedIn()) {
         redirect(`/login?lang=${lang}`);
         return;
       }
       if (status) {
         show(status, error);
+        return;
+      }
+      if (document && documentFormat(document.title) !== documentFormat(file.name)) {
+        show(422, 'versionFormat');
         return;
       }
       const uploaded = documentId

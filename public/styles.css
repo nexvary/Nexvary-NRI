@@ -350,3 +350,9 @@ small { font-size: .84rem; }
 
 .pdf-reader { display: grid; gap: .75rem; min-width: 0; }
 .pdf-reader canvas { max-width: 100%; height: auto; justify-self: center; background-color: white; }
+
+.document-text-preview {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  unicode-bidi: plaintext;
+}

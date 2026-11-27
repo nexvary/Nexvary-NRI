@@ -117,7 +117,7 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
     };
     const postOnly = kind === 'delete' || kind === 'logout' || kind === 'delete-document';
     const allowed = postOnly ? ['POST'] : ['GET', 'HEAD'];
-    if (!postOnly && !['download-document', 'reference-projects', 'evidence-projects', 'evidence-export', 'readiness-projects', 'economics-projects', 'economics-export', 'library', 'report-projects', 'sharing-project', 'assistant'].includes(kind)) allowed.push('POST');
+    if (!postOnly && !['download-document', 'preview-document', 'reference-projects', 'evidence-projects', 'evidence-export', 'readiness-projects', 'economics-projects', 'economics-export', 'library', 'report-projects', 'sharing-project', 'assistant'].includes(kind)) allowed.push('POST');
     const method = request.method;
     if (!allowed.includes(method)) {
       reply(405, null, { Allow: allowed.join(', ') });
@@ -302,7 +302,7 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
       return;
     }
 
-    if (['documents', 'document', 'delete-document', 'download-document'].includes(kind)) {
+    if (['documents', 'document', 'delete-document', 'download-document', 'preview-document'].includes(kind)) {
       if (kind === 'delete-document' && form.get('confirm') !== 'yes') {
         reply(400);
         return;

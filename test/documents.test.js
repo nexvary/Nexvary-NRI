@@ -253,3 +253,49 @@ test('migrates a P1a database and persists encrypted files across restarts', asy
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+
+test('validates, previews, versions and isolates private UTF-8 documents', async () => {
+  const upload = (bytes, name = 'field-notes.txt') => {
+    const form = new FormData();
+    form.set('file', new Blob([bytes]), name);
+    return form;
+  };
+  const original = 'ملخص البحث\n<script>alert(1)</script>';
+  const created = await request(documentsPath(), { body: upload(original) });
+  assert.equal(created.status, 303);
+  const history = created.headers.get('location').split('?')[0];
+  assert.match(await (await request(history + '?lang=ar')).text(), /معاينة النص/);
+  assert.equal((await request(history, { body: upload(firstPdf, 'different.pdf') })).status, 422);
+  assert.equal((await request(history, { body: upload('Second version') })).status, 303);
+  const preview = history + '/versions/1/preview?lang=en';
+  const shown = await request(preview);
+  assert.equal(shown.status, 200);
+  const html = await shown.text();
+  assert.match(html, /ملخص البحث/);
+  assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+  assert.doesNotMatch(html, /<script>alert/);
+  assert.equal((await request(preview, { cookie: bobCookie })).status, 404);
+  assert.equal((await request(history + '/versions/1', { cookie: bobCookie })).status, 404);
+  const download = await request(history + '/versions/1');
+  assert.equal(download.headers.get('content-type'), 'text/plain; charset=utf-8');
+  assert.match(download.headers.get('content-disposition'), /attachment; filename="document-v1\.txt"/);
+  assert.equal(await download.text(), original);
+  const search = '/workspace/library?lang=en&kind=txt&q=field-notes';
+  assert.match(await (await request(search)).text(), /field-notes\.txt/);
+  assert.doesNotMatch(await (await request(search, { cookie: bobCookie })).text(), /<bdi>field-notes\.txt/);
+  assert.equal((await request(documentsPath(), { body: upload(Uint8Array.of(0xc3, 0x28)) })).status, 422);
+  assert.equal((await request(documentsPath(), { body: upload('Binary\0data') })).status, 422);
+  assert.equal((await request(documentsPath(), { body: upload(Buffer.alloc(256 * 1024 + 1, 65)) })).status, 413);
+  const operator = store.credentials(alice).id;
+  store.licensing.setOperator(operator, true);
+  try {
+    store.licensing.save(operator, 'txt-test', 100, 0, 0);
+    store.licensing.assign(operator, alice, 'txt-test', null);
+    assert.equal((await request(history, { body: upload('Over quota') })).status, 429);
+  } finally {
+    store.licensing.setOperator(operator, false);
+  }
+  assert.equal((await request(history + '/delete', { body: new URLSearchParams({ confirm: 'yes' }) })).status, 303);
+  assert.equal((await request(preview)).status, 404);
+});

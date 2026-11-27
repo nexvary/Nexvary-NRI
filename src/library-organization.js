@@ -134,7 +134,7 @@ export function handleOrganization({ request, reply, redirect, route, lang, acco
       ${pagination(records)}`}`);
   }
   const entry = library.reading(owner,id,document,offset);
-  if (!entry) return reply(404);
+  if (!entry || /\.txt$/iu.test(entry.title)) return reply(404);
   if (form) {
     let saved = false;
     if (intent === 'link' || intent === 'unlink') saved = library.membership(owner,id,document,form.get('collection'),intent === 'link');

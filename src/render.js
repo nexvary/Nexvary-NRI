@@ -75,7 +75,7 @@ export function render({ lang, view, version, page, workspace, unread = 0, invit
         ${workspace ? `<section class="surface panel">
           <h2>${icon('🕒')}${t('activity')}</h2>
           ${workspace.activity.length ? `<ul class="activity">${workspace.activity.map((item) =>
-            `<li>${icon(item.kind === 'pdf' ? '📄' : '🔗')}<a href="${libraryEntryPath(lang, item)}"><bdi>${escapeHtml(item.title)}</bdi></a></li>`).join('')}</ul>`
+            `<li>${icon(item.kind !== 'source' ? '📄' : '🔗')}<a href="${libraryEntryPath(lang, item)}"><bdi>${escapeHtml(item.title)}</bdi></a></li>`).join('')}</ul>`
             : `<p>${t('noActivity')}</p>`}
         </section>` : ''}
         <section class="surface panel summary"><h2>${t('aboutSystem')}</h2><p>${t('motto')}</p><a href="${href('about')}">${label('about')}</a></section>

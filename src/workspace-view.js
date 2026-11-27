@@ -19,29 +19,33 @@ const labels = {
   missing: ['Project unavailable', 'المشروع غير متاح'],
   empty: ['Your projects will appear here after you create one.', 'ستظهر مشاريعك هنا بعد إنشاء أول مشروع.'],
   confirmProject: ['Confirm deletion of this project and its files', 'أؤكد حذف المشروع وكل ملفاته'],
-  documents: ['Private PDFs', 'ملفات PDF الخاصة'],
+  documents: ['Private PDFs and text files', 'ملفات PDF والنصوص الخاصة'],
   sharing: ['Project invitations', 'دعوات المشروع'],
   reports: ['Report studio', 'استوديو التقارير'],
   economics: ['Economic feasibility', 'الجدوى الاقتصادية'],
   readiness: ['L-READY assessment', 'تقييم L-READY'],
   evidence: ['Evidence intelligence', 'تحليل الأدلة'],
   references: ['Reference validator', 'التحقق من المراجع'],
-  emptyDocuments: ['This project has no PDFs yet.', 'لم تُضف ملفات PDF إلى هذا المشروع بعد.'],
+  emptyDocuments: ['This project has no PDFs or text files yet.', 'لم تُضف ملفات PDF أو ملفات نصية إلى هذا المشروع بعد.'],
   backToProject: ['Back to the project', 'العودة إلى المشروع'],
   backToDocuments: ['Back to project files', 'العودة إلى ملفات المشروع'],
-  pdfFile: ['PDF file', 'ملف PDF'],
-  upload: ['Upload PDF', 'رفع ملف PDF'],
+  pdfFile: ['Document file', 'ملف المستند'],
+  upload: ['Upload document', 'رفع مستند'],
   uploadVersion: ['Upload new version', 'رفع إصدار جديد'],
   history: ['Version history', 'سجل الإصدارات'],
   version: ['Version', 'الإصدار'],
-  download: ['Download PDF', 'تنزيل PDF'],
+  download: ['Download file', 'تنزيل الملف'],
   bytes: ['bytes', 'بايت'],
-  fileLimit: ['Up to 8 MiB per PDF.', 'الحد الأقصى 8 ميبيبايت لكل ملف PDF.'],
+  fileLimit: ['PDF up to 8 MiB. UTF-8 TXT up to 256 KiB.', 'الحد الأقصى 8 ميبيبايت لملف PDF و256 كيبيبايت لملف TXT بترميز UTF-8.'],
+  preview: ['Preview text', 'معاينة النص'],
+  invalidText: ['Choose a valid UTF-8 text file.', 'اختر ملفًا نصيًا صالحًا بترميز UTF-8.'],
+  largeText: ['The TXT file exceeds 256 KiB.', 'يتجاوز الملف النصي 256 كيبيبايت.'],
+  versionFormat: ['Versions must use the original file format.', 'يجب أن تطابق الإصدارات صيغة الملف الأصلي.'],
   invalidPdf: ['Choose one PDF file with a valid PDF signature.', 'اختر ملف PDF واحدًا بتوقيع صالح.'],
   largePdf: ['The PDF exceeds the 8 MiB limit.', 'يتجاوز الملف الحد الأقصى البالغ 8 ميبيبايت.'],
-  storageLimit: ['The plan PDF storage limit has been reached.', 'بلغت الحد الأقصى لتخزين PDF في خطتك.'],
+  storageLimit: ['The plan PDF storage limit has been reached for documents.', 'بلغت الحد الأقصى لتخزين المستندات في خطتك.'],
   uploadBusy: ['Other uploads are in progress. Try again shortly.', 'هناك ملفات أخرى قيد الرفع. جرّب مرة أخرى بعد قليل.'],
-  deleteDocument: ['Delete PDF and all versions', 'حذف ملف PDF وكل إصداراته'],
+  deleteDocument: ['Delete document and all versions', 'حذف المستند وكل إصداراته'],
   confirmDocument: ['Confirm file deletion', 'أؤكد حذف الملف'],
   invalid: ['Enter a title of up to 120 characters and a summary of up to 2,000 characters.', 'أدخل اسمًا من 120 حرفًا بحد أقصى وملخّصًا من 2000 حرف بحد أقصى.'],
 };
@@ -102,10 +106,12 @@ export function workspacePage(lang, kind, options = {}) {
     const { project, document, documents, versions, documentId } = options;
     const route = documentsPath(lang, id, documentId);
     const path = route.split('?')[0];
+    const textDocument = Boolean(document && /\.txt$/iu.test(document.title));
+    const accept = document ? (textDocument ? ".txt,text/plain" : ".pdf,application/pdf") : ".pdf,.txt";
     const upload = `
       ${feedback}
       <form method="post" action="${route}" enctype="multipart/form-data" class="workspace-form">
-        <label>${t('pdfFile')}<input type="file" name="pdf" accept="application/pdf,.pdf" aria-describedby="pdf-limit" required></label>
+        <label>${t('pdfFile')}<input type="file" name="file" accept="${accept}" aria-describedby="pdf-limit" required></label>
         <small id="pdf-limit">${t('fileLimit')}</small>
         <button class="action" type="submit">${t(document ? 'uploadVersion' : 'upload')}</button>
       </form>`;
@@ -132,7 +138,7 @@ export function workspacePage(lang, kind, options = {}) {
       <section class="surface panel detail workspace-page">
         <a href="${documentsPath(lang, id)}">${t('backToDocuments')}</a>
         <h1 dir="auto">${escapeHtml(document.title)}</h1>
-        <p><a href="${path}/reading?lang=${lang}">${lang === 'ar' ? 'ملاحظات القراءة' : 'Reading notes'}</a></p>
+        ${textDocument ? '' : `<p><a href="${path}/reading?lang=${lang}">${lang === 'ar' ? 'ملاحظات القراءة' : 'Reading notes'}</a></p>`}
         <section class="project-list">
           <h2>${t('history')}</h2>
           <ol class="document-history">
@@ -140,7 +146,7 @@ export function workspacePage(lang, kind, options = {}) {
               <li><div><strong>${t('version')} ${numeric.format(item.number)}</strong><br>
                 <bdi>${escapeHtml(item.filename)}</bdi><br>
                 <time datetime="${new Date(item.created_at).toISOString()}">${date.format(item.created_at)}</time> · ${numeric.format(item.size)} ${t('bytes')}
-              </div><a class="action" href="${path}/versions/${item.number}?lang=${lang}">${t('download')}</a></li>`).join('')}
+              </div><div class="project-tools">${textDocument ? `<a href="${path}/versions/${item.number}/preview?lang=${lang}">${t('preview')}</a>` : ''}<a class="action" href="${path}/versions/${item.number}?lang=${lang}">${t('download')}</a></div></li>`).join('')}
           </ol>
         </section>
         <section class="project-editor"><h2>${t('uploadVersion')}</h2>${upload}</section>
