@@ -84,7 +84,7 @@ export function handleAssistantSettings({ reply, redirect, lang, form, store, ac
     html: `<section class="surface panel detail workspace-page">
       <h1>${title}</h1>
       <p><a href="/workspace/assistant?lang=${lang}">${t('Back to source review', 'العودة إلى مراجعة المصادر')}</a></p>
-      <p>${t('These settings are saved locally. Local answers require a configured loopback server. OpenAI generation is pending.', 'تُحفظ هذه الإعدادات محليًا. تتطلب الإجابات المحلية خادمًا محليًا مُعدًّا. توليد الإجابات عبر OpenAI قيد التطوير.')}</p>
+      <p>${t('These settings are saved locally. Local answers require a configured loopback server. OpenAI answers require an enabled model and consent for each request.', 'تُحفظ هذه الإعدادات محليًا. تتطلب الإجابات المحلية خادمًا محليًا مُعدًّا. تتطلب إجابات OpenAI نموذجًا مفعّلًا وموافقة لكل طلب.')}</p>
       ${status === 422 ? `<p role="alert">${t('Check the provider, model and key. OpenAI requires a key.', 'تحقق من المزوّد والنموذج والمفتاح. يتطلب OpenAI مفتاحًا.')}</p>` : ''}
       <form class="workspace-form" method="post" action="${path}?lang=${lang}">
         <label>${t('Provider', 'المزوّد')}<select name="provider">

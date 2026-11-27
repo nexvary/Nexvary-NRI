@@ -60,4 +60,14 @@ Open a project, choose **Report studio**, then select PDF or DOCX. The local ren
 
 Offline source review works with no model or provider credentials. For local generation, start an existing loopback OpenAI-compatible server and set `NRI_LOCAL_AI_PORT` when starting NRI. In Assistant provider settings select Local and enter the server’s model ID. Open a project with saved reference metadata, select **Generate a research answer**, and submit a question. The request includes the question and displayed reference metadata. Use a local model that returns JSON in its chat completion content.
 
-The answer identifies saved citations and flags unknown or missing citation IDs. Verify scientific claims against the original work. OpenAI credentials can be saved for later use. External generation is pending.
+The answer identifies saved citations and flags unknown or missing citation IDs. Verify scientific claims against the original work. For external OpenAI answers, configure one Chat Completions model and all four limits and rates before starting NRI. These settings default to disabled.
+
+| Environment variable | Value |
+|---|---|
+| `NRI_OPENAI_MODEL` | Exact OpenAI model ID |
+| `NRI_OPENAI_INPUT_MICROUSD_PER_MILLION` | Input USD rate per million tokens, in millionths of a dollar |
+| `NRI_OPENAI_OUTPUT_MICROUSD_PER_MILLION` | Output USD rate per million tokens, in millionths of a dollar |
+| `NRI_OPENAI_DAILY_TOKENS` | Per-account aggregate daily token reservation ceiling |
+| `NRI_OPENAI_DAILY_MICROUSD` | Per-account daily estimated spend ceiling, in millionths of a dollar |
+
+Select OpenAI and the enabled model in provider settings and save an API key. Each request requires consent to share the question and displayed reference metadata. NRI estimates prompt tokens from UTF-8 bytes plus framing, reserves the maximum output allowance, and accounts for reported usage when available. Reservations count toward the daily ceiling even if usage is unavailable. Provider invoices depend on actual usage and pricing.

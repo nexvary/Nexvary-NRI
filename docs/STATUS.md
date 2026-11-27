@@ -1,5 +1,12 @@
 # Development status
 
+## NRI-08d · External consent and usage limits · 2026-11-27 (Cairo)
+
+OpenAI chat completions are opt-in through an operator-configured model and rate policy. Each request requires explicit consent for the current question and displayed source metadata. The SQLite ledger reserves per-account daily tokens and estimated USD cost before sending, and records usage reported by the provider. Input tokens and cost are estimates based on configured rates. Reservations remain charged against the internal limit when provider usage is unavailable.
+
+- External calls use a fixed HTTPS endpoint and tests inject a mock transport. The tests cover absent and stale consent, reservations before calls, reported usage, cache reuse and budget denial.
+- Offline review and optional local generation remain available. The feature accepts saved reference metadata and excludes manuscript contents. Citation matching verifies identifiers against those records, with scientific support left for human review.
+
 ## NRI-08c · Local cited answers · 2026-11-27 (Cairo)
 
 An optional loopback OpenAI-compatible model can answer questions from saved reference titles and provenance in Arabic and English. Answers display matched saved identifiers and flag unsupported citation IDs. A citation match verifies the saved record, while scientific support remains a human review step. Offline source review continues to work without a model.
@@ -184,7 +191,7 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | NRI-05 | Partial | Claims, dated source snapshots, study type, limitations, conflicting evidence, owner review and JSON export are verified. Team reviewer roles and review revisions remain. |
 | NRI-06 | Partial | Six ordered dimensions, four qualitative categories, project evidence links, revision history, reviewer and safety/authorization blockers are verified. Independent team reviewer roles remain. |
 | NRI-07 | Verified | One-year operating model with explicit assumptions, currency, units, capacity, sensitivity, scenario comparison and reproducible JSON export. |
-| NRI-08 | Partial | NRI-08a exercises private saved-source review, provenance and retraction/editorial warnings in `test/assistant.test.js`. NRI-08b adds private encrypted BYOK storage, offline/provider selection and model settings in `test/assistant-settings.test.js`. NRI-08c verifies mocked local cited answers, cancellation and bounded caching in `test/assistant-answer.test.js`. External provider requests, consent and durable usage/cost accounting remain. |
+| NRI-08 | Verified | NRI-08a exercises private saved-source review, provenance and retraction/editorial warnings in `test/assistant.test.js`. NRI-08b adds private encrypted BYOK storage, offline/provider selection and model settings in `test/assistant-settings.test.js`. NRI-08c verifies mocked local cited answers, cancellation and bounded caching in `test/assistant-answer.test.js`. NRI-08d verifies external consent, mocked OpenAI requests and durable reservations in the same test suite. |
 | NRI-09 | Partial | Opt-in profiles, search, follow and block, bounded requests and private profile isolation verified. Verified ORCID ownership, posts, groups, publication sharing and moderation remain. |
 | NRI-10 | Partial | Collaboration requests and scoped project-summary invitations, acceptance/decline, revoke and access history are verified. Broader roles, notifications, shared notes and tasks remain. |
 | NRI-11 | Not started | Conversations, notification preferences and authorization remain. |
@@ -197,4 +204,4 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | NRI-18 | Partial | Local authentication, session revocation, account audit, authorization, encrypted PDF bytes, RTL/LTR and verified recovery are implemented. Team RBAC, MFA, account recovery, export/deletion, accessibility audit and administration remain. |
 | NRI-19 | Partial | Local restore and regression workflow configuration are implemented. Entitlements, approved hosting, operational monitoring and billing remain. |
 
-Next milestone: NRI-08 provider integration and safeguards, followed by NRI-11 private messaging.
+Next milestone: NRI-11 private messaging and notification preferences.

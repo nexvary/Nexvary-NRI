@@ -102,3 +102,8 @@
 
 - Added bounded loopback generation with saved-source citation matching and unsupported citation warnings, plus a short scoped cache, cancellation and deadline.
 - 48/48 with real report rendering. Provider checks used only mocked responses. External generation and the durable usage and cost ledger remain.
+
+## 2026-11-27 · NRI-08d external consent and estimated spend controls
+
+- Added opt-in OpenAI transport, consent tied to disclosed reference snapshots, daily reservations and provider-reported usage. Mocked tests verify consent and budget denial, citation results and cache hits.
+- No live OpenAI calls were made. NRI-11 is the next acceptance milestone.

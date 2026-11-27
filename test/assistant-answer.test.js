@@ -73,3 +73,57 @@ test('local Assistant scopes input, verifies citations, escapes output and cance
   assert.equal(cancelled.status, 409);
   assert.match(await cancelled.text(), /أُلغي الطلب/);
 });
+
+test('external Assistant requires current informed consent and reserves budgets before sending', async (t) => {
+  const store = openWorkspaceStore();
+  store.addAccount('external@local.test', { salt: Buffer.alloc(16), hash: Buffer.alloc(32) });
+  const { id } = store.credentials('external@local.test');
+  const cookie = 'nri_session=' + store.newSession(id);
+  const project = store.createProject(id, { title: 'Private name', description: 'Private description' });
+  store.assistantSettings.save(id, 'openai', 'mock-model', 'mock-key');
+  const source = (title) => store.references.save(id, project, {
+    doi: '10.0000/example', provider: 'crossref', status: 'found', checkedAt: 42, metadata: { title },
+  });
+  source('Sample title');
+  let calls = 0;
+  const assistantProvider = createAssistantProvider({
+    openai: { model: 'mock-model', inputRate: 1_000_000, outputRate: 1_000_000, dailyTokens: 1600, dailyCost: 1600 },
+    async fetchImpl(url, options) {
+      calls++;
+      assert.equal(url, 'https://api.openai.com/v1/chat/completions');
+      assert.equal(options.headers.Authorization, 'Bearer mock-key');
+      assert.doesNotMatch(options.body, /Private name|Private description|mock-key/);
+      const payload = JSON.parse(options.body);
+      assert.equal(payload.max_completion_tokens, 512);
+      assert.match(payload.messages[1].content, /Updated title/);
+      return Response.json({
+        choices: [{ message: { content: '{"claims":[{"text":"Matched citation","citations":["S1"]}]}' } }],
+        usage: { prompt_tokens: 100, completion_tokens: 20 },
+      });
+    },
+  });
+  const app = createApp(store, { assistantProvider });
+  app.listen(0, '127.0.0.1');
+  await once(app, 'listening');
+  t.after(() => new Promise((resolve) => app.close(resolve)));
+  const origin = 'http://127.0.0.1:' + app.address().port;
+  const url = origin + '/workspace/assistant/answer?lang=en&project=' + project;
+  const disclosure = async () => (await (await fetch(url, { headers: { cookie } })).text()).match(/name="disclosure" value="([a-f0-9]+)"/)[1];
+  const send = (question, extra = {}) => fetch(url, {
+    method: 'POST', headers: { cookie, origin }, body: new URLSearchParams({ project, question, ...extra }),
+  });
+  const old = await disclosure();
+  assert.equal((await send('Question', { disclosure: old })).status, 422);
+  source('Updated title');
+  assert.equal((await send('Question', { disclosure: old, share: 'yes' })).status, 422);
+  assert.equal(calls, 0);
+  const consent = { disclosure: await disclosure(), share: 'yes' };
+  const result = await send('Question', consent);
+  assert.equal(result.status, 200);
+  assert.match(await result.text(), /Matched citation/);
+  assert.equal(store.assistantUsage.today(id).observedTokens, 120);
+  assert.equal(store.assistantUsage.today(id).observedCost, 120);
+  assert.equal((await send('Question', consent)).status, 200);
+  assert.equal((await send('Different question', consent)).status, 429);
+  assert.equal(calls, 1);
+});

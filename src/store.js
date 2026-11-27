@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { closeSync, mkdirSync, openSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { assistantUsageSchema, assistantUsageStore } from './assistant-usage.js';
 import { assistantSettingsSchema, assistantSettingsStore } from './assistant-settings.js';
 import { bindDocumentKey } from './document-crypto.js';
 import { documentSchema, documentStore } from './document-store.js';
@@ -17,7 +18,7 @@ import { evidenceSchema, evidenceStore } from './evidence-store.js';
 import { referenceSchema, referenceMigrationV4, referenceStore } from './reference-store.js';
 
 export const sessionLifetime = 8 * 60 * 60;
-const schemaVersion = 13;
+const schemaVersion = 14;
 const schema = `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -73,6 +74,7 @@ function initialize(db, path) {
     if (version < 11) db.exec(sharingSchema);
     if (version < 12) db.exec(educationSchema);
     if (version < 13) db.exec(assistantSettingsSchema);
+    if (version < 14) db.exec(assistantUsageSchema);
     return bindDocumentKey(db, path);
   });
 }
@@ -140,6 +142,7 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
 
   return {
     assistantSettings,
+    assistantUsage: assistantUsageStore(db, now, transact),
     documents,
     references,
     evidence,
