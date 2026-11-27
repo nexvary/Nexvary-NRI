@@ -56,6 +56,7 @@ async function showInvoice({ reply, lang, account, store, query, reportRenderer,
   const rows = invoice.lines.map((line) => [line.description || t('Invoice amount', 'مبلغ الفاتورة'),
     count.format(line.quantity), money(line.unit_minor), money(line.quantity * line.unit_minor)]);
   const totals = [
+    ...(invoice.discount ? [t('Discount', 'الخصم') + ' · ' + invoice.discount.code + ' · ' + money(invoice.discount.amount)] : []),
     t('Total', 'الإجمالي') + ' · ' + money(invoice.total),
     t('Outstanding', 'المبلغ المستحق') + ' · ' + money(invoice.outstanding),
     t('Amounts shown in minor units.', 'المبالغ معروضة بالوحدات الصغرى للعملة.'),
@@ -135,7 +136,7 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
   if (form) {
     const code = (form.get('plan') ?? '').trim();
     const intent = form.get('intent');
-    if (!['save', 'assign', 'transition', 'trial', 'modules', 'pricing', 'institution-create',
+    if (!['save', 'assign', 'transition', 'trial', 'modules', 'pricing', 'discount-create', 'discount-revoke', 'institution-create',
       'institution-assign', 'institution-trial', 'institution-transition'].includes(intent) &&
       !Object.hasOwn(institutionalActions, intent)) return reply(422);
     const retryAfter = throttle.begin(request.socket.remoteAddress ?? '', account.email);
@@ -147,7 +148,16 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
           store.session(token)?.id !== account.id) return reply(403);
       const optional = (field) => form.get(field) ? whole(form.get(field)) : null;
       const institution = (form.get('institution') ?? '').trim();
-      if (intent === 'institution-create') {
+      const promo = (form.get('discount-code') ?? '').trim().toUpperCase();
+      if (intent === 'discount-create') {
+        status = store.billing.createDiscount(account.id, {
+          code: promo, kind: form.get('discount-kind'), value: whole(form.get('discount-value')),
+          currency: (form.get('currency') ?? '').trim().toUpperCase(), plan: code,
+          expires: endDate(form.get('expires')), limit: whole(form.get('discount-limit')),
+        });
+      } else if (intent === 'discount-revoke') {
+        status = store.billing.revokeDiscount(account.id, promo);
+      } else if (intent === 'institution-create') {
         status = store.licensing.createOrganization(account.id, institution, (form.get('institution-name') ?? '').trim());
       } else if (intent === 'institution-assign' || intent === 'institution-trial') {
         status = store.licensing.assignInstitution(account.id, institution, code, endDate(form.get('expires')),
@@ -206,6 +216,28 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
       </fieldset>
       ${passwordField}<button class="action" name="intent" value="pricing">${t('Save pricing', 'احفظ الأسعار')}</button>
     </form>`).join('');
+  const discountList = store.billing.discounts(account.id);
+  const discountForm = `<h2>${t('Discount codes', 'رموز الخصم')}</h2>
+    <form class="workspace-form" method="post" action="${url}">
+      <label>${t('Discount code', 'رمز الخصم')}<input name="discount-code" maxlength="32" required dir="ltr"></label>
+      <label>${t('Type', 'النوع')}<select name="discount-kind"><option value="percent">${t('Percentage', 'نسبة مئوية')}</option>
+        <option value="fixed">${t('Fixed amount', 'مبلغ ثابت')}</option></select></label>
+      <label>${t('Value (basis points for percentages, minor units for fixed amounts)', 'القيمة (نقاط أساس للنسبة، ووحدات صغرى للمبلغ الثابت)')}
+        <input name="discount-value" type="number" min="1" max="9999999999" required></label>
+      <label>${t('ISO currency code for fixed amounts', 'رمز العملة الدولي للمبلغ الثابت')}<input name="currency" maxlength="3" dir="ltr"></label>
+      <label>${t('Eligible plan', 'الخطة المؤهلة')}<select name="plan"><option value="">${t('Any plan', 'أي خطة')}</option>
+        ${data.plans.map(({ code }) => `<option>${escapeHtml(code)}</option>`).join('')}</select></label>
+      <label>${t('Expiry (UTC)', 'انتهاء الصلاحية بتوقيت UTC')}<input name="expires" type="date" required></label>
+      <label>${t('Redemption limit', 'الحد الأقصى للاستخدام')}<input name="discount-limit" type="number" min="1" max="10000" required></label>
+      ${passwordField}<button class="action" name="intent" value="discount-create">${t('Create discount', 'أنشئ خصمًا')}</button>
+    </form>
+    ${discountList.length ? `<ul class="activity">${discountList.map((item) => `<li><bdi>${escapeHtml(item.code)}</bdi> ·
+      <bdi>${count.format(item.redeemed)} / ${count.format(item.redemption_limit)}</bdi> ·
+      ${item.revoked_at !== null ? t('Revoked', 'ملغى') : `<time>${date.format(item.expires_at)} UTC</time>`}</li>`).join('')}</ul>
+      <form class="workspace-form" method="post" action="${url}">
+        <label>${t('Discount code', 'رمز الخصم')}<input name="discount-code" maxlength="32" required dir="ltr"></label>
+        ${passwordField}<button class="action" name="intent" value="discount-revoke">${t('Revoke discount', 'ألغِ الخصم')}</button>
+      </form>` : ''}`;
   const institutionSelect = `<label>${t('Organization', 'المؤسسة')}<select name="institution" required>
     ${data.organizations.map(({ code, name }) => `<option value="${escapeHtml(code)}">${escapeHtml(name)} · ${escapeHtml(code)}</option>`).join('')}
     </select></label>`;
@@ -289,6 +321,7 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
         ${planPrices}` : ''}
       ${moduleForms}
       ${organizations}
+      ${discountForm}
       ${data.plans.length ? `<h2>${t('Start a trial', 'ابدأ فترة تجريبية')}</h2>
       <form class="workspace-form" method="post" action="${url}">
         <label>${t('Account email', 'البريد الإلكتروني للحساب')}<input name="email" type="email" maxlength="254" required dir="ltr"></label>

@@ -115,6 +115,32 @@ test('billing reviewers with MFA can read sandbox records without gaining operat
     assert.equal(pdf.headers.get('content-type'), 'application/pdf');
     assert.equal(Buffer.from(await pdf.arrayBuffer()).subarray(0, 5).toString(), '%PDF-');
   }
+  const promo = { code: 'RESEARCH10', kind: 'percent', value: 1000, currency: '', plan: 'research',
+    expires: timestamp + 60_000, limit: 1 };
+  assert.equal(store.billing.createDiscount(reviewer.id, promo), 403);
+  store.licensing.setOperator(reviewer.id, true);
+  assert.equal(store.licensing.save(reviewer.id, 'research', 10, 0), 303);
+  assert.equal(store.licensing.save(reviewer.id, 'other-plan', 10, 0), 303);
+  assert.equal(store.billing.createDiscount(reviewer.id, { ...promo, expires: timestamp }), 422);
+  assert.equal(store.billing.createDiscount(reviewer.id, promo), 303);
+  const usePromo = { discountCode: promo.code, planCode: promo.plan };
+  assert.equal(accept('wrong_plan', 'invoice.issued', 'wrong_plan', 1234, { ...usePromo, planCode: 'other-plan' }),
+    'discount-unavailable');
+  assert.equal(accept('discount_1', 'invoice.issued', 'discounted_invoice', 1234, usePromo), 'accepted');
+  assert.equal(accept('discount_1', 'invoice.issued', 'discounted_invoice', 1234, usePromo), 'duplicate');
+  assert.equal(accept('discount_2', 'invoice.issued', 'second_discounted_invoice', 1234, usePromo), 'discount-unavailable');
+  const discounted = store.billing.invoice(reviewer.id, adapter.provider, 'discounted_invoice');
+  assert.equal(discounted.total, 1111);
+  assert.equal(discounted.discount.amount, 123);
+  assert.equal(store.billing.discounts(reviewer.id)[0].redeemed, 1);
+  assert.equal(store.billing.createDiscount(reviewer.id, { ...promo, code: 'FIXED', kind: 'fixed', value: 250, currency: 'EUR' }), 303);
+  const useFixed = { ...usePromo, discountCode: 'FIXED' };
+  assert.equal(accept('bad_currency', 'invoice.issued', 'bad_currency', 100, useFixed, 'USD'), 'discount-unavailable');
+  assert.equal(accept('fixed_1', 'invoice.issued', 'fixed_invoice', 100, useFixed), 'accepted');
+  assert.equal(store.billing.invoice(reviewer.id, adapter.provider, 'fixed_invoice').outstanding, 0);
+  assert.equal(store.billing.revokeDiscount(reviewer.id, 'FIXED'), 303);
+  assert.equal(accept('fixed_revoked', 'invoice.issued', 'fixed_revoked', 100, useFixed), 'discount-unavailable');
+  store.licensing.setOperator(reviewer.id, false);
   store.billing.setReviewer(reviewer.id, false);
   assert.equal((await request(reviewer, path)).status, 403);
 });

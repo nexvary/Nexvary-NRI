@@ -289,3 +289,8 @@
 
 - Added an hourly unprivileged systemd timer and an idempotent local command for trial, active and grace expiration. Each batch stores effective expiry and attributable system audit rows within one SQLite transaction.
 - Account settings surface an upcoming or past expiry to the account holder. Renewal remains operator-managed and the scheduler sends no external messages or charges.
+
+## 2026-11-27 · Sandbox discount redemption
+
+- Added MFA- and password-protected discount creation and revocation for licensing operators. Codes support percentage basis points or currency-specific fixed minor units, a UTC expiry, optional plan eligibility, and bounded redemptions.
+- Signed synthetic invoice events may specify a discount code and plan code with their gross line total. The verified event, net invoice and redemption commit together. Exact retries preserve the original result and do not consume a second redemption.
