@@ -1,3 +1,4 @@
+import { operationsPaths } from './admin-operations.js';
 import { escapeHtml, workspacePath } from './workspace-view.js';
 
 export const settingsSchema = `
@@ -74,6 +75,8 @@ export function settingsPage(store, lang, account, token) {
       <a href="${workspacePath(lang)}">${t('back')}</a>
       <a href="/workspace/settings/mfa?lang=${lang}">${t('mfa')}</a>
       <a href="/workspace/settings/privacy?lang=${lang}">${t('privacy')}</a>
+      ${store.operations.canReview(account.id, 'support') ? `<a href="${operationsPaths.support}?lang=${lang}">${lang === 'ar' ? 'إدارة الدعم' : 'Support administration'}</a>` : ''}
+      ${store.operations.canReview(account.id, 'security') ? `<a href="${operationsPaths.security}?lang=${lang}">${lang === 'ar' ? 'إدارة الأمان' : 'Security administration'}</a>` : ''}
       ${store.billing.canReview(account.id) ? `<a href="/control-center/billing?lang=${lang}">${lang === 'ar' ? 'سجلات الفوترة التجريبية' : 'Sandbox billing records'}</a>` : ''}
       ${store.licensing.isOperator(account.id) && store.mfa.enabled(account.id) ? `<a href="/control-center?lang=${lang}">${t('licensing')}</a>` : ''}
       ${store.messages.isModerator(account.id) ? `<a href="/workspace/settings/message-moderation?lang=${lang}">${t('moderation')}</a>` : ''}

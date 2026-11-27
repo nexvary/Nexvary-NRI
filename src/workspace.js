@@ -1,3 +1,4 @@
+import { handleOperations, operationsPaths } from './admin-operations.js';
 import { allowsRoute } from './entitlements.js';
 import { createLoginThrottle } from './login-throttle.js';
 import { createResourceHandler, resolveResourceRoute } from './resource-sharing.js';
@@ -42,6 +43,8 @@ export function resolveWorkspaceRoute(pathname) {
   if (pathname === '/workspace/assistant') return { kind: 'assistant' };
   if (pathname === '/workspace/education') return { kind: 'education' };
   if (pathname === '/workspace/settings/message-moderation') return { kind: 'settings-message-moderation' };
+  if (pathname === operationsPaths.support) return { kind: 'control-operations', role: 'support' };
+  if (pathname === operationsPaths.security) return { kind: 'control-operations', role: 'security' };
   if (pathname === billingRecordsPath) return { kind: 'control-billing' };
   if (pathname === controlCenterPath || pathname === legacyLicensingPath) return { kind: 'settings-licensing' };
   if (pathname === '/workspace/settings/privacy') return { kind: 'settings-privacy' };
@@ -119,7 +122,7 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
     };
     const postOnly = kind === 'delete' || kind === 'logout' || kind === 'delete-document';
     const allowed = postOnly ? ['POST'] : ['GET', 'HEAD'];
-    if (!postOnly && !['control-billing', 'download-document', 'preview-document', 'reference-projects', 'evidence-projects', 'evidence-export', 'readiness-projects', 'economics-projects', 'economics-export', 'library', 'report-projects', 'sharing-project', 'assistant'].includes(kind)) allowed.push('POST');
+    if (!postOnly && !['control-operations', 'control-billing', 'download-document', 'preview-document', 'reference-projects', 'evidence-projects', 'evidence-export', 'readiness-projects', 'economics-projects', 'economics-export', 'library', 'report-projects', 'sharing-project', 'assistant'].includes(kind)) allowed.push('POST');
     const method = request.method;
     if (!allowed.includes(method)) {
       reply(405, null, { Allow: allowed.join(', ') });
@@ -238,6 +241,10 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
     }
     if (kind === 'settings-message-moderation') {
       handleMessageModeration({ request, reply, redirect, lang, account, form, store });
+      return;
+    }
+    if (kind === 'control-operations') {
+      handleOperations({ request, reply, lang, account, store, role: route.role });
       return;
     }
     if (kind === 'control-billing') {

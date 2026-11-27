@@ -309,3 +309,8 @@
 
 - Added reasoned and password-confirmed operator renewal and plan changes for individual and institutional subscriptions. Stale snapshots are rejected transactionally. The sandbox cycles use fixed 30-day and 365-day terms.
 - An active, dated term retains its end date on a plan change. The same-currency adjustment uses the selected cycle's configured prices, the remaining term fraction, and integer truncation toward zero. Adjustments are audited only and do not create invoices, payments or refunds.
+
+## 2026-11-28 · Scoped operational dashboards
+
+- Schema v41 preserves billing reviewers and adds independently provisioned support and security reviewers. Both require MFA. Support can look up subscription and organization seat metadata for an exact account. Security can review MFA enrollment, active session counts, recent security events and schema readiness.
+- These routes are read-only. Their queries exclude research content, messages, session tokens and encryption keys.

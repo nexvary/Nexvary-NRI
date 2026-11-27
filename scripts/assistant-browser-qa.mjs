@@ -403,6 +403,12 @@ try {
         await waitFor(() => inspect(send, 'Boolean(document.querySelector("button[value=manage-term]"))'), 'synthetic renewal form');
         await captureLayout(send, 'licensing', lang, name, width, height);
       }
+      for (const section of ['support', 'security']) {
+        const path = '/control-center/' + section;
+        await send('Page.navigate', { url: origin + path + '?lang=' + lang });
+        await waitFor(() => inspect(send, `Boolean(document.querySelector('form[action="${path}"]'))`), section + ' account lookup');
+        await captureLayout(send, section, lang, name, width, height);
+      }
       await send('Page.navigate', { url: origin + '/control-center/billing?lang=' + lang });
       await waitFor(() => inspect(send, 'document.body?.textContent.includes("browser_invoice")'), 'verified sandbox invoice');
       await captureLayout(send, 'billing', lang, name, width, height);
