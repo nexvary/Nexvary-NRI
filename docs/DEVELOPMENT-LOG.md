@@ -278,3 +278,9 @@
 
 - Added a paginated list of owned document versions on the account Privacy screen. Downloads use existing password, conditional MFA, session and document ownership checks, independent of a subscription.
 - Direct requests for other accounts' files are denied. The full account archive keeps its existing size limit and individual downloads support large libraries.
+
+## 2026-11-27 · Sandbox invoice reconciliation
+
+- Schema v37 projects signed sandbox events into provider-scoped invoices, line items, allocations and refunds. Linked operations and their audit events commit atomically. Retries and object collisions are distinguished, and overpayments, excess refunds and currency mismatches are rejected.
+- Existing invoice events are backfilled with a single total line. Historical payments without an explicit invoice reference remain visible in the event ledger and are not inferred as allocations.
+- Signed-in billing reviewers with MFA can open bilingual invoice balances and download PDFs through the existing local renderer. Access is rechecked before delivery.

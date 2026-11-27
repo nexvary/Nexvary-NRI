@@ -241,7 +241,7 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
       return;
     }
     if (kind === 'control-billing') {
-      handleBillingRecords({ request, reply, lang, account, store });
+      await handleBillingRecords({ request, reply, lang, account, store, reportRenderer, stillSignedIn });
       return;
     }
     if (kind === 'settings-licensing') {

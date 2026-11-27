@@ -404,6 +404,9 @@ try {
       await send('Page.navigate', { url: origin + '/control-center/billing?lang=' + lang });
       await waitFor(() => inspect(send, 'document.body?.textContent.includes("browser_invoice")'), 'verified sandbox invoice');
       await captureLayout(send, 'billing', lang, name, width, height);
+      await send('Page.navigate', { url: origin + '/control-center/billing?lang=' + lang + '&provider=sandbox-browser&invoice=browser_invoice' });
+      await waitFor(() => inspect(send, 'Array.from(document.links).some(link => link.href.endsWith("format=pdf"))'), 'sandbox invoice PDF link');
+      await captureLayout(send, 'invoice', lang, name, width, height);
       for (const view of ['about', 'developer']) {
         await send('Page.navigate', { url: origin + '/?lang=' + lang + '&view=' + view });
         await waitFor(() => inspect(send, `location.search.includes('view=${view}') &&

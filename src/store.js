@@ -1,4 +1,4 @@
-import { billingAccessSchema, billingSchema, billingStore } from './billing-store.js';
+import { billingAccessSchema, billingReconciliationSchema, billingSchema, billingStore } from './billing-store.js';
 import { resourceSchema, resourceStore } from './resource-store.js';
 import { citationSchema, citationStore } from './citation-store.js';
 import { organizationSchema, organizationStore } from './library-organization.js';
@@ -29,7 +29,7 @@ import { referenceSchema, referenceMigrationV4, referenceStore } from './referen
 
 export const sessionLifetime = 8 * 60 * 60;
 export const sessionIdle = 30 * 60_000;
-const schemaVersion = 36;
+const schemaVersion = 37;
 const schema = `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -116,6 +116,7 @@ function initialize(db, path) {
     if (version < 34) db.exec(institutionalSubscriptionSchema);
     if (version < 35) db.exec(planPricingSchema);
     if (version < 36) db.exec(billingAccessSchema);
+    if (version < 37) db.exec(billingReconciliationSchema);
     return bindDocumentKey(db, path);
   });
 }

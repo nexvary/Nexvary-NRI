@@ -40,10 +40,64 @@ const billingLabels = {
   'subscription.cancelled': ['Cancellation recorded', 'سُجّل إلغاء'],
 };
 
-export function handleBillingRecords({ request, reply, lang, account, store }) {
+let invoiceRenderActive = false;
+
+async function showInvoice({ reply, lang, account, store, query, reportRenderer, stillSignedIn }) {
+  const t = (en, ar) => lang === 'ar' ? ar : en;
+  const provider = query.get('provider') ?? '';
+  const id = query.get('invoice') ?? '';
+  if (!/^[a-z][a-z0-9-]{1,30}$/.test(provider) || !/^[A-Za-z0-9_-]{1,128}$/.test(id)) return reply(422);
+  const invoice = store.billing.invoice(account.id, provider, id);
+  if (!invoice) return reply(404);
+  const title = t('Sandbox invoice', 'فاتورة تجريبية');
+  const count = new Intl.NumberFormat(lang);
+  const money = (amount) => count.format(amount) + ' ' + invoice.currency;
+  const headers = [t('Description', 'الوصف'), t('Quantity', 'الكمية'), t('Unit price', 'سعر الوحدة'), t('Line total', 'إجمالي البند')];
+  const rows = invoice.lines.map((line) => [line.description || t('Invoice amount', 'مبلغ الفاتورة'),
+    count.format(line.quantity), money(line.unit_minor), money(line.quantity * line.unit_minor)]);
+  const totals = [
+    t('Total', 'الإجمالي') + ' · ' + money(invoice.total),
+    t('Outstanding', 'المبلغ المستحق') + ' · ' + money(invoice.outstanding),
+    t('Amounts shown in minor units.', 'المبالغ معروضة بالوحدات الصغرى للعملة.'),
+  ];
+  if (query.get('format') === 'pdf') {
+    if (!reportRenderer) return reply(503);
+    if (invoiceRenderActive) return reply(429);
+    invoiceRenderActive = true;
+    try {
+      const file = await reportRenderer({ lang, title, subtitle: provider + ' / ' + id,
+        sections: [{ title: t('Line items', 'بنود الفاتورة'), headers, rows }, { title: t('Balance', 'الرصيد'), text: totals }],
+      }, 'pdf');
+      if (!stillSignedIn() || !store.billing.canReview(account.id)) return reply(403);
+      return reply(200, null, { 'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename="sandbox-invoice.pdf"' }, file);
+    } catch {
+      return reply(503);
+    } finally {
+      invoiceRenderActive = false;
+    }
+  }
+  const pdf = invoiceLink(lang, provider, id) + '&amp;format=pdf';
+  return reply(200, { title, path: billingRecordsPath, controlCenter: true, billingOnly: true,
+    html: `<section class="surface panel detail workspace-page"><h1>${title}</h1>
+      <p><bdi>${escapeHtml(provider)} / ${escapeHtml(id)}</bdi></p>
+      <h2>${t('Line items', 'بنود الفاتورة')}</h2><ul>
+      ${rows.map((row) => `<li>${row.map((cell) => `<bdi>${escapeHtml(cell)}</bdi>`).join(' · ')}</li>`).join('')}
+      </ul>${totals.map((line) => `<p>${escapeHtml(line)}</p>`).join('')}
+      <a href="${pdf}">${t('Download invoice PDF', 'نزّل الفاتورة بصيغة PDF')}</a>
+      <a href="${billingRecordsPath}?lang=${lang}">${t('Billing records', 'سجلات الفوترة')}</a>
+    </section>`,
+  });
+}
+
+function invoiceLink(lang, provider, id) {
+  return billingRecordsPath + '?lang=' + lang + '&amp;provider=' + encodeURIComponent(provider) + '&amp;invoice=' + encodeURIComponent(id);
+}
+
+export async function handleBillingRecords({ request, reply, lang, account, store, reportRenderer, stillSignedIn }) {
   if (!store.billing.canReview(account.id)) return reply(403);
   const t = (en, ar) => lang === 'ar' ? ar : en;
   const query = new URL(request.url, 'http://localhost').searchParams;
+  if (query.has('invoice')) return showInvoice({ reply, lang, account, store, query, reportRenderer, stillSignedIn });
   const page = whole(query.get('page') ?? '0');
   if (!Number.isInteger(page) || page > 10_000) return reply(422);
   const records = store.billing.records(account.id, page * 50);
@@ -56,7 +110,11 @@ export function handleBillingRecords({ request, reply, lang, account, store }) {
     html: `<section class="surface panel detail workspace-page">
       <h1>${title}</h1>
       ${records.length ? `<ol class="activity">${records.slice(0, 50).map((event) => `<li>
-        ${t(...billingLabels[event.kind])} · <bdi>${escapeHtml(event.provider)}</bdi> · <bdi>${escapeHtml(event.objectId)}</bdi>
+        ${t(...billingLabels[event.kind])} · <bdi>${escapeHtml(event.provider)}</bdi> ·
+        <bdi>${event.kind === 'invoice.issued' ? `<a href="${invoiceLink(lang, event.provider, event.objectId)}">${escapeHtml(event.objectId)}</a>`
+          : escapeHtml(event.objectId)}</bdi>
+        ${event.invoiceId ? ` · <a href="${invoiceLink(lang, event.provider, event.invoiceId)}">${escapeHtml(event.invoiceId)}</a>` : ''}
+        ${event.paymentId ? ` · <bdi>${escapeHtml(event.paymentId)}</bdi>` : ''}
         ${event.amountMinor === undefined ? '' : ` · <bdi>${count.format(event.amountMinor)} ${escapeHtml(event.currency)}</bdi> ${t('minor units', 'وحدة صغرى')}`}
         · <time>${date.format(event.recordedAt)} UTC</time></li>`).join('')}</ol>`
         : `<p>${t('No verified sandbox billing records on this page.', 'لا توجد سجلات فوترة تجريبية متحققة في هذه الصفحة.')}</p>`}

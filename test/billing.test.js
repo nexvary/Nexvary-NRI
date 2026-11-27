@@ -68,19 +68,36 @@ test('billing reviewers with MFA can read sandbox records without gaining operat
   const seed = Buffer.from(bits.match(/.{8}/g).map((byte) => parseInt(byte, 2)));
   assert.equal(store.mfa.confirm(reviewer.id, totp(seed, timestamp / 30_000), reviewer.session).length, 8);
 
-  const body = Buffer.from(JSON.stringify({
-    id: 'fixture_invoice_issued', kind: 'invoice.issued', objectId: 'fixture_invoice',
-    amountMinor: 1234, currency: 'EUR', occurredAt: timestamp,
-  }));
   const key = Buffer.alloc(32, 43);
-  const signature = createHmac('sha256', key).update(String(timestamp) + '.').update(body).digest('hex');
-  assert.deepEqual(store.billing.accept(createSandboxBillingAdapter('sandbox-fixture', key),
-    { body, signature, timestamp }), { status: 'accepted' });
+  const adapter = createSandboxBillingAdapter('sandbox-fixture', key);
+  const accept = (id, kind, objectId, amountMinor, extra = {}, currency = 'EUR') => {
+    const body = Buffer.from(JSON.stringify({ id, kind, objectId, amountMinor, currency, occurredAt: timestamp, ...extra }));
+    const signature = createHmac('sha256', key).update(String(timestamp) + '.').update(body).digest('hex');
+    return store.billing.accept(adapter, { body, signature, timestamp }).status;
+  };
+  const invoiceLink = { invoiceId: 'fixture_invoice' };
+  assert.equal(accept('pay_1', 'payment.recorded', 'payment_one', 1000, invoiceLink), 'unmatched');
+  const lineItems = { lines: [{ description: 'Synthetic research subscription', quantity: 2, unitMinor: 617 }] };
+  assert.equal(accept('bad_invoice', 'invoice.issued', 'fixture_invoice', 1233, lineItems), 'invalid-event');
+  assert.equal(accept('invoice_1', 'invoice.issued', 'fixture_invoice', 1234, lineItems), 'accepted');
+  assert.equal(accept('invoice_2', 'invoice.issued', 'fixture_invoice', 1234, lineItems), 'conflict');
+  assert.equal(accept('pay_1', 'payment.recorded', 'payment_one', 1000, invoiceLink), 'accepted');
+  assert.equal(accept('pay_1', 'payment.recorded', 'payment_one', 1000, invoiceLink), 'duplicate');
+  assert.equal(accept('pay_again', 'payment.recorded', 'payment_one', 1000, invoiceLink), 'conflict');
+  assert.equal(store.billing.invoice(reviewer.id, adapter.provider, 'fixture_invoice').outstanding, 234);
+  assert.equal(accept('pay_over', 'payment.recorded', 'payment_over', 235, invoiceLink), 'conflict');
+  assert.equal(accept('pay_usd', 'payment.recorded', 'payment_usd', 234, invoiceLink, 'USD'), 'conflict');
+  assert.equal(accept('pay_2', 'payment.recorded', 'payment_two', 234, invoiceLink), 'accepted');
+  assert.equal(store.billing.invoice(reviewer.id, adapter.provider, 'fixture_invoice').outstanding, 0);
+  assert.equal(accept('refund_over', 'payment.refunded', 'refund_over', 235, { paymentId: 'payment_two' }), 'conflict');
+  assert.equal(accept('refund_1', 'payment.refunded', 'refund_one', 125, { paymentId: 'payment_two' }), 'accepted');
+  assert.equal(accept('refund_2', 'payment.refunded', 'refund_two', 110, { paymentId: 'payment_two' }), 'conflict');
+  assert.equal(store.billing.invoice(reviewer.id, adapter.provider, 'fixture_invoice').outstanding, 125);
   const response = await request(reviewer, path + '?lang=en');
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('cache-control'), 'no-store');
   const html = await response.text();
-  assert.match(html, /Invoice issued.*fixture_invoice/);
+  assert.match(html, /Invoice issued[\s\S]*fixture_invoice/);
   assert.doesNotMatch(html, /Synthetic private research/);
   assert.equal((await request(researcher, path)).status, 403);
   assert.equal((await request(reviewer, '/control-center')).status, 403);
@@ -88,6 +105,16 @@ test('billing reviewers with MFA can read sandbox records without gaining operat
   assert.equal((await request(reviewer, '/workspace/projects/' + project)).status, 403);
   assert.equal((await request(reviewer, path + '?page=oops')).status, 422);
   assert.match(await (await request(reviewer, path + '?lang=ar')).text(), /صدرت فاتورة/);
+  const invoice = path + '?provider=sandbox-fixture&invoice=fixture_invoice';
+  assert.match(await (await request(reviewer, invoice + '&lang=en')).text(), /Outstanding · 125 EUR/);
+  assert.match(await (await request(reviewer, invoice + '&lang=ar')).text(), /المبلغ المستحق/);
+  assert.equal((await request(researcher, invoice + '&format=pdf')).status, 403);
+  if (process.env.NRI_REPORT_PYTHON) {
+    const pdf = await request(reviewer, invoice + '&format=pdf&lang=ar');
+    assert.equal(pdf.status, 200);
+    assert.equal(pdf.headers.get('content-type'), 'application/pdf');
+    assert.equal(Buffer.from(await pdf.arrayBuffer()).subarray(0, 5).toString(), '%PDF-');
+  }
   store.billing.setReviewer(reviewer.id, false);
   assert.equal((await request(reviewer, path)).status, 403);
 });
