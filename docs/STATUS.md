@@ -1,5 +1,12 @@
 # Development status
 
+## NRI-03b · Citation exchange · 2026-11-27 (Cairo)
+
+The project citation library imports and exports BibTeX and RIS. It retains original-format fields and saved provider snapshots, groups normalized DOI and qualified provider identifiers, and suggests title matches for manual review. Merging retains source records and refuses conflicting DOIs. Representative and all-source exports are available. Cross-format exchange maps common bibliographic fields.
+
+- 59/59 with real report rendering. HTTP tests cover account isolation, foreign origins, identifier grouping, merge conflicts and downloads.
+- Chromium imported a citation and captured [Arabic desktop](qa/nri-03/citations-ar-desktop.webp) and [English mobile](qa/nri-03/citations-en-mobile.webp).
+
 ## NRI-03a · Private collections and PDF reading marks · 2026-11-27 (Cairo)
 
 The library supports named collections of owned PDFs. The reading notes page records bookmarks and annotations against an exact document version and a user-supplied page number. Association removal preserves the document. Document deletion removes dependent reading marks. Account exports include collections and marks.
@@ -260,7 +267,7 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 |---|---|---|
 | NRI-01 | Partial | Verified real private project, PDF, reference and evidence counts, recent activity, sign-in/empty states and account isolation. Accepted collaborator counts, self-reported ORCID and metered cost are verified. Verified ORCID ownership remains. |
 | NRI-02 | Partial | Personal project CRUD, project PDF versions, project DOI records and access denial are verified. The team workspace adds versioned manuscripts and author attribution. Catalog search, authors, tags, DOI and publication revisions are verified, alongside team notes and tasks. Wider document integration remains. |
-| NRI-03 | Partial | Project-bound PDF upload, metadata, encrypted persistence, version downloads and deletion are verified. Cross-project search and type filtering for PDFs and saved sources are verified. Private PDF collections, version-specific bookmarks and annotations are verified. Other formats, embedded reading, citation import/export and deduplication remain. |
+| NRI-03 | Partial | Project-bound PDF upload, metadata, encrypted persistence, version downloads and deletion are verified. Cross-project search and type filtering for PDFs and saved sources are verified. Private PDF collections, version-specific bookmarks and annotations are verified. BibTeX/RIS exchange, DOI/provider grouping and controlled merging are verified. Embedded reading and other document formats remain. |
 | NRI-04 | Partial | Crossref and OpenAlex DOI lookups, dated per-provider source links, correction/retraction metadata, per-provider local cache, rate limits and unknown/failure outcomes are verified. Side-by-side provider comparison view implemented. Agency resolution, additional providers, claim-to-source mapping and evidence review remain. |
 | NRI-05 | Partial | Claims, dated source snapshots, study type, limitations, conflicting evidence, owner review and JSON export are verified. Team reviewers can file attributable reviews alongside immutable review history. |
 | NRI-06 | Partial | Six ordered dimensions, four qualitative categories, project evidence links, revision history, reviewer and safety/authorization blockers are verified. Independent team reviewer roles remain. |
@@ -278,4 +285,4 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | NRI-18 | Partial | Local authentication, session revocation, account audit, authorization, encrypted PDF bytes, RTL/LTR and verified recovery are implemented. NRI-18a adds optional MFA and one-use recovery codes. NRI-18b adds the operator-managed message moderator role and scoped report review. Project team RBAC is verified for manuscripts and evidence review. Password/account recovery, accessibility audit and broader administration remain. |
 | NRI-19 | Partial | Local restore and regression workflow configuration are implemented. Local plans, entitlement limits, an MFA-protected operator console, migration/restore drills and schema health checks are verified. Approved hosting, production security and monitoring, and optional billing remain. |
 
-Next milestone: citation exchange, then duplicate detection and other remaining library requirements.
+Next milestone: embedded PDF versions and reading marks, then resource-level collaboration.

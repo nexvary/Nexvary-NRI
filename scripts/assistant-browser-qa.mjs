@@ -250,6 +250,17 @@ try {
         }
         await waitFor(() => inspect(send, 'Boolean(document.querySelector(".message-list")?.textContent.includes("Record the review date."))'), 'saved reading annotation');
         await captureLayout(send, 'reading', lang, name, width, height);
+        await send('Page.navigate', { url: origin + '/workspace/projects/' + project + '/citations?lang=' + lang });
+        await waitFor(() => inspect(send, 'Boolean(document.querySelector("button[value=import]"))'), 'citation import form');
+        if (lang === 'ar') {
+          await inspect(send, `(() => {
+            const button = document.querySelector('button[value=import]');
+            button.form.elements.data.value = '@article{fixture, title={Illustrative catalog citation}, author={Sample team}}';
+            setTimeout(() => button.form.requestSubmit(button), 0);
+          })()`);
+        }
+        await waitFor(() => inspect(send, 'document.body?.textContent.includes("Illustrative catalog citation")'), 'imported citation');
+        await captureLayout(send, 'citations', lang, name, width, height);
         await send('Page.navigate', { url: origin + '/workspace/settings/mfa?lang=' + lang });
         await waitFor(() => inspect(send, 'Boolean(document.querySelector("button[value=begin]"))'), 'MFA settings');
         await captureLayout(send, 'mfa', lang, name, width, height);

@@ -157,3 +157,8 @@
 
 - Added private PDF collections, bookmarks, and version-specific reading annotations. Included all three in account export and deletion coverage.
 - 57/57 with real report rendering. Chromium saved an annotation and captured both locales.
+
+## 2026-11-27 · NRI-03b citation exchange
+
+- Added private BibTeX/RIS exchange, source provenance, DOI and provider identifier grouping and controlled merges.
+- 59/59 with real report rendering. Chromium imported a citation in the running app.

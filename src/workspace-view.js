@@ -167,6 +167,7 @@ export function workspacePage(lang, kind, options = {}) {
         <nav class="project-tools" aria-label="${t('workspace')}">
           <a class="action project-files" href="${documentsPath(lang, id)}">${t('documents')}</a>
           <a class="action" href="/workspace/projects/${id}/team?lang=${lang}">${lang === 'ar' ? 'فريق المشروع' : 'Project team'}</a>
+          <a class="action" href="/workspace/projects/${id}/citations?lang=${lang}">${lang === 'ar' ? 'مكتبة الاستشهادات' : 'Citation library'}</a>
           <a class="action" href="${projectReferencesPath(lang, id)}">${t('references')}</a>
           <a class="action" href="/workspace/projects/${id}/evidence?lang=${lang}">${t('evidence')}</a>
           <a class="action" href="/workspace/projects/${id}/readiness?lang=${lang}">${t('readiness')}</a>

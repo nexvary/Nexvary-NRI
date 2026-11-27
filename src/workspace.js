@@ -1,3 +1,4 @@
+import { handleCitations, resolveCitationRoute } from './citations.js';
 import { handleOrganization, resolveOrganizationRoute } from './library-organization.js';
 import { handleTeamWork } from './team-work.js';
 import { handleLicensing } from './licensing.js';
@@ -52,7 +53,7 @@ export function resolveWorkspaceRoute(pathname) {
   if (pathname === '/workspace') return { kind: 'index' };
   const match = pathname.match(/^\/workspace\/projects\/([0-9a-f-]{36})(\/delete)?$/);
   if (match) return { kind: match[2] ? 'delete' : 'project', id: match[1] };
-  return resolveOrganizationRoute(pathname) ?? resolveTeamRoute(pathname) ?? resolveMessageRoute(pathname) ?? resolveDocumentRoute(pathname) ?? resolveReferenceRoute(pathname) ?? resolveEvidenceRoute(pathname) ?? resolveReadinessRoute(pathname) ?? resolveEconomicsRoute(pathname) ?? resolveObservatoryRoute(pathname) ?? resolveReportRoute(pathname) ?? resolveSharingRoute(pathname);
+  return resolveCitationRoute(pathname) ?? resolveOrganizationRoute(pathname) ?? resolveTeamRoute(pathname) ?? resolveMessageRoute(pathname) ?? resolveDocumentRoute(pathname) ?? resolveReferenceRoute(pathname) ?? resolveEvidenceRoute(pathname) ?? resolveReadinessRoute(pathname) ?? resolveEconomicsRoute(pathname) ?? resolveObservatoryRoute(pathname) ?? resolveReportRoute(pathname) ?? resolveSharingRoute(pathname);
 }
 
 function acceptsPost(request) {
@@ -129,7 +130,7 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
         return;
       }
       if (!['logout', 'documents', 'document', 'analytics'].includes(kind)) {
-        const { status, fields } = await readForm(request, kind === 'team-project' ? 160 * 1024 : formLimit);
+        const { status, fields } = await readForm(request, kind === 'citations' ? 1024 * 1024 : kind === 'team-project' ? 160 * 1024 : formLimit);
         if (status) {
           reply(status);
           return;
@@ -262,6 +263,10 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
     }
     if (kind === 'network' || kind === 'collaboration') {
       handleNetwork({ request, reply, redirect, route, lang, account, form });
+      return;
+    }
+    if (kind === 'citations') {
+      handleCitations({request,reply,redirect,route,lang,account,form,store});
       return;
     }
     if (kind.startsWith('library-')) {

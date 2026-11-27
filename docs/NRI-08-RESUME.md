@@ -32,4 +32,6 @@ NRI-02a adds manuscript catalog search, authors, tags, publication status, DOI a
 
 NRI-03a adds private PDF collections, bookmarks and annotations with stable version references. See `src/library-organization.js`, `test/library.test.js` and `test/privacy.test.js`. Full regression: 57/57.
 
-Next: implement account-scoped BibTeX/RIS citation exchange for saved project references, with bounded imports, provenance retention and DOI/provider deduplication. Start from `src/reference-store.js` and `src/library.js`. Scope import and export to authenticated project ownership, test cross-account direct requests, and continue through the [functional matrix](STATUS.md#functional-acceptance).
+NRI-03b adds BibTeX/RIS exchange, DOI and provider identifier grouping, title candidates and audited merges, with source preservation. See `src/citation-formats.js`, `src/citation-store.js` and `test/citations.test.js`. Full regression: 59/59.
+
+Next: embed owner-scoped PDF versions and integrate page bookmarks and annotations. Follow with project resource sharing and production readiness in the [functional matrix](STATUS.md#functional-acceptance).
