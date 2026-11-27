@@ -254,4 +254,11 @@
 
 - Added schema v32 for explicit module grants, a default-deny HTTP route inventory and strict HTTPS defaults. Existing plan assignments need explicit grants before serving external traffic.
 - Added audited plan grant management to the existing MFA and password-confirmed Control Center. Plan permissions remain independent of account and resource authorization.
-- Local regression with the actual bilingual renderer: 75 passed, zero failed, zero skipped. Verifies TLS default-deny, isolated project access, plan edit conflicts, and in-flight report revocation. Hosted CI and browser evidence await an approved private destination.
+- Local regression with the actual bilingual renderer: 75 passed, zero failed, zero skipped. Verifies TLS default-deny, isolated project access, plan edit conflicts, and in-flight report revocation. [Hosted CI and browser regression passed for the recovered SHA](https://github.com/nexvary/Nexvary-NRI/actions/runs/46067500586).
+
+
+## 2026-11-27 · Institutional subscriptions and seats
+
+- Published the original v33 seat configuration on draft PR #19. Schema v34 adds organizations, operator-managed memberships and subscriptions, seat allocation and revocation, and attributable institutional audit records.
+- Institutional seats feed the same server-side module and quota checks as individual assignments. Existing personal assignments take precedence. Membership and private resource permissions remain independent.
+- The deterministic regression covers competing allocations, revocation, expiry, blocked direct requests, unauthorized administration and post-expiry account export.

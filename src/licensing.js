@@ -3,6 +3,13 @@ import { createLoginThrottle } from './login-throttle.js';
 import { normalizeAddress, verifyPassword } from './password.js';
 import { escapeHtml } from './workspace-view.js';
 
+const institutionalActions = Object.freeze({
+  'institution-member-add': ['Add member', 'أضف عضوًا'],
+  'institution-member-remove': ['Remove member', 'أزل العضو'],
+  'institution-seat-allocate': ['Allocate seat', 'خصّص مقعدًا'],
+  'institution-seat-revoke': ['Revoke seat', 'ألغِ المقعد'],
+});
+
 const throttle = createLoginThrottle();
 const states = {
   trial: ['Trial', 'تجريبية'], active: ['Active', 'نشطة'], grace: ['Grace period', 'فترة السماح'],
@@ -35,7 +42,9 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
   if (form) {
     const code = (form.get('plan') ?? '').trim();
     const intent = form.get('intent');
-    if (!['save', 'assign', 'transition', 'trial', 'modules'].includes(intent)) return reply(422);
+    if (!['save', 'assign', 'transition', 'trial', 'modules', 'institution-create',
+      'institution-assign', 'institution-trial', 'institution-transition'].includes(intent) &&
+      !Object.hasOwn(institutionalActions, intent)) return reply(422);
     const retryAfter = throttle.begin(request.socket.remoteAddress ?? '', account.email);
     if (retryAfter) return reply(429, null, { 'Retry-After': String(retryAfter) });
     try {
@@ -43,7 +52,21 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
       const credentials = store.credentials(account.email);
       if (password.length > 128 || !await verifyPassword(password, credentials) ||
           store.session(token)?.id !== account.id) return reply(403);
-      if (intent === 'modules') {
+      const institution = (form.get('institution') ?? '').trim();
+      if (intent === 'institution-create') {
+        status = store.licensing.createOrganization(account.id, institution, (form.get('institution-name') ?? '').trim());
+      } else if (intent === 'institution-assign' || intent === 'institution-trial') {
+        status = store.licensing.assignInstitution(account.id, institution, code, endDate(form.get('expires')),
+          intent === 'institution-trial' ? 'trial' : 'active');
+      } else if (intent === 'institution-transition') {
+        status = store.licensing.transitionInstitution(account.id, institution, form.get('current-state'),
+          form.get('next-state'), endDate(form.get('expires')));
+      } else if (Object.hasOwn(institutionalActions, intent)) {
+        const email = normalizeAddress(form.get('email') ?? '');
+        status = intent.startsWith('institution-member')
+          ? store.licensing.changeInstitutionMember(account.id, institution, email, intent.endsWith('-add'))
+          : store.licensing.changeInstitutionSeat(account.id, institution, email, intent.endsWith('-allocate'));
+      } else if (intent === 'modules') {
         status = store.licensing.saveModules(account.id, code, form.getAll('module').map(whole), form.get('previous'));
       } else if (intent === 'save') {
         const optional = (field) => form.get(field) ? whole(form.get(field)) : null;
@@ -76,6 +99,51 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
       </fieldset>
       ${passwordField}<button class="action" name="intent" value="modules">${t('Save module access', 'احفظ الوصول إلى الوحدات')}</button>
     </form>`).join('');
+  const institutionSelect = `<label>${t('Organization', 'المؤسسة')}<select name="institution" required>
+    ${data.organizations.map(({ code, name }) => `<option value="${escapeHtml(code)}">${escapeHtml(name)} · ${escapeHtml(code)}</option>`).join('')}
+    </select></label>`;
+  const institutionPlans = data.plans.filter(({ institutional_seats }) => institutional_seats !== null);
+  const organizations = `
+    <h2 id="organizations">${t('Organizations and seats', 'المؤسسات والمقاعد')}</h2>
+    <form class="workspace-form" method="post" action="${url}">
+      <label>${t('Organization code', 'رمز المؤسسة')}<input name="institution" maxlength="31" required dir="ltr"></label>
+      <label>${t('Organization name', 'اسم المؤسسة')}<input name="institution-name" maxlength="100" required></label>
+      ${passwordField}<button class="action" name="intent" value="institution-create">${t('Create organization', 'أنشئ مؤسسة')}</button>
+    </form>
+    ${data.organizations.length ? `
+      <ul class="project-list">${data.organizations.map((item) => `<li><bdi>${escapeHtml(item.name)}</bdi> ·
+        <bdi>${escapeHtml(item.code)}</bdi> · ${item.plan ? `<bdi>${escapeHtml(item.plan)}</bdi> · ${t(...states[item.state])} ·
+        ${t('Allocated seats', 'المقاعد المخصصة')} <bdi>${count.format(item.seats)} / ${count.format(item.institutional_seats ?? 0)}</bdi>
+        ${item.expires_at === null ? '' : ` · <time>${date.format(item.expires_at)} UTC</time>`}`
+        : t('Unassigned', 'بلا اشتراك')}</li>`).join('')}</ul>
+      ${institutionPlans.length ? `<form class="workspace-form" method="post" action="${url}">
+        ${institutionSelect}
+        <label>${t('Institutional plan', 'الخطة المؤسسية')}<select name="plan" required>
+          ${institutionPlans.map(({ code }) => `<option>${escapeHtml(code)}</option>`).join('')}</select></label>
+        <label>${t('Expiry date (UTC, required for trials)', 'تاريخ الانتهاء (UTC، مطلوب للتجربة)')}<input name="expires" type="date"></label>
+        ${passwordField}
+        <button class="action" name="intent" value="institution-assign">${t('Assign institutional plan', 'عيّن خطة مؤسسية')}</button>
+        <button class="action" name="intent" value="institution-trial">${t('Start institutional trial', 'ابدأ تجربة مؤسسية')}</button>
+      </form>` : ''}
+      <form class="workspace-form" method="post" action="${url}">
+        ${institutionSelect}
+        <label>${t('Account email', 'البريد الإلكتروني للحساب')}<input name="email" type="email" maxlength="254" required dir="ltr"></label>
+        ${passwordField}
+        ${Object.entries(institutionalActions).map(([intent, labels]) => `<button class="action" name="intent" value="${intent}">${t(...labels)}</button>`).join('')}
+      </form>
+      ${data.organizations.some(({ plan }) => plan) ? `<form class="workspace-form" method="post" action="${url}">
+        ${institutionSelect}
+        <label>${t('Current state', 'الحالة الحالية')}<select name="current-state">${stateOptions}</select></label>
+        <label>${t('New state', 'الحالة الجديدة')}<select name="next-state">${stateOptions}</select></label>
+        <label>${t('New expiry (UTC, required for grace)', 'تاريخ الانتهاء الجديد (UTC، مطلوب لفترة السماح)')}<input name="expires" type="date"></label>
+        ${passwordField}<button class="action" name="intent" value="institution-transition">${t('Change institutional subscription status', 'غيّر حالة الاشتراك المؤسسي')}</button>
+      </form>` : ''}
+    ` : ''}
+    ${data.institutionalHistory.length ? `<h3>${t('Organization audit history', 'سجل تدقيق المؤسسات')}</h3>
+      <ol class="activity">${data.institutionalHistory.map((item) => `<li><bdi>${escapeHtml(item.organization)}</bdi> ·
+        ${escapeHtml(item.action)} · <bdi>${escapeHtml(item.actor ?? '')}</bdi>
+        ${item.subject ? `· <bdi>${escapeHtml(item.subject)}</bdi>` : ''} · <time>${date.format(item.recorded_at)} UTC</time></li>`).join('')}</ol>` : ''}
+  `;
   reply(status, {
     title, path, controlCenter: true,
     html: `<section class="surface panel detail workspace-page">
@@ -109,6 +177,7 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
         ${passwordField}<button class="action" name="intent" value="assign">${t('Assign plan', 'عيّن الخطة')}</button>
       </form>` : ''}
       ${moduleForms}
+      ${organizations}
       ${data.plans.length ? `<h2>${t('Start a trial', 'ابدأ فترة تجريبية')}</h2>
       <form class="workspace-form" method="post" action="${url}">
         <label>${t('Account email', 'البريد الإلكتروني للحساب')}<input name="email" type="email" maxlength="254" required dir="ltr"></label>

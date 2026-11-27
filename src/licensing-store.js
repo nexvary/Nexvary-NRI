@@ -64,6 +64,39 @@ export const institutionalSeatSchema = `
   PRAGMA user_version = 33;
 `;
 
+export const institutionalSubscriptionSchema = `
+  CREATE TABLE IF NOT EXISTS license_organizations (
+    code TEXT PRIMARY KEY,
+    name TEXT NOT NULL
+  ) STRICT;
+  CREATE TABLE IF NOT EXISTS license_organization_subscriptions (
+    organization TEXT PRIMARY KEY REFERENCES license_organizations(code),
+    plan TEXT NOT NULL REFERENCES license_plans(code),
+    expires_at INTEGER,
+    state TEXT NOT NULL CHECK(state IN ('trial','active','grace','past_due','expired','suspended','cancelled','revoked'))
+  ) STRICT;
+  CREATE TABLE IF NOT EXISTS license_organization_members (
+    organization TEXT NOT NULL REFERENCES license_organizations(code),
+    account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    PRIMARY KEY(organization,account_id)
+  ) STRICT;
+  CREATE TABLE IF NOT EXISTS license_organization_seats (
+    organization TEXT NOT NULL,
+    account_id TEXT PRIMARY KEY,
+    FOREIGN KEY(organization,account_id) REFERENCES license_organization_members(organization,account_id) ON DELETE CASCADE
+  ) STRICT;
+  CREATE INDEX IF NOT EXISTS license_seats_organization ON license_organization_seats(organization);
+  CREATE TABLE IF NOT EXISTS license_institutional_events (
+    id INTEGER PRIMARY KEY,
+    actor TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+    organization TEXT NOT NULL REFERENCES license_organizations(code),
+    subject TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+    action TEXT NOT NULL,
+    recorded_at INTEGER NOT NULL
+  ) STRICT;
+  PRAGMA user_version = 34;
+`;
+
 const subscriptionTransitions = Object.freeze({
   trial: ['active', 'expired', 'suspended', 'cancelled', 'revoked'],
   active: ['grace', 'past_due', 'expired', 'suspended', 'cancelled', 'revoked'],
@@ -93,8 +126,18 @@ export function licensingStore(db, now, transact) {
   const save = db.prepare(`INSERT INTO license_plans VALUES (?,?,?)
     ON CONFLICT(code) DO UPDATE SET project_limit=excluded.project_limit,daily_ai_tokens=excluded.daily_ai_tokens`);
   const lookup = db.prepare('SELECT id FROM accounts WHERE email = ?');
+  const individual = db.prepare('SELECT plan,state,expires_at FROM license_assignments WHERE account_id = ?');
+  const effectiveAssignment = `
+    SELECT plan,state,expires_at FROM license_assignments WHERE account_id = :account
+    UNION ALL
+    SELECT s.plan,s.state,s.expires_at FROM license_organization_subscriptions s
+    JOIN license_organization_seats seats ON seats.organization=s.organization
+    JOIN license_organization_members m ON m.organization=seats.organization AND m.account_id=seats.account_id
+    WHERE seats.account_id=:account AND NOT EXISTS (SELECT 1 FROM license_assignments WHERE account_id=:account)
+  `;
   const entitlement = db.prepare(`SELECT p.code,p.project_limit,p.daily_ai_tokens,a.expires_at,a.state,q.storage_mib,q.daily_reports
-    FROM license_assignments a JOIN license_plans p ON p.code=a.plan LEFT JOIN license_plan_quotas q ON q.code=p.code WHERE a.account_id = ?`);
+    FROM (${effectiveAssignment}) a JOIN license_plans p ON p.code=a.plan
+    LEFT JOIN license_plan_quotas q ON q.code=a.plan`);
   const assign = db.prepare(`INSERT INTO license_assignments(account_id,plan,expires_at,state) VALUES (?,?,?,'active')
     ON CONFLICT(account_id) DO UPDATE SET plan=excluded.plan,expires_at=excluded.expires_at`);
   const events = db.prepare('SELECT actor,subject,plan,action,recorded_at FROM license_events ORDER BY id DESC LIMIT 50');
@@ -115,8 +158,33 @@ export function licensingStore(db, now, transact) {
   const prune = db.prepare('DELETE FROM report_reservations WHERE day<?');
   const subscriptions = db.prepare(`SELECT a.email,s.plan,s.state,s.expires_at FROM license_assignments s
     JOIN accounts a ON a.id=s.account_id ORDER BY a.email LIMIT 50`);
-  const accountModules = db.prepare(`SELECT a.state,a.expires_at,m.module FROM license_assignments a
-    LEFT JOIN license_plan_modules m ON m.plan=a.plan WHERE a.account_id=?`);
+  const accountModules = db.prepare(`SELECT a.state,a.expires_at,m.module FROM (${effectiveAssignment}) a
+    LEFT JOIN license_plan_modules m ON m.plan=a.plan`);
+  const organization = db.prepare('SELECT 1 FROM license_organizations WHERE code=?');
+  const createOrganization = db.prepare('INSERT OR IGNORE INTO license_organizations VALUES (?,?)');
+  const organizationSubscription = db.prepare(`SELECT a.*,p.institutional_seats FROM license_organization_subscriptions a
+    LEFT JOIN license_plan_seats p ON p.code=a.plan WHERE a.organization=?`);
+  const organizationList = db.prepare(`SELECT o.code,o.name,s.plan,s.state,s.expires_at,p.institutional_seats,
+    (SELECT count(*) FROM license_organization_seats WHERE organization=o.code) AS seats
+    FROM license_organizations o LEFT JOIN license_organization_subscriptions s ON s.organization=o.code
+    LEFT JOIN license_plan_seats p ON p.code=s.plan ORDER BY o.code LIMIT 100`);
+  const institutionPlan = db.prepare('SELECT institutional_seats FROM license_plan_seats WHERE code=?');
+  const insertInstitutionalSubscription = db.prepare(`INSERT INTO license_organization_subscriptions VALUES (?,?,?,?)
+    ON CONFLICT(organization) DO UPDATE SET plan=excluded.plan,expires_at=excluded.expires_at`);
+  const setInstitutionalState = db.prepare('UPDATE license_organization_subscriptions SET state=?,expires_at=? WHERE organization=?');
+  const member = db.prepare('SELECT 1 FROM license_organization_members WHERE organization=? AND account_id=?');
+  const addMember = db.prepare('INSERT OR IGNORE INTO license_organization_members VALUES (?,?)');
+  const removeMember = db.prepare('DELETE FROM license_organization_members WHERE organization=? AND account_id=?');
+  const allocateSeat = db.prepare('INSERT OR IGNORE INTO license_organization_seats VALUES (?,?)');
+  const revokeSeat = db.prepare('DELETE FROM license_organization_seats WHERE organization=? AND account_id=?');
+  const seatCount = db.prepare('SELECT count(*) AS total FROM license_organization_seats WHERE organization=?');
+  const maxSeatsInUse = db.prepare(`SELECT COALESCE(MAX(total),0) AS total FROM (
+    SELECT count(*) AS total FROM license_organization_seats seats
+    JOIN license_organization_subscriptions s USING(organization) WHERE s.plan=? GROUP BY seats.organization
+  )`);
+  const institutionalAudit = db.prepare(`INSERT INTO license_institutional_events
+    (actor,organization,subject,action,recorded_at) VALUES (?,?,?,?,?)`);
+  const institutionalHistory = db.prepare('SELECT * FROM license_institutional_events ORDER BY id DESC LIMIT 50');
   const planModules = db.prepare('SELECT module FROM license_plan_modules WHERE plan=? ORDER BY module');
   const clearModules = db.prepare('DELETE FROM license_plan_modules WHERE plan=?');
   const addModule = db.prepare('INSERT INTO license_plan_modules VALUES (?,?)');
@@ -126,8 +194,17 @@ export function licensingStore(db, now, transact) {
     return current.state;
   }
 
+  function validateTransition(current, expected, next, expiresAt, timestamp) {
+    if (!current || !Object.hasOwn(subscriptionTransitions, expected) || !Object.hasOwn(subscriptionTransitions, next)) return 422;
+    const previous = stateAt(current, timestamp);
+    if (previous !== expected || !subscriptionTransitions[previous].includes(next)) return 409;
+    if ((expiresAt !== null && (!Number.isSafeInteger(expiresAt) || expiresAt <= timestamp || !usableStates.has(next))) ||
+        (next === 'grace' && expiresAt === null)) return 422;
+    return 303;
+  }
+
   function limits(account) {
-    const current = entitlement.get(account);
+    const current = entitlement.get({ account });
     if (!current) return { projectLimit: Infinity, aiTokens: Infinity, storage: Infinity, reports: Infinity };
     if (!usableStates.has(stateAt(current, now()))) return { projectLimit: 0, aiTokens: 0, storage: 0, reports: 0 };
     return { projectLimit: current.project_limit, aiTokens: current.daily_ai_tokens,
@@ -137,7 +214,7 @@ export function licensingStore(db, now, transact) {
   return {
     allowsModules(account, required) {
       if (required.length === 0) return true;
-      const rows = accountModules.all(account);
+      const rows = accountModules.all({ account });
       if (!rows.length || !usableStates.has(stateAt(rows[0], now()))) return false;
       const granted = new Set(rows.map(({ module }) => module));
       return required.every((module) => granted.has(module));
@@ -163,7 +240,8 @@ export function licensingStore(db, now, transact) {
       if (!authorized.get(actor)) return undefined;
       const timestamp = now();
       return { plans: plans.all().map((plan) => ({ ...plan, modules: planModules.all(plan.code).map(({ module }) => module) })), metrics: metrics.get(timestamp), recent: events.all(),
-        subscriptions: subscriptions.all().map((current) => ({ ...current, state: stateAt(current, timestamp) })) };
+        organizations: organizationList.all().map((current) => ({ ...current, state: stateAt(current, timestamp) })),
+        institutionalHistory: institutionalHistory.all(), subscriptions: subscriptions.all().map((current) => ({ ...current, state: stateAt(current, timestamp) })) };
     },
     save(actor, code, projectLimit, aiTokens, storage = null, dailyReports = null, institutionalSeats = null) {
       return transact(db, () => {
@@ -172,6 +250,7 @@ export function licensingStore(db, now, transact) {
             !Number.isInteger(aiTokens) || aiTokens < 0 || aiTokens > 1_000_000_000 ||
             !optionalLimit(storage,1048576) || !optionalLimit(dailyReports,10000) ||
             !optionalLimit(institutionalSeats,10000) || institutionalSeats === 0) return 422;
+        if ((institutionalSeats ?? 0) < maxSeatsInUse.get(code).total) return 409;
         save.run(code, projectLimit, aiTokens);
         saveQuotas.run(code, storage, dailyReports);
         saveSeats.run(code, institutionalSeats);
@@ -186,7 +265,7 @@ export function licensingStore(db, now, transact) {
         if (!account || !plan.get(code) || (expiresAt !== null && !Number.isSafeInteger(expiresAt))) return 422;
         const timestamp = now();
         if (initialState !== 'active' && (initialState !== 'trial' || expiresAt === null || expiresAt <= timestamp)) return 422;
-        const current = entitlement.get(account.id);
+        const current = individual.get(account.id);
         if (current && (stateAt(current, timestamp) !== 'active' || initialState !== 'active')) return 409;
         assign.run(account.id, code, expiresAt);
         if (initialState === 'trial') updateSubscription.run('trial', expiresAt, account.id);
@@ -198,15 +277,76 @@ export function licensingStore(db, now, transact) {
       return transact(db, () => {
         if (!authorized.get(actor)) return 403;
         const account = lookup.get(email);
-        const current = account && entitlement.get(account.id);
-        if (!current || !Object.hasOwn(subscriptionTransitions, expected) || !Object.hasOwn(subscriptionTransitions, next)) return 422;
+        const current = account && individual.get(account.id);
         const timestamp = now();
-        const previous = stateAt(current, timestamp);
-        if (previous !== expected || !subscriptionTransitions[previous].includes(next)) return 409;
-        if ((expiresAt !== null && (!Number.isSafeInteger(expiresAt) || expiresAt <= timestamp || !usableStates.has(next))) ||
-            (next === 'grace' && expiresAt === null)) return 422;
+        const status = validateTransition(current, expected, next, expiresAt, timestamp);
+        if (status !== 303) return status;
         updateSubscription.run(next, expiresAt, account.id);
-        record.run(actor, account.id, current.code, `subscription:${previous}:${next}`, timestamp);
+        record.run(actor, account.id, current.plan, `subscription:${expected}:${next}`, timestamp);
+        return 303;
+      });
+    },
+    createOrganization(actor, code, name) {
+      return transact(db, () => {
+        if (!authorized.get(actor)) return 403;
+        if (!/^[a-z][a-z0-9-]{1,30}$/.test(code) || !name || name.length > 100) return 422;
+        if (!createOrganization.run(code, name).changes) return 409;
+        institutionalAudit.run(actor, code, null, 'organization-created', now());
+        return 303;
+      });
+    },
+    assignInstitution(actor, code, planCode, expiresAt, initialState) {
+      return transact(db, () => {
+        if (!authorized.get(actor)) return 403;
+        const seats = institutionPlan.get(planCode)?.institutional_seats;
+        const timestamp = now();
+        if (!organization.get(code) || !seats || (expiresAt !== null && (!Number.isSafeInteger(expiresAt) || expiresAt <= timestamp)) ||
+            (initialState !== 'active' && (initialState !== 'trial' || expiresAt === null))) return 422;
+        const current = organizationSubscription.get(code);
+        if ((current && (stateAt(current, timestamp) !== 'active' || initialState !== 'active')) ||
+            seatCount.get(code).total > seats) return 409;
+        insertInstitutionalSubscription.run(code, planCode, expiresAt, initialState);
+        institutionalAudit.run(actor, code, null, 'subscription:' + initialState + ':' + planCode, timestamp);
+        return 303;
+      });
+    },
+    transitionInstitution(actor, code, expected, next, expiresAt) {
+      return transact(db, () => {
+        if (!authorized.get(actor)) return 403;
+        const current = organizationSubscription.get(code);
+        const timestamp = now();
+        const status = validateTransition(current, expected, next, expiresAt, timestamp);
+        if (status !== 303) return status;
+        setInstitutionalState.run(next, expiresAt, code);
+        institutionalAudit.run(actor, code, null, 'subscription:' + expected + ':' + next, timestamp);
+        return 303;
+      });
+    },
+    changeInstitutionMember(actor, code, email, add) {
+      return transact(db, () => {
+        if (!authorized.get(actor)) return 403;
+        const account = lookup.get(email);
+        if (!organization.get(code) || !account) return 422;
+        const operation = add ? addMember : removeMember;
+        if (!operation.run(code, account.id).changes) return 409;
+        institutionalAudit.run(actor, code, account.id, add ? 'member-added' : 'member-removed', now());
+        return 303;
+      });
+    },
+    changeInstitutionSeat(actor, code, email, allocate) {
+      return transact(db, () => {
+        if (!authorized.get(actor)) return 403;
+        const account = lookup.get(email);
+        if (!account || !member.get(code, account.id)) return 422;
+        const timestamp = now();
+        if (allocate) {
+          const current = organizationSubscription.get(code);
+          if (!current?.institutional_seats || !usableStates.has(stateAt(current, timestamp)) ||
+              seatCount.get(code).total >= current.institutional_seats) return 409;
+        }
+        const operation = allocate ? allocateSeat : revokeSeat;
+        if (!operation.run(code, account.id).changes) return 409;
+        institutionalAudit.run(actor, code, account.id, allocate ? 'seat-allocated' : 'seat-revoked', timestamp);
         return 303;
       });
     },

@@ -366,10 +366,28 @@ try {
             button.form.elements['ai-tokens'].value = 5000;
             button.form.elements['storage-mib'].value = 250;
             button.form.elements['daily-reports'].value = 3;
+            button.form.elements['institutional-seats'].value = 10;
             setTimeout(() => button.form.requestSubmit(button), 0);
           })()`);
         }
         await waitFor(() => inspect(send, 'Boolean(document.querySelector("select[name=plan] option[value=research]"))'), 'saved workspace plan');
+        if (lang === 'ar') {
+          assert.equal(store.licensing.createOrganization(moderator, 'research-center', 'Research Center'), 303);
+          assert.equal(store.licensing.assignInstitution(moderator, 'research-center', 'research', null, 'active'), 303);
+          await send('Page.reload', {});
+        }
+        await waitFor(() => inspect(send,
+          'Boolean(document.querySelector("button[value=institution-seat-allocate]"))'), 'institutional seat allocation form');
+        await captureLayout(send, 'licensing', lang, name, width, height);
+      }
+      if ((lang === 'ar' && name === 'mobile') || (lang === 'en' && name === 'desktop')) {
+        const operatorCookie = await send('Network.setCookie', {
+          url: origin, name: 'nri_session', value: moderatorSession, httpOnly: true, sameSite: 'Strict',
+        });
+        assert.equal(operatorCookie.success, true);
+        await send('Page.navigate', { url: origin + '/control-center?lang=' + lang });
+        await waitFor(() => inspect(send,
+          'Boolean(document.querySelector("button[value=institution-seat-allocate]"))'), 'institutional seat allocation form');
         await captureLayout(send, 'licensing', lang, name, width, height);
       }
       for (const view of ['about', 'developer']) {
