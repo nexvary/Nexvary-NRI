@@ -171,3 +171,45 @@ test('institutional subscriptions require a seat and preserve ownership and data
   assert.equal(licensing.transition(operator.id, winner.email, 'revoked', 'active', null, 'Fixture authorization'), 409);
   assert.equal((await request(winner, paths.get(winner))).status, 403);
 });
+
+test('synthetic term changes reject stale or unauthorized requests and audit signed minor-unit proration', async (t) => {
+  const now = Date.UTC(2026, 10, 28);
+  const expiry = now + 15 * 86_400_000;
+  const store = openWorkspaceStore(':memory:', () => now);
+  t.after(() => store.close());
+  const operatorEmail = 'operator@terms.test';
+  const email = 'customer@terms.test';
+  const credentials = await hashPassword('Synthetic terms fixture password');
+  for (const address of [operatorEmail, email]) store.addAccount(address, credentials);
+  const operator = store.credentials(operatorEmail).id;
+  const customer = store.credentials(email).id;
+  const token = store.newSession(operator);
+  const licensing = store.licensing;
+  licensing.setOperator(operator, true);
+  assert.equal(store.mfa.begin(operator), true);
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  const bits = [...store.mfa.pending(operator)].map((letter) => alphabet.indexOf(letter).toString(2).padStart(5, '0')).join('');
+  const seed = Buffer.from(bits.match(/.{8}/g).map((byte) => parseInt(byte, 2)));
+  assert.equal(store.mfa.confirm(operator, totp(seed, now / 30_000), token).length, 8);
+  for (const [plan, price] of [['basic', 1000], ['premium', 1501]]) {
+    assert.equal(licensing.save(operator, plan, 10, 0), 303);
+    assert.equal(licensing.setPricing(operator, plan, 'EUR', price, null), 303);
+  }
+  assert.equal(licensing.assign(operator, email, 'basic', expiry), 303);
+  const change = { email, expectedPlan: 'basic', expectedState: 'active', expectedExpiry: expiry,
+    targetPlan: 'premium', cycle: 'monthly', reason: 'Synthetic term acceptance' };
+  assert.equal(licensing.manageTerm(customer, change), 403);
+  assert.equal(licensing.manageTerm(operator, change), 303);
+  assert.equal(licensing.manageTerm(operator, change), 409);
+  assert.match(licensing.dashboard(operator).recent[0].action, /^synthetic-plan-change:basic:premium:monthly:EUR:250:/);
+  assert.equal(licensing.manageTerm(operator, { ...change, expectedPlan: 'premium', targetPlan: 'basic' }), 303);
+  assert.match(licensing.dashboard(operator).recent[0].action, /^synthetic-plan-change:premium:basic:monthly:EUR:-250:/);
+  assert.equal(licensing.transition(operator, email, 'active', 'past_due', null), 303);
+  assert.equal(licensing.transition(operator, email, 'past_due', 'grace', expiry), 303);
+  const renewal = { ...change, targetPlan: '', expectedState: 'grace' };
+  assert.equal(licensing.manageTerm(operator, renewal), 303);
+  assert.equal(licensing.manageTerm(operator, renewal), 409);
+  assert.equal(licensing.dashboard(operator).subscriptions[0].expires_at, now + 30 * 86_400_000);
+  assert.match(licensing.dashboard(operator).recent[0].action, /^synthetic-renewal:monthly:/);
+  assert.deepEqual(store.billing.records(operator, 0), []);
+});

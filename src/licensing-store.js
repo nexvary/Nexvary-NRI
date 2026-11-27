@@ -237,6 +237,9 @@ export function licensingStore(db, now, transact) {
     WHERE state IN ('trial','active','grace') AND expires_at<=? ORDER BY expires_at,account_id LIMIT 500`);
   const dueInstitutions = db.prepare(`SELECT organization,state,expires_at FROM license_organization_subscriptions
     WHERE state IN ('trial','active','grace') AND expires_at<=? ORDER BY expires_at,organization LIMIT 500`);
+  const priceFor = db.prepare('SELECT currency,monthly_minor,annual_minor FROM license_plan_prices WHERE plan=?');
+  const changeIndividual = db.prepare('UPDATE license_assignments SET plan=?,state=?,expires_at=? WHERE account_id=?');
+  const changeOrganization = db.prepare('UPDATE license_organization_subscriptions SET plan=?,state=?,expires_at=? WHERE organization=?');
   const accountExpiry = db.prepare(`SELECT plan,state,expires_at,source FROM (${effectiveAssignment})`);
 
   function stateAt(current, timestamp) {
@@ -432,6 +435,54 @@ export function licensingStore(db, now, transact) {
         const operation = allocate ? allocateSeat : revokeSeat;
         if (!operation.run(code, account.id).changes) return 409;
         institutionalAudit.run(actor, code, account.id, allocate ? 'seat-allocated' : 'seat-revoked', timestamp);
+        return 303;
+      });
+    },
+    manageTerm(actor, { email, organization: code, expectedPlan, expectedState, expectedExpiry, targetPlan, cycle, reason }) {
+      return transact(db, () => {
+        if (!authorized.get(actor)) return 403;
+        const term = cycle === 'monthly' ? 30 * dayMs : cycle === 'annual' ? 365 * dayMs : 0;
+        if (!term || !reason || !validReason(reason) || !Object.hasOwn(subscriptionTransitions, expectedState)) return 422;
+        const account = !code && lookup.get(email);
+        const subject = code || account?.id;
+        const current = subject && (code ? organizationSubscription.get(subject) : individual.get(subject));
+        if (!current) return 422;
+        const timestamp = now();
+        const state = stateAt(current, timestamp);
+        if (state !== expectedState || current.plan !== expectedPlan || current.expires_at !== expectedExpiry) return 409;
+        const next = targetPlan || current.plan;
+        const audience = planAudience.get(next)?.audience ?? 'all';
+        const capacity = code ? institutionPlan.get(next)?.institutional_seats : null;
+        if (!plan.get(next) || (code ? audience === 'individual' || !capacity :
+          !['all', 'individual'].includes(audience))) return 422;
+        if (code && seatCount.get(code).total > capacity) return 409;
+
+        let expires;
+        let action;
+        if (next === current.plan) {
+          if (!['active', 'trial', 'grace', 'past_due', 'expired'].includes(state)) return 409;
+          if (state === 'active' && current.expires_at === null) return 409;
+          // Only an unexpired paid term carries its remaining days forward.
+          expires = (state === 'active' ? current.expires_at : timestamp) + term;
+          action = `synthetic-renewal:${cycle}:${reason.trim()}`;
+        } else {
+          if (state !== 'active' || current.expires_at === null) return 409;
+          const remaining = current.expires_at - timestamp;
+          if (remaining > term) return 409;
+          const from = priceFor.get(current.plan);
+          const to = priceFor.get(next);
+          const field = cycle + '_minor';
+          if (!from || !to || from.currency !== to.currency || from[field] === null || to[field] === null) return 422;
+          const numerator = BigInt(to[field] - from[field]) * BigInt(remaining);
+          // Truncate toward zero symmetrically. This is an audit-only adjustment.
+          const difference = numerator / BigInt(term);
+          expires = current.expires_at;
+          action = `synthetic-plan-change:${current.plan}:${next}:${cycle}:${from.currency}:${difference}:${reason.trim()}`;
+        }
+        if (!Number.isSafeInteger(expires) || expires > 8_640_000_000_000_000) return 422;
+        (code ? changeOrganization : changeIndividual).run(next, 'active', expires, subject);
+        if (code) institutionalAudit.run(actor, subject, null, action, timestamp);
+        else record.run(actor, subject, next, action, timestamp);
         return 303;
       });
     },

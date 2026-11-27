@@ -389,6 +389,7 @@ try {
         }
         await waitFor(() => inspect(send,
           'Boolean(document.querySelector("button[value=institution-seat-allocate]"))'), 'institutional seat allocation form');
+        await waitFor(() => inspect(send, 'Boolean(document.querySelector("button[value=manage-term]"))'), 'synthetic renewal form');
         await captureLayout(send, 'licensing', lang, name, width, height);
       }
       if ((lang === 'ar' && name === 'mobile') || (lang === 'en' && name === 'desktop')) {
@@ -399,6 +400,7 @@ try {
         await send('Page.navigate', { url: origin + '/control-center?lang=' + lang });
         await waitFor(() => inspect(send,
           'Boolean(document.querySelector("button[value=institution-seat-allocate]"))'), 'institutional seat allocation form');
+        await waitFor(() => inspect(send, 'Boolean(document.querySelector("button[value=manage-term]"))'), 'synthetic renewal form');
         await captureLayout(send, 'licensing', lang, name, width, height);
       }
       await send('Page.navigate', { url: origin + '/control-center/billing?lang=' + lang });

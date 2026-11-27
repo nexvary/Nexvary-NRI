@@ -142,7 +142,7 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
   if (form) {
     const code = (form.get('plan') ?? '').trim();
     const intent = form.get('intent');
-    if (!['save', 'assign', 'transition', 'complimentary', 'override', 'trial', 'modules', 'pricing', 'discount-create', 'discount-revoke', 'institution-create',
+    if (!['save', 'assign', 'transition', 'complimentary', 'override', 'trial', 'modules', 'pricing', 'discount-create', 'discount-revoke', 'manage-term', 'institution-create',
       'institution-assign', 'institution-trial', 'institution-transition', 'institution-sponsor', 'institution-override'].includes(intent) &&
       !Object.hasOwn(institutionalActions, intent)) return reply(422);
     const retryAfter = throttle.begin(request.socket.remoteAddress ?? '', account.email);
@@ -156,7 +156,19 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
       const institution = (form.get('institution') ?? '').trim();
       const reason = (form.get('reason') ?? '').trim();
       const promo = (form.get('discount-code') ?? '').trim().toUpperCase();
-      if (intent === 'discount-create') {
+      if (intent === 'manage-term') {
+        const [scope, target, expectedPlan, expectedState, expiry] = (form.get('term-snapshot') ?? '').split('|');
+        if (!['account', 'organization'].includes(scope) || expiry === undefined || !/^[A-Za-z0-9_-]+$/.test(target ?? '')) return reply(422);
+        const identifier = Buffer.from(target, 'base64url').toString('utf8');
+        if (!identifier) return reply(422);
+        status = store.licensing.manageTerm(account.id, {
+          email: scope === 'account' ? normalizeAddress(identifier) : '',
+          organization: scope === 'organization' ? identifier : '',
+          expectedPlan, expectedState,
+          expectedExpiry: expiry === '' ? null : (/^\d{1,16}$/.test(expiry) ? Number(expiry) : NaN),
+          targetPlan: code, cycle: form.get('cycle'), reason,
+        });
+      } else if (intent === 'discount-create') {
         status = store.billing.createDiscount(account.id, {
           code: promo, kind: form.get('discount-kind'), value: whole(form.get('discount-value')),
           currency: (form.get('currency') ?? '').trim().toUpperCase(), plan: code,
@@ -206,6 +218,23 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
   const passwordField = `<label>${t('Current password', 'كلمة المرور الحالية')}<input name="password" type="password" required maxlength="128" autocomplete="current-password"></label>`;
   const reasonField = `<label>${t('Reason for promotional grants or overrides', 'سبب المنح الترويجية أو التجاوزات')}
     <input name="reason" maxlength="200"></label>`;
+  const termTargets = [
+    ...data.subscriptions.map((row) => ({ ...row, scope: 'account', target: row.email })),
+    ...data.organizations.filter((row) => row.plan).map((row) => ({ ...row, scope: 'organization', target: row.code })),
+  ];
+  const termForm = termTargets.length ? `<h2>${t('Synthetic renewal and plan change', 'التجديد التجريبي وتغيير الخطة')}</h2>
+    <form class="workspace-form" method="post" action="${url}">
+      <label>${t('Current subscription', 'الاشتراك الحالي')}<select name="term-snapshot" required>
+        ${termTargets.map((row) => `<option value="${row.scope}|${Buffer.from(row.target).toString('base64url')}|${escapeHtml(row.plan)}|${row.state}|${row.expires_at ?? ''}">
+          ${escapeHtml(row.target)} · ${escapeHtml(row.plan)} · ${t(...states[row.state])}</option>`).join('')}
+      </select></label>
+      <label>${t('Target plan (leave blank to renew)', 'الخطة المستهدفة (اتركها فارغة للتجديد)')}<select name="plan">
+        <option value="">${t('Renew current plan', 'جدّد الخطة الحالية')}</option>
+        ${data.plans.map(({ code }) => `<option>${escapeHtml(code)}</option>`).join('')}</select></label>
+      <label>${t('Billing cycle', 'دورة الفوترة')}<select name="cycle">
+        <option value="monthly">${t('30 days', '٣٠ يومًا')}</option><option value="annual">${t('365 days', '٣٦٥ يومًا')}</option></select></label>
+      ${reasonField}${passwordField}<button class="action" name="intent" value="manage-term">${t('Record synthetic change', 'سجّل التغيير التجريبي')}</button>
+    </form>` : '';
   const moduleForms = data.plans.map(({ code, modules }) => `
     <form class="workspace-form" method="post" action="${url}">
       <input name="plan" type="hidden" value="${escapeHtml(code)}">
@@ -341,6 +370,7 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
         ${planPrices}` : ''}
       ${moduleForms}
       ${organizations}
+      ${termForm}
       ${discountForm}
       ${individualPlans.length ? `<h2>${t('Start a trial', 'ابدأ فترة تجريبية')}</h2>
       <form class="workspace-form" method="post" action="${url}">

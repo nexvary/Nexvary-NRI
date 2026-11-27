@@ -304,3 +304,8 @@
 
 - The Control Center can classify plans as individual, research team, enterprise, institutional or available to both assignment types. Existing plans retain both assignment paths. New assignments enforce the plan audience, and incompatible changes are rejected while existing assignments reference the plan.
 - Account settings show the effective assignment source and available modules using the same personal-over-institutional precedence as request-time entitlement enforcement.
+
+## 2026-11-28 · Synthetic subscription term changes
+
+- Added reasoned and password-confirmed operator renewal and plan changes for individual and institutional subscriptions. Stale snapshots are rejected transactionally. The sandbox cycles use fixed 30-day and 365-day terms.
+- An active, dated term retains its end date on a plan change. The same-currency adjustment uses the selected cycle's configured prices, the remaining term fraction, and integer truncation toward zero. Adjustments are audited only and do not create invoices, payments or refunds.
