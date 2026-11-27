@@ -76,3 +76,8 @@ Select OpenAI and the enabled model in provider settings and save an API key. Ea
 ### Optional account MFA
 
 From **Account security → Two-step verification**, confirm the current password, add the displayed key to a time-based authenticator, and confirm with a current six-digit code. Save the eight recovery codes shown during activation. Each code can be used once in place of an authenticator code during sign-in. Changing MFA signs out other active sessions. The existing workspace backup includes the encrypted seed and paired workspace key.
+
+
+### Local message moderation
+
+An operator with access to the workspace database can run `npm run account:role -- moderator@example.test grant-message-moderator`. The recipient sees **Message reports** under Account security and can review reported message text and record decisions. To revoke the role, run the same command with `revoke-message-moderator`. The role has no private conversation access.

@@ -3,7 +3,7 @@ import { closeSync, mkdirSync, openSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { mfaSchema, mfaStore } from './mfa.js';
-import { messageSchema, messageStore } from './message-store.js';
+import { messageSchema, messageStore, moderationSchema } from './message-store.js';
 import { assistantUsageSchema, assistantUsageStore } from './assistant-usage.js';
 import { assistantSettingsSchema, assistantSettingsStore } from './assistant-settings.js';
 import { bindDocumentKey } from './document-crypto.js';
@@ -20,7 +20,7 @@ import { evidenceSchema, evidenceStore } from './evidence-store.js';
 import { referenceSchema, referenceMigrationV4, referenceStore } from './reference-store.js';
 
 export const sessionLifetime = 8 * 60 * 60;
-const schemaVersion = 16;
+const schemaVersion = 17;
 const schema = `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -79,6 +79,7 @@ function initialize(db, path) {
     if (version < 14) db.exec(assistantUsageSchema);
     if (version < 15) db.exec(messageSchema);
     if (version < 16) db.exec(mfaSchema);
+    if (version < 17) db.exec(moderationSchema);
     return bindDocumentKey(db, path);
   });
 }

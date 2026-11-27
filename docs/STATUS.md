@@ -1,5 +1,12 @@
 # Development status
 
+## NRI-18b · Scoped message moderation · 2026-11-27 (Cairo)
+
+A local operator can grant or revoke the message moderator role. Moderators see reported messages and can record one attributed decision per report. The rest of a conversation remains participant-only. Moderators cannot adjudicate their own reports or reports about messages they sent.
+
+- 52/52 with real report rendering. HTTP coverage verifies direct-route denial, live role revocation, review conflicts, report scope, escaped evidence and immutable decisions.
+- Real Chromium captures: [Arabic desktop](qa/nri-18/moderation-ar-desktop.webp) and [English mobile](qa/nri-18/moderation-en-mobile.webp).
+
 ## NRI-18a · Account MFA and recovery codes · 2026-11-27 (Cairo)
 
 Signed-in accounts can enable time-based authenticator codes after password re-verification. The secret is encrypted at rest and setup expires in ten minutes. Enrollment issues eight one-use recovery codes. Login rejects replayed authenticator and recovery codes. Activation and deactivation revoke other sessions in the same transaction.
@@ -13,7 +20,7 @@ Accepted collaborators can open a shared private thread. Each participant has in
 
 - 50/50 regression tests with the PDF/DOCX renderer. HTTP acceptance covers participant and origin authorization, account isolation, encrypted storage, reporting privacy, read markers, notification preferences, blocking and rate limiting.
 - Real Chromium exercised sending and rendering a message in four viewports using illustrative accounts. Captures: [Arabic desktop](qa/nri-11/messages-ar-desktop.webp), [Arabic mobile](qa/nri-11/messages-ar-mobile.webp), [English desktop](qa/nri-11/messages-en-desktop.webp), [English mobile](qa/nri-11/messages-en-mobile.webp).
-- Reports are persisted for the pending NRI-18 moderation console.
+- NRI-18b provides the scoped review console for persisted reports.
 
 ## NRI-08d · External consent and usage limits · 2026-11-27 (Cairo)
 
@@ -216,7 +223,7 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | NRI-15 | Verified | Versioned Arabic/English PDF and DOCX downloads with citations, evidence, L-READY findings and limitations. Requires the documented local renderer. |
 | NRI-16 | Partial | System About view shows the purpose, framework wording, build version and documentation links. Changelog, licensing, privacy, terms and support content remain. |
 | NRI-17 | Partial | Separate developer view identifies Nexvary Inc. and links to the official company site. Dedicated confirmed contact information remains. |
-| NRI-18 | Partial | Local authentication, session revocation, account audit, authorization, encrypted PDF bytes, RTL/LTR and verified recovery are implemented. NRI-18a adds optional MFA and one-use recovery codes. Team RBAC, password/account recovery, export/deletion, accessibility audit and administration remain. |
+| NRI-18 | Partial | Local authentication, session revocation, account audit, authorization, encrypted PDF bytes, RTL/LTR and verified recovery are implemented. NRI-18a adds optional MFA and one-use recovery codes. NRI-18b adds the operator-managed message moderator role and scoped report review. Team RBAC, password/account recovery, export/deletion, accessibility audit and broader administration remain. |
 | NRI-19 | Partial | Local restore and regression workflow configuration are implemented. Entitlements, approved hosting, operational monitoring and billing remain. |
 
-Next milestone: scoped RBAC and the message-report moderation console.
+Next milestone: account data export and deletion, then broader roles and commercial readiness.

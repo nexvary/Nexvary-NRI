@@ -88,3 +88,52 @@ test('private messages enforce conversation membership, unread state, blocking a
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test('moderation role can review reported evidence and cannot enter private threads', async (t) => {
+  const store = openWorkspaceStore();
+  const [sender, recipient, reviewer] = ['sender', 'recipient', 'reviewer'].map((name) => {
+    const email = name + '@example.test';
+    store.addAccount(email, { salt: Buffer.alloc(16), hash: Buffer.alloc(32) });
+    const { id } = store.credentials(email);
+    store.network.save(id, { name, interests: '', orcid: '', discoverable: true });
+    return { id, cookie: 'nri_session=' + store.newSession(id) };
+  });
+  store.network.interact(sender.id, recipient.id, 'request');
+  store.network.interact(recipient.id, sender.id, 'accept');
+  const conversation = store.messages.open(sender.id, recipient.id);
+  store.messages.send(sender.id, conversation, 'Only reported <script>evidence</script>');
+  store.messages.send(sender.id, conversation, 'Unreported private conversation');
+  const [unreported, reported] = store.messages.list(recipient.id, conversation, null);
+  assert.equal(store.messages.report(recipient.id, conversation, reported.id, 'harassment'), 303);
+
+  const app = createApp(store);
+  app.listen(0, '127.0.0.1');
+  await once(app, 'listening');
+  t.after(() => new Promise((resolve) => app.close(resolve)));
+  const origin = 'http://127.0.0.1:' + app.address().port;
+  const queue = '/workspace/settings/message-moderation?lang=en';
+  const request = (user, path, fields) => fetch(origin + path, {
+    redirect: 'manual', headers: { cookie: user.cookie, ...(fields ? { origin } : {}) },
+    ...(fields ? { method: 'POST', body: new URLSearchParams(fields) } : {}),
+  });
+  const decision = { message: reported.id, reporter: recipient.id, outcome: 'upheld' };
+  assert.equal((await request(reviewer, queue)).status, 403);
+  assert.equal((await request(reviewer, queue, decision)).status, 403);
+  store.messages.setModerator(reviewer.id, true);
+  store.messages.setModerator(sender.id, true);
+  assert.doesNotMatch(await (await request(sender, queue)).text(), /Only reported/);
+  assert.equal((await request(sender, queue, decision)).status, 404);
+  assert.equal((await request(reviewer, '/workspace/messages/' + conversation)).status, 404);
+  const response = await request(reviewer, queue);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  const html = await response.text();
+  assert.match(html, /Only reported &lt;script&gt;evidence&lt;\/script&gt;/);
+  assert.doesNotMatch(html, /Unreported private conversation/);
+  assert.equal((await request(reviewer, queue, { ...decision, message: unreported.id })).status, 404);
+  assert.equal((await request(reviewer, queue, decision)).status, 303);
+  assert.equal((await request(reviewer, queue, { ...decision, outcome: 'dismissed' })).status, 404);
+  assert.doesNotMatch(await (await request(reviewer, queue)).text(), /Only reported/);
+  assert.match(await (await request(reviewer, queue + '&reviewed=yes')).text(), /Upheld/);
+  store.messages.setModerator(reviewer.id, false);
+  assert.equal((await request(reviewer, queue)).status, 403);
+});

@@ -16,4 +16,6 @@ NRI-11 adds private messaging for accepted collaborators, encrypted message text
 
 NRI-18a adds optional authenticator MFA, one-use recovery codes and transactional revocation of other sessions when MFA changes. The new verification tests are in `test/mfa.test.js`.
 
-Next: implement operator-provisioned roles and a scoped moderation console for received message reports. Start from `src/message-store.js`, `src/messages.js` and `src/store.js`. Keep raw conversation access participant-only and restrict moderation to reports. Then implement account export/deletion, broader RBAC, commercial readiness and remaining project features tracked in the [functional matrix](STATUS.md#functional-acceptance).
+NRI-18b adds the local operator-managed message moderator role and report decisions, with private threads still participant-only. See `src/message-store.js`, `src/moderation.js` and `test/messages.test.js`. Full regression: 52/52. The browser harness now captures Assistant, messaging, MFA settings and report review.
+
+Next: fetch and fast-forward to the PR head. Implement owner-scoped account export and deletion in the authenticated settings routes. Verify foreign-origin denial, destructive confirmation, cleanup of files/credentials/sessions and recovery behavior from paired workspace backups. Continue broader project RBAC, commercial readiness and the other incomplete items in the [functional matrix](STATUS.md#functional-acceptance).

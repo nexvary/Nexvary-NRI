@@ -36,6 +36,24 @@ export const messageSchema = `
   PRAGMA user_version = 15;
 `;
 
+export const moderationSchema = `
+  CREATE TABLE IF NOT EXISTS account_roles (
+    account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    role TEXT NOT NULL CHECK(role = 'message-moderator'),
+    PRIMARY KEY(account_id, role)
+  ) STRICT;
+  CREATE TABLE IF NOT EXISTS message_report_decisions (
+    message INTEGER NOT NULL,
+    reporter TEXT NOT NULL,
+    reviewer TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+    outcome TEXT NOT NULL CHECK(outcome IN ('upheld', 'dismissed')),
+    decided_at INTEGER NOT NULL,
+    PRIMARY KEY(message, reporter),
+    FOREIGN KEY(message, reporter) REFERENCES message_reports(message, reporter) ON DELETE CASCADE
+  ) STRICT;
+  PRAGMA user_version = 17;
+`;
+
 export function messageStore(db, workspaceKey, now, transact) {
   const key = createHmac('sha256', workspaceKey).update('nri-private-message-v1').digest();
   const peers = db.prepare(`
@@ -103,6 +121,26 @@ export function messageStore(db, workspaceKey, now, transact) {
     INSERT INTO message_preferences VALUES (?, ?) ON CONFLICT(account_id) DO UPDATE SET notifications=excluded.notifications
   `);
 
+  const moderator = db.prepare("SELECT 1 FROM account_roles WHERE account_id = ? AND role = 'message-moderator'");
+  const grantModerator = db.prepare("INSERT OR IGNORE INTO account_roles VALUES (?, 'message-moderator')");
+  const removeModerator = db.prepare("DELETE FROM account_roles WHERE account_id = ? AND role = 'message-moderator'");
+  const queue = db.prepare(`
+    SELECT r.message, r.reporter, r.category, r.created_at AS reportedAt,
+      m.conversation, m.crypto_id, m.nonce, m.ciphertext, m.tag, d.outcome
+    FROM message_reports r
+    JOIN messages m ON m.id = r.message
+    LEFT JOIN message_report_decisions d ON d.message = r.message AND d.reporter = r.reporter
+    WHERE r.reporter <> :reviewer AND m.sender <> :reviewer
+      AND ((:reviewed = 1 AND d.outcome IS NOT NULL) OR (:reviewed = 0 AND d.outcome IS NULL))
+    ORDER BY r.created_at DESC, r.message DESC, r.reporter LIMIT 50 OFFSET :offset
+  `);
+  const decide = db.prepare(`
+    INSERT OR IGNORE INTO message_report_decisions
+    SELECT r.message, r.reporter, :reviewer, :outcome, :now
+    FROM message_reports r JOIN messages m ON m.id = r.message
+    WHERE r.message = :message AND r.reporter = :reporter AND r.reporter <> :reviewer AND m.sender <> :reviewer
+  `);
+
   function thread(owner, id) {
     const row = conversation.get({ owner, id });
     if (!row) return undefined;
@@ -114,6 +152,24 @@ export function messageStore(db, workspaceKey, now, transact) {
   }
 
   return {
+    isModerator: (account) => Boolean(moderator.get(account)),
+    setModerator(account, enabled) {
+      if (enabled) grantModerator.run(account);
+      else removeModerator.run(account);
+    },
+    moderationQueue(reviewer, reviewed, offset) {
+      if (!moderator.get(reviewer)) return undefined;
+      return queue.all({ reviewer, reviewed: Number(reviewed), offset }).map((item) => ({
+        message: item.message, reporter: item.reporter, category: item.category, reportedAt: item.reportedAt, outcome: item.outcome,
+        content: decryptDocument(key, item.conversation, item.crypto_id, { ...item, number: 1 }).toString('utf8'),
+      }));
+    },
+    moderate(reviewer, message, reporter, outcome) {
+      return transact(db, () => {
+        if (!moderator.get(reviewer)) return 403;
+        return decide.run({ reviewer, message, reporter, outcome, now: now() }).changes ? 303 : 404;
+      });
+    },
     peers: (owner) => peers.all({ owner }),
     inbox: (owner, offset) => inbox.all({ owner, offset }),
     unread: (owner) => totalUnread.get({ owner }).total,

@@ -10,6 +10,7 @@
     "start": "node src/server.js",
     "test": "node --test",
     "account:create": "node src/account-cli.js",
+    "account:role": "node src/account-role-cli.js",
     "workspace:backup": "node src/recovery-cli.js backup",
     "workspace:restore": "node src/recovery-cli.js restore"
   }

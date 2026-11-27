@@ -28,6 +28,11 @@ store.network.interact(id, peer, 'request');
 store.network.interact(peer, id, 'accept');
 const thread = store.messages.open(id, peer);
 store.messages.send(peer, thread, 'Could we verify the reference metadata before submitting the report?');
+const moderatorEmail = 'moderator@example.test';
+store.addAccount(moderatorEmail, { salt: Buffer.alloc(16), hash: Buffer.alloc(32) });
+const moderator = store.credentials(moderatorEmail).id;
+store.messages.setModerator(moderator, true);
+const moderatorSession = store.newSession(moderator);
 const app = createApp(store);
 await new Promise((resolve) => app.listen(0, '127.0.0.1', resolve));
 const origin = 'http://127.0.0.1:' + app.address().port;
@@ -70,8 +75,12 @@ async function inspect(send, expression) {
 
 async function waitFor(check, description, attempts = 50) {
   for (let attempt = 0; attempt < attempts; attempt += 1) {
-    const value = await check();
-    if (value) return value;
+    try {
+      const value = await check();
+      if (value) return value;
+    } catch (error) {
+      if (!/Inspected target navigated|Execution context was destroyed|Cannot find context/.test(error.message)) throw error;
+    }
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   throw new Error('Browser condition timed out: ' + description);
@@ -150,7 +159,7 @@ try {
       assert.equal(await inspect(send, `(() => {
         const field = document.querySelector('select[name=project]');
         field.value = ${JSON.stringify(project)};
-        field.form.requestSubmit();
+        setTimeout(() => field.form.requestSubmit(), 0);
         return Boolean(field.value);
       })()`), true);
       await waitFor(() => inspect(send, 'Boolean(document.body?.innerText.includes("Illustrative reference snapshot"))'), 'saved source result');
@@ -161,15 +170,26 @@ try {
         await inspect(send, `(() => {
           const field = document.querySelector('textarea[name=text]');
           field.value = 'I checked the saved snapshot and its retrieval date.';
-          field.form.requestSubmit(field.form.querySelector('button'));
+          setTimeout(() => field.form.requestSubmit(field.form.querySelector('button')), 0);
         })()`);
       }
       await waitFor(() => inspect(send, 'Boolean(document.querySelector(".message-list")?.textContent.includes("checked the saved snapshot"))'), 'sent private message');
       await captureLayout(send, 'messages', lang, name, width, height);
+      if (lang === 'ar' && name === 'desktop') {
+        const [reported] = store.messages.list(peer, thread, null);
+        assert.equal(store.messages.report(peer, thread, reported.id, 'other'), 303);
+      }
       if ((lang === 'ar' && name === 'desktop') || (lang === 'en' && name === 'mobile')) {
         await send('Page.navigate', { url: origin + '/workspace/settings/mfa?lang=' + lang });
         await waitFor(() => inspect(send, 'Boolean(document.querySelector("button[value=begin]"))'), 'MFA settings');
         await captureLayout(send, 'mfa', lang, name, width, height);
+        const moderatorCookie = await send('Network.setCookie', {
+          url: origin, name: 'nri_session', value: moderatorSession, httpOnly: true, sameSite: 'Strict',
+        });
+        assert.equal(moderatorCookie.success, true);
+        await send('Page.navigate', { url: origin + '/workspace/settings/message-moderation?lang=' + lang });
+        await waitFor(() => inspect(send, 'Boolean(document.querySelector("button[value=upheld]"))'), 'message moderation queue');
+        await captureLayout(send, 'moderation', lang, name, width, height);
       }
       client.socket.close();
     }

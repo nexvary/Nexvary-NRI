@@ -2,7 +2,7 @@ import { escapeHtml } from './workspace-view.js';
 
 const path = '/workspace/messages';
 const uuid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
-const categories = { spam: ['Spam', 'رسائل مزعجة'], harassment: ['Harassment', 'مضايقة'], other: ['Other', 'أخرى'] };
+export const reportCategories = { spam: ['Spam', 'رسائل مزعجة'], harassment: ['Harassment', 'مضايقة'], other: ['Other', 'أخرى'] };
 
 function positiveInteger(input) {
   if (!/^[1-9]\d{0,14}$/.test(input ?? '')) return undefined;
@@ -87,7 +87,7 @@ export function handleMessages({ request, reply, redirect, route, lang, account,
         return redirect(href(id));
       case 'report': {
         const category = form.get('category');
-        if (!sequence || !Object.hasOwn(categories, category)) return reply(422);
+        if (!sequence || !Object.hasOwn(reportCategories, category)) return reply(422);
         status = messages.report(owner, id, sequence, category);
         break;
       }
@@ -120,7 +120,7 @@ export function handleMessages({ request, reply, redirect, route, lang, account,
         <p dir="auto">${escapeHtml(text)}</p>
         ${mine ? '' : reported ? `<small>${t('Reported', 'تم الإبلاغ')}</small>` : `<form class="project-tools" method="post" action="${href(id)}">
           <input type="hidden" name="message" value="${sequence}">
-          <select name="category" aria-label="${t('Report reason', 'سبب الإبلاغ')}">${Object.entries(categories).map(([key, labels]) => `<option value="${key}">${t(...labels)}</option>`).join('')}</select>
+          <select name="category" aria-label="${t('Report reason', 'سبب الإبلاغ')}">${Object.entries(reportCategories).map(([key, labels]) => `<option value="${key}">${t(...labels)}</option>`).join('')}</select>
           <button class="action" name="intent" value="report">${t('Report', 'أبلغ')}</button>
         </form>`}
       </li>`).join('')}</ol>

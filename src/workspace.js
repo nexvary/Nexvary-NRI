@@ -1,3 +1,4 @@
+import { handleMessageModeration } from './moderation.js';
 import { createMfaSettingsHandler } from './mfa-settings.js';
 import { handleMessages, resolveMessageRoute } from './messages.js';
 import { createAssistantAnswerHandler } from './assistant-answer.js';
@@ -34,6 +35,7 @@ export function resolveWorkspaceRoute(pathname) {
   if (pathname === '/workspace/assistant/settings') return { kind: 'assistant-settings' };
   if (pathname === '/workspace/assistant') return { kind: 'assistant' };
   if (pathname === '/workspace/education') return { kind: 'education' };
+  if (pathname === '/workspace/settings/message-moderation') return { kind: 'settings-message-moderation' };
   if (pathname === '/workspace/settings/mfa') return { kind: 'settings-mfa' };
   if (pathname === '/workspace/settings') return { kind: 'settings' };
   if (pathname === '/workspace/analytics') return { kind: 'analytics' };
@@ -198,6 +200,10 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
     }
     if (kind.startsWith('sharing')) {
       handleSharing({ request, reply, redirect, route, lang, account, form });
+      return;
+    }
+    if (kind === 'settings-message-moderation') {
+      handleMessageModeration({ request, reply, redirect, lang, account, form, store });
       return;
     }
     if (kind === 'settings-mfa') {
