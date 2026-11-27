@@ -33,6 +33,11 @@ function fixture() {
 
 test('exports owner-scoped report content with dated provenance, evidence and governance limitations', async () => {
   const { store, owner, other, projectId } = fixture();
+  const checkedAt = Date.UTC(2026, 10, 27);
+  store.references.save(owner, projectId, {
+    doi: '10.5555/report-fixture', provider: 'openalex', status: 'found', checkedAt,
+    metadata: { title: 'Synthetic later record', isRetracted: true },
+  }, true);
   const ownerCookie = 'nri_session=' + store.newSession(owner);
   const otherCookie = 'nri_session=' + store.newSession(other);
   const app = createApp(store, { reportRenderer: async (model) => Buffer.from(JSON.stringify(model)) });
@@ -55,6 +60,8 @@ test('exports owner-scoped report content with dated provenance, evidence and go
     assert.match(body, /Synthetic citation/);
     assert.match(body, /2026-11-26T00:00:00.000Z/);
     assert.match(body, /Blocked by safety or authorization/);
+    assert.match(body, /No reviewed supporting link eligible as evidence/);
+    assert.match(body, /A saved record for this identifier flags a retraction/);
     assert.match(body, /حدود الدراسة/);
   } finally {
     await new Promise((resolve, reject) => app.close((error) => error ? reject(error) : resolve()));

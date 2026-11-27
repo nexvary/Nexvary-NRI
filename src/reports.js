@@ -49,6 +49,8 @@ const copy = {
   accepted: ['Link accepted', 'قُبل الربط'],
   rejected: ['Link rejected', 'رُفض الربط'],
   pending: ['Review pending', 'المراجعة قيد الانتظار'],
+  unsupported: ['No reviewed supporting link eligible as evidence', 'لا يوجد رابط داعم خضع للمراجعة ويصلح للاستدلال'],
+  laterNotice: ['A saved record for this identifier flags a retraction', 'يشير سجل محفوظ لهذا المعرّف إلى سحب المرجع'],
   unavailableEvidence: ['Unavailable', 'غير متاح'],
   preliminary: ['Preliminary', 'أولي'],
   independent: ['Independent within limited scope', 'مستقل ضمن نطاق محدود'],
@@ -87,12 +89,32 @@ export function buildReport(store, owner, project, lang, release, now = Date.now
   ]));
   const table = (title, keys, rows) => rows.length
     ? { title: t(title), headers: keys.map(t), rows } : { title: t(title), text: [t('empty')] };
+  const retracted = (metadata) => metadata.isRetracted === true ||
+    metadata.updatedBy?.some(({ type }) => type === 'retraction');
+  const retractedIdentifiers = new Set(refs.filter(({ metadata }) => retracted(metadata)).map(({ doi }) => doi));
+  for (const claim of claims) {
+    for (const { source } of claim.evidence) {
+      if (retracted(source.metadata)) retractedIdentifiers.add(source.identifier);
+    }
+  }
   const notice = (metadata) => {
-    if (metadata.isRetracted === true) return t('flagged');
+    if (retracted(metadata)) return t('flagged');
     const updates = [...(metadata.updatedBy ?? []), ...(metadata.updates ?? [])];
     return updates.length ? updates.map((update) => [update.type, update.doi, update.date].filter(Boolean).join(' · ')).join('\n') : t('unverified');
   };
-  const sourceLine = (source) => `${resolverUrl(source.identifier)}\n${source.provider} · ${utc(source.retrievedAt)}\n${notice(source.metadata)}`;
+  const sourceLine = (source) => [
+    resolverUrl(source.identifier), source.provider + ' · ' + utc(source.retrievedAt), notice(source.metadata),
+    ...(!retracted(source.metadata) && retractedIdentifiers.has(source.identifier) ? [t('laterNotice')] : []),
+  ].join('\n');
+  const reviewedSupport = (claim) => claim.evidence.some(({ relation, review, source }) =>
+    relation === 'supports' && review?.decision === 'accepted' && !retractedIdentifiers.has(source.identifier));
+  const evidenceRows = claims.flatMap((claim) => {
+    const statement = reviewedSupport(claim) ? claim.statement : claim.statement + '\n' + t('unsupported');
+    return claim.evidence.length ? claim.evidence.map((item) => [
+      statement, sourceLine(item.source), `${item.studyType} · ${t(item.relation)}`, item.limitations,
+      item.review ? `${t(item.review.decision)} · ${utc(item.review.reviewedAt)}\n${item.review.note}` : t('pending'),
+    ]) : [[statement, '', '', '', t('pending')]];
+  });
   return {
     lang, title: project.title, subtitle: `NEXVARY NRI ${release} · ${t('version')} 1 · ${t('created')} ${utc(now())}`,
     sections: [
@@ -100,11 +122,7 @@ export function buildReport(store, owner, project, lang, release, now = Date.now
         ref.metadata.title || ref.doi, ref.metadata.authors?.join(', ') || '',
         resolverUrl(ref.doi), ref.provider, utc(ref.checkedAt), notice(ref.metadata),
       ])),
-      table('evidence', ['claim', 'identifier', 'study', 'limitations', 'review'], claims.flatMap((claim) =>
-        claim.evidence.length ? claim.evidence.map((item) => [
-          claim.statement, sourceLine(item.source), `${item.studyType} · ${t(item.relation)}`, item.limitations,
-          item.review ? `${t(item.review.decision)} · ${utc(item.review.reviewedAt)}\n${item.review.note}` : t('pending'),
-        ]) : [[claim.statement, '', '', '', t('pending')]])),
+      table('evidence', ['claim', 'identifier', 'study', 'limitations', 'review'], evidenceRows),
       table('readiness', ['intended', 'dimension', 'category', 'identifier', 'limitations', 'status'],
         [...revisions.values()].flatMap((revision) => revision.dimensions.map((row, index) => [
           revision.intendedUse, row.letter + ' · ' + tr(dimensions[index][3]),

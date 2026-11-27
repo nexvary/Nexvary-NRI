@@ -1,3 +1,4 @@
+import { evidenceSourceSelection } from './evidence-store.js';
 import { doiAgencyUrl } from './doi-agency.js';
 import { crossrefUrl, resolverUrl } from './crossref.js';
 import { openAlexUrl, safeOpenAccessUrl } from './openalex.js';
@@ -25,6 +26,7 @@ const copy = {
   'limited-agency': ['DOI agency checks are temporarily limited.', 'التحقق من جهة تسجيل DOI محدود مؤقتًا.'],
   'unavailable-agency': ['The DOI agency could not be checked.', 'تعذّر التحقق من جهة تسجيل DOI.'],
   agency: ['Registration agency', 'جهة التسجيل'],
+  linkEvidence: ['Use this source as evidence', 'استخدم هذا المصدر كدليل'],
   agencyOption: ['DOI agency (Crossref)', 'جهة تسجيل DOI (Crossref)'],
   'found-crossref': ['Metadata found in Crossref', 'عُثِر على البيانات في Crossref'],
   'found-openalex': ['Metadata found in OpenAlex', 'عُثِر على البيانات في OpenAlex'],
@@ -165,6 +167,7 @@ export function referencePage(lang, options = {}) {
       const d = new Date(record.checkedAt);
       const statusKey = `${record.status}-${record.provider}`;
       const statusLabel = t(statusKey) || t(record.status);
+      const evidenceSource = record.status === 'found' && evidenceSourceSelection(record);
       return `<div class="provider-block">
         <dl class="reference-meta">
           <div><dt>${t('source')}</dt><dd><a href="${providers[record.provider].url(doi)}" lang="en" dir="ltr">${providers[record.provider].label}</a></dd></div>
@@ -172,6 +175,7 @@ export function referencePage(lang, options = {}) {
         </dl>
         <p class="tag">${statusLabel}</p>
         ${renderMeta(record)}
+        ${evidenceSource ? `<p><a href="/workspace/projects/${id}/evidence?lang=${lang}&amp;source=${evidenceSource}">${t('linkEvidence')}</a></p>` : ''}
         <form class="project-tools" method="post" action="${action}">
           <input type="hidden" name="doi" value="${escapeHtml(doi)}">
           <input type="hidden" name="provider" value="${record.provider}">

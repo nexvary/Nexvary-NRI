@@ -231,3 +231,9 @@
 - Migrated existing assignments as active with their prior expiry dates. Added audited, validated state changes, trials and current-password confirmation in the existing operator console.
 - Project creation, document storage, report rendering and external AI reservations use the effective subscription state. Existing private data and resource access checks are preserved.
 - Local regression: 73 passed, zero failed, zero skipped, with the pinned bilingual report renderer. Hosted browser verification follows in PR #19.
+
+## 2026-11-27 · Reference-to-evidence provenance
+
+- Link to an evidence form with the selected provider snapshot prefilled. Bind the submission to identifier, provider, retrieval time and metadata. A refreshed record requires a new selection even when the lookup timestamp is identical.
+- Report Studio preserves the cited snapshot and surfaces conflicting saved retraction flags and claims without a reviewed supporting link eligible as evidence.
+- Local regression: 73 passed, zero failed, zero skipped, including actual bilingual PDF and DOCX rendering.

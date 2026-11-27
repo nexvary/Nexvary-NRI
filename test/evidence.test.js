@@ -25,7 +25,7 @@ test('migrates v4, links a saved source to a claim, records human review and exp
     const project = legacy.createProject(owner, { title: 'Evidence fixture', description: '' });
     const unrelated = legacy.createProject(owner, { title: 'Unrelated project', description: '' });
     legacy.references.save(owner, project, {
-      doi, provider: 'crossref', status: 'found', checkedAt, metadata: { title: 'Synthetic source' },
+      doi, provider: 'crossref', status: 'found', checkedAt, metadata: { title: 'Synthetic source', authors: [], updatedBy: [], updates: [] },
     }, true);
     legacy.close();
     const raw = new DatabaseSync(dbPath);
@@ -61,16 +61,33 @@ test('migrates v4, links a saved source to a claim, records human review and exp
       assert.equal((await write(project, { intent: 'claim', statement: 'Synthetic scientific claim' }, otherCookie)).status, 404);
       assert.equal((await write(project, { intent: 'claim', statement: 'Synthetic scientific claim' })).status, 303);
       const claim = (await matrix()).claims[0];
+      const sourceOption = async () => {
+        const response = await fetch(root(project) + '?lang=en', { headers: { cookie: ownerCookie } });
+        const html = await response.text();
+        return /<select name="source" required><option value="([^"]+)"/.exec(html)?.[1];
+      };
       const link = {
-        intent: 'link', claim: claim.id, source: 'crossref:' + doi,
+        intent: 'link', claim: claim.id, source: await sourceOption(),
         relation: 'conflicts', studyType: 'Synthetic observational study', limitations: 'Limited sample.',
       };
+      assert.ok(link.source);
+      const references = await fetch(root(project).replace(/evidence$/, 'references') + '?lang=en', { headers: { cookie: ownerCookie } });
+      assert.equal(references.status, 200);
+      const href = '/workspace/projects/' + project + '/evidence?lang=en&source=' + link.source;
+      assert.ok((await references.text()).includes(href.replace('&', '&amp;')));
+      const preselected = await fetch(origin + href, { headers: { cookie: ownerCookie } });
+      assert.ok((await preselected.text()).includes('value="' + link.source + '" selected'));
       assert.equal((await write(unrelated, link)).status, 422);
+      store.references.save(owner, project, {
+        doi, provider: 'crossref', status: 'found', checkedAt, metadata: { title: 'Refreshed synthetic source' },
+      }, true);
+      assert.equal((await write(project, link)).status, 422);
+      link.source = await sourceOption();
       assert.equal((await write(project, link)).status, 303);
       assert.equal((await write(project, link)).status, 422);
       const item = (await matrix()).claims[0].evidence[0];
       assert.equal(item.source.retrievedAt, checkedAt);
-      assert.equal(item.source.metadata.title, 'Synthetic source');
+      assert.equal(item.source.metadata.title, 'Refreshed synthetic source');
       assert.equal(item.review, null);
       const review = { intent: 'review', item: item.id, decision: 'accepted', note: 'Preserve the conflict.' };
       assert.equal((await write(project, review, otherCookie)).status, 404);
