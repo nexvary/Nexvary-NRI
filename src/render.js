@@ -109,6 +109,32 @@ export function render({ lang, view, version, page, workspace, unread = 0, invit
   const otherLanguage = lang === 'ar' ? 'en' : 'ar';
   const validView = isModule || view === 'developer' ? view : 'dashboard';
   const languageLink = page ? `${page.path}?lang=${otherLanguage}` : href(validView, otherLanguage);
+  if (page?.controlCenter) return `<!doctype html>
+<html lang="${lang}" dir="${direction}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${title} | NRI CONTROL CENTER</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <a class="skip" href="#main">${t('skip')}</a>
+  <header class="topbar">
+    <strong lang="en" dir="ltr">NRI CONTROL CENTER — NEXVARY INC.</strong>
+    <nav class="language" aria-label="${t('language')}">
+      <a href="${languageLink}" hreflang="${otherLanguage}" lang="${otherLanguage}" dir="auto">${icon('🌐')}${otherLanguage === 'ar' ? 'العربية' : 'English'}</a>
+    </nav>
+  </header>
+  <main id="main" class="control-center" tabindex="-1">
+    <nav class="project-tools" aria-label="${tr(['Control Center', 'مركز التحكم'])}">
+      <a href="#overview">${tr(['Dashboard', 'لوحة التحكم'])}</a>
+      <a href="#plans">${tr(['Subscription plans', 'خطط الاشتراك'])}</a>
+      <a href="/workspace/settings?lang=${lang}">${tr(['Researcher settings', 'إعدادات الباحث'])}</a>
+    </nav>
+    ${content}
+  </main>
+</body>
+</html>`;
   return `<!doctype html>
 <html lang="${lang}" dir="${direction}">
 <head>

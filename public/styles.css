@@ -356,3 +356,11 @@ small { font-size: .84rem; }
   overflow-wrap: anywhere;
   unicode-bidi: plaintext;
 }
+
+.control-center {
+  width: min(100%, 70rem);
+  margin-inline: auto;
+  padding: clamp(.75rem, 3vw, 2rem);
+}
+.control-center > nav { margin-block-end: 1rem; }
+.control-center .workspace-page { max-width: none; }

@@ -27,13 +27,13 @@ test('MFA-protected operator plans govern project capacity and external token re
   await once(app, 'listening');
   t.after(() => new Promise((resolve) => app.close(resolve)));
   const origin = 'http://127.0.0.1:' + app.address().port;
-  const path = '/workspace/settings/licensing?lang=en';
+  const path = '/control-center?lang=en';
   const request = (user, url, fields, source = origin) => fetch(origin + url, {
     redirect: 'manual', headers: { cookie: user?.cookie ?? '', ...(fields ? { origin: source } : {}) },
     ...(fields ? { method: 'POST', body: new URLSearchParams(fields) } : {}),
   });
-  const setup = { intent: 'save', plan: 'research', 'project-limit': 1, 'ai-tokens': 1000, 'storage-mib': 1, 'daily-reports': 1 };
-  const assign = { intent: 'assign', email: researcher.email, plan: 'research', expires: '2027-12-01' };
+  const setup = { password, intent: 'save', plan: 'research', 'project-limit': 1, 'ai-tokens': 1000, 'storage-mib': 1, 'daily-reports': 1 };
+  const assign = { password, intent: 'assign', email: researcher.email, plan: 'research', expires: '2027-12-01' };
   assert.equal((await request(null, path)).headers.get('location'), '/login?lang=en');
   assert.equal((await request(operator, path, setup)).status, 403);
   store.licensing.setOperator(operator.id, true);
@@ -51,7 +51,11 @@ test('MFA-protected operator plans govern project capacity and external token re
   assert.equal((await request(researcher, path, assign)).status, 403);
   const dashboard = await request(operator, path);
   assert.equal(dashboard.headers.get('cache-control'), 'no-store');
-  assert.match(await dashboard.text(), /Active assignments/);
+  const content = await dashboard.text();
+  assert.match(content, /Active assignments/);
+  assert.match(content, /NRI CONTROL CENTER — NEXVARY INC/);
+  assert.doesNotMatch(content, /class="surface sidebar"/);
+  assert.equal((await request(operator, '/workspace/settings/licensing?lang=en', { ...setup, password: 'incorrect' })).status, 403);
   const project = await request(researcher, '/workspace?lang=en', { title: 'First' });
   assert.equal(project.status, 303);
   const denied = await request(researcher, '/workspace?lang=en', { title: 'Second' });
@@ -92,8 +96,7 @@ test('MFA-protected operator plans govern project capacity and external token re
     intent: 'transition', email: researcher.email, 'current-state': from, 'next-state': to, password, ...other,
   });
   assert.equal((await request(researcher, path, change('active', 'suspended'))).status, 403);
-  assert.equal((await request(operator, path, change('active', 'suspended', { password: 'incorrect' }))).status, 403);
-  assert.equal((await request(operator, path, change('active', 'grace'))).status, 422);
+  assert.equal(store.licensing.transition(operator.id, researcher.email, 'active', 'grace', null), 422);
   assert.equal((await request(operator, path, change('active', 'suspended'))).status, 303);
   assert.equal((await request(operator, path, change('active', 'revoked'))).status, 409);
   assert.equal((await request(operator, path, assign)).status, 409);

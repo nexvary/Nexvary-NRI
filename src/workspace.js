@@ -3,7 +3,7 @@ import { createResourceHandler, resolveResourceRoute } from './resource-sharing.
 import { handleCitations, resolveCitationRoute } from './citations.js';
 import { handleOrganization, resolveOrganizationRoute } from './library-organization.js';
 import { handleTeamWork } from './team-work.js';
-import { handleLicensing } from './licensing.js';
+import { controlCenterPath, handleLicensing, legacyLicensingPath } from './licensing.js';
 import { handleTeam, resolveTeamRoute } from './teams.js';
 import { createPrivacyHandler } from './privacy.js';
 import { handleMessageModeration } from './moderation.js';
@@ -41,7 +41,7 @@ export function resolveWorkspaceRoute(pathname) {
   if (pathname === '/workspace/assistant') return { kind: 'assistant' };
   if (pathname === '/workspace/education') return { kind: 'education' };
   if (pathname === '/workspace/settings/message-moderation') return { kind: 'settings-message-moderation' };
-  if (pathname === '/workspace/settings/licensing') return { kind: 'settings-licensing' };
+  if (pathname === controlCenterPath || pathname === legacyLicensingPath) return { kind: 'settings-licensing' };
   if (pathname === '/workspace/settings/privacy') return { kind: 'settings-privacy' };
   if (pathname === '/workspace/settings/mfa') return { kind: 'settings-mfa' };
   if (pathname === '/workspace/settings') return { kind: 'settings' };

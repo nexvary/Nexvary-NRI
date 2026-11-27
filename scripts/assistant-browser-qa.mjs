@@ -61,7 +61,8 @@ assert.equal(store.teams.decide(peer,project,'reviewer',roleInvitation.invitatio
 const thread = store.messages.open(id, peer);
 store.messages.send(peer, thread, 'Could we verify the reference metadata before submitting the report?');
 const moderatorEmail = 'moderator@example.test';
-store.addAccount(moderatorEmail, { salt: Buffer.alloc(16), hash: Buffer.alloc(32) });
+const moderatorPassword = 'Synthetic browser operator password';
+store.addAccount(moderatorEmail, await hashPassword(moderatorPassword));
 const moderator = store.credentials(moderatorEmail).id;
 store.messages.setModerator(moderator, true);
 const moderatorSession = store.newSession(moderator);
@@ -354,11 +355,12 @@ try {
         await send('Page.navigate', { url: origin + '/workspace/settings/message-moderation?lang=' + lang });
         await waitFor(() => inspect(send, 'Boolean(document.querySelector("button[value=upheld]"))'), 'message moderation queue');
         await captureLayout(send, 'moderation', lang, name, width, height);
-        await send('Page.navigate', { url: origin + '/workspace/settings/licensing?lang=' + lang });
+        await send('Page.navigate', { url: origin + '/control-center?lang=' + lang });
         await waitFor(() => inspect(send, 'Boolean(document.querySelector("button[value=save]"))'), 'operator licensing form');
         if (lang === 'ar') {
           await inspect(send, `(() => {
             const button = document.querySelector('button[value=save]');
+            button.form.elements.password.value = ${JSON.stringify(moderatorPassword)};
             button.form.elements.plan.value = 'research';
             button.form.elements['project-limit'].value = 10;
             button.form.elements['ai-tokens'].value = 5000;

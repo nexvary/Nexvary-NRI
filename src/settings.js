@@ -43,7 +43,7 @@ export function settingsStore(db, now) {
 }
 
 const labels = {
-  licensing: ['Plans and entitlements', 'الخطط والصلاحيات'],
+  licensing: ['NRI Control Center', 'مركز تحكم NRI'],
   privacy: ['Account data and privacy', 'بيانات الحساب والخصوصية'],
   moderation: ['Message reports', 'بلاغات الرسائل'],
   mfa: ['Two-step verification', 'التحقق بخطوتين'],
@@ -72,7 +72,7 @@ export function settingsPage(store, lang, account, token) {
       <a href="${workspacePath(lang)}">${t('back')}</a>
       <a href="/workspace/settings/mfa?lang=${lang}">${t('mfa')}</a>
       <a href="/workspace/settings/privacy?lang=${lang}">${t('privacy')}</a>
-      ${store.licensing.isOperator(account.id) && store.mfa.enabled(account.id) ? `<a href="/workspace/settings/licensing?lang=${lang}">${t('licensing')}</a>` : ''}
+      ${store.licensing.isOperator(account.id) && store.mfa.enabled(account.id) ? `<a href="/control-center?lang=${lang}">${t('licensing')}</a>` : ''}
       ${store.messages.isModerator(account.id) ? `<a href="/workspace/settings/message-moderation?lang=${lang}">${t('moderation')}</a>` : ''}
       <dl class="reference-meta"><div><dt>${t('email')}</dt><dd><bdi>${escapeHtml(account.email)}</bdi></dd></div>
         <div><dt>${t('other')}</dt><dd>${current}</dd></div></dl>

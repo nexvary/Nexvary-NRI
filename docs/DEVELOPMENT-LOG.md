@@ -237,3 +237,9 @@
 - Link to an evidence form with the selected provider snapshot prefilled. Bind the submission to identifier, provider, retrieval time and metadata. A refreshed record requires a new selection even when the lookup timestamp is identical.
 - Report Studio preserves the cited snapshot and surfaces conflicting saved retraction flags and claims without a reviewed supporting link eligible as evidence.
 - Local regression: 73 passed, zero failed, zero skipped, including actual bilingual PDF and DOCX rendering.
+
+## 2026-11-27 · NRI Control Center foundation
+
+- Added a separate bilingual Control Center at `/control-center` for existing licensed operators with confirmed MFA. The previous licensing path uses the same handler and checks.
+- All commercial mutations require rate-limited current-password confirmation and an active session. Existing origin protection and transactional audit writes apply.
+- Local regression: 73 passed, zero failed, zero skipped, with actual bilingual PDF and DOCX rendering.
