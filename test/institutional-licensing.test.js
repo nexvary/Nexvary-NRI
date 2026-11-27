@@ -50,6 +50,19 @@ test('institutional subscriptions require a seat and preserve ownership and data
   assert.equal((await manage(operator, 'institution-create', { 'institution-name': 'Research Center' })).status, 303);
   assert.equal(licensing.save(operator.id, 'research', 1, 0, null, null, 1), 303);
   assert.equal(licensing.saveModules(operator.id, 'research', [2], ''), 303);
+  assert.equal(licensing.dashboard(operator.id).plans[0].currency, null);
+  const pricing = { plan: 'research', currency: 'eur', 'monthly-minor': '1200', 'annual-minor': '0' };
+  assert.equal((await manage(first, 'pricing', pricing)).status, 403);
+  assert.equal((await manage(operator, 'pricing', { ...pricing, password: 'Incorrect fixture password' })).status, 403);
+  assert.equal((await manage(operator, 'pricing', { ...pricing, currency: 'ZZZ' })).status, 422);
+  assert.equal((await manage(operator, 'pricing', pricing)).status, 303);
+  const { currency, monthly_minor, annual_minor } = licensing.dashboard(operator.id).plans[0];
+  assert.deepEqual([currency, monthly_minor, annual_minor], ['EUR', 1200, 0]);
+  assert.equal(licensing.save(operator.id, 'research', 1, 0, null, null, 1), 303);
+  assert.equal(licensing.dashboard(operator.id).plans[0].monthly_minor, 1200);
+  assert.equal(licensing.setPricing(operator.id, 'research', '', null, null), 303);
+  assert.equal(licensing.dashboard(operator.id).plans[0].currency, null);
+  assert.equal(licensing.dashboard(operator.id).recent[0].action, 'pricing-cleared');
   const expire = now + 60_000;
   assert.equal(licensing.assignInstitution(operator.id, code, 'research', expire, 'trial'), 303);
   for (const user of [first, second]) {

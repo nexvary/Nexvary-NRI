@@ -97,6 +97,18 @@ export const institutionalSubscriptionSchema = `
   PRAGMA user_version = 34;
 `;
 
+export const planPricingSchema = `
+  CREATE TABLE IF NOT EXISTS license_plan_prices (
+    plan TEXT PRIMARY KEY REFERENCES license_plans(code) ON DELETE CASCADE,
+    currency TEXT NOT NULL CHECK(currency GLOB '[A-Z][A-Z][A-Z]'),
+    monthly_minor INTEGER CHECK(monthly_minor BETWEEN 0 AND 9999999999),
+    annual_minor INTEGER CHECK(annual_minor BETWEEN 0 AND 9999999999),
+    CHECK(monthly_minor IS NOT NULL OR annual_minor IS NOT NULL)
+  ) STRICT;
+  PRAGMA user_version = 35;
+`;
+
+const currencies = new Set(Intl.supportedValuesOf('currency'));
 const subscriptionTransitions = Object.freeze({
   trial: ['active', 'expired', 'suspended', 'cancelled', 'revoked'],
   active: ['grace', 'past_due', 'expired', 'suspended', 'cancelled', 'revoked'],
@@ -119,12 +131,17 @@ export function licensingStore(db, now, transact) {
     WHERE o.account_id = ? AND m.pending_until = 0`);
   const grant = db.prepare('INSERT OR IGNORE INTO license_operators VALUES (?)');
   const revoke = db.prepare('DELETE FROM license_operators WHERE account_id = ?');
-  const plans = db.prepare(`SELECT p.*,q.storage_mib,q.daily_reports,s.institutional_seats
+  const plans = db.prepare(`SELECT p.*,q.storage_mib,q.daily_reports,s.institutional_seats,price.currency,price.monthly_minor,price.annual_minor
     FROM license_plans p LEFT JOIN license_plan_quotas q ON q.code=p.code
-    LEFT JOIN license_plan_seats s ON s.code=p.code ORDER BY p.code`);
+    LEFT JOIN license_plan_seats s ON s.code=p.code
+    LEFT JOIN license_plan_prices price ON price.plan=p.code ORDER BY p.code`);
   const plan = db.prepare('SELECT * FROM license_plans WHERE code = ?');
   const save = db.prepare(`INSERT INTO license_plans VALUES (?,?,?)
     ON CONFLICT(code) DO UPDATE SET project_limit=excluded.project_limit,daily_ai_tokens=excluded.daily_ai_tokens`);
+  const savePrice = db.prepare(`INSERT INTO license_plan_prices VALUES (?,?,?,?)
+    ON CONFLICT(plan) DO UPDATE SET currency=excluded.currency,
+      monthly_minor=excluded.monthly_minor,annual_minor=excluded.annual_minor`);
+  const clearPrice = db.prepare('DELETE FROM license_plan_prices WHERE plan=?');
   const lookup = db.prepare('SELECT id FROM accounts WHERE email = ?');
   const individual = db.prepare('SELECT plan,state,expires_at FROM license_assignments WHERE account_id = ?');
   const effectiveAssignment = `
@@ -255,6 +272,21 @@ export function licensingStore(db, now, transact) {
         saveQuotas.run(code, storage, dailyReports);
         saveSeats.run(code, institutionalSeats);
         record.run(actor, null, code, 'plan-saved', now());
+        return 303;
+      });
+    },
+    setPricing(actor, code, currency, monthly, annual) {
+      return transact(db, () => {
+        if (!authorized.get(actor)) return 403;
+        if (!plan.get(code)) return 422;
+        if (currency === '' && monthly === null && annual === null) {
+          if (clearPrice.run(code).changes) record.run(actor, null, code, 'pricing-cleared', now());
+          return 303;
+        }
+        if (!currencies.has(currency) || (monthly === null && annual === null) ||
+            !optionalLimit(monthly, 9_999_999_999) || !optionalLimit(annual, 9_999_999_999)) return 422;
+        savePrice.run(code, currency, monthly, annual);
+        record.run(actor, null, code, 'pricing-saved', now());
         return 303;
       });
     },

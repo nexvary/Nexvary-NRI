@@ -2,7 +2,7 @@ import { billingSchema, billingStore } from './billing-store.js';
 import { resourceSchema, resourceStore } from './resource-store.js';
 import { citationSchema, citationStore } from './citation-store.js';
 import { organizationSchema, organizationStore } from './library-organization.js';
-import { institutionalSeatSchema, institutionalSubscriptionSchema, licenseSchema, licensingStore, moduleEntitlementSchema, quotaSchema, subscriptionSchema } from './licensing-store.js';
+import { institutionalSeatSchema, institutionalSubscriptionSchema, licenseSchema, licensingStore, moduleEntitlementSchema, planPricingSchema, quotaSchema, subscriptionSchema } from './licensing-store.js';
 import { manuscriptCatalogSchema, teamSchema, teamStore, teamWorkSchema } from './team-store.js';
 import { privacyStore } from './privacy-store.js';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
@@ -29,7 +29,7 @@ import { referenceSchema, referenceMigrationV4, referenceStore } from './referen
 
 export const sessionLifetime = 8 * 60 * 60;
 export const sessionIdle = 30 * 60_000;
-const schemaVersion = 34;
+const schemaVersion = 35;
 const schema = `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -114,6 +114,7 @@ function initialize(db, path) {
     if (version < 32) db.exec(moduleEntitlementSchema);
     if (version < 33) db.exec(institutionalSeatSchema);
     if (version < 34) db.exec(institutionalSubscriptionSchema);
+    if (version < 35) db.exec(planPricingSchema);
     return bindDocumentKey(db, path);
   });
 }

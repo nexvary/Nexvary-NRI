@@ -262,3 +262,8 @@
 - Published the original v33 seat configuration on draft PR #19. Schema v34 adds organizations, operator-managed memberships and subscriptions, seat allocation and revocation, and attributable institutional audit records.
 - Institutional seats feed the same server-side module and quota checks as individual assignments. Existing personal assignments take precedence. Membership and private resource permissions remain independent.
 - The deterministic regression covers competing allocations, revocation, expiry, blocked direct requests, unauthorized administration and post-expiry account export.
+
+## 2026-11-27 · Configurable plan pricing
+
+- Added optional ISO currency and independently configurable monthly and annual prices in integer minor units. Existing plans stay unpriced. Pricing edits and clearing require the existing MFA and password checks and are audited.
+- Local regression: 76 passed, zero failed, zero skipped, including protected pricing edits and bilingual report rendering. Price configuration does not initiate billing.

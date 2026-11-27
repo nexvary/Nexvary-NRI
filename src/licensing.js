@@ -42,7 +42,7 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
   if (form) {
     const code = (form.get('plan') ?? '').trim();
     const intent = form.get('intent');
-    if (!['save', 'assign', 'transition', 'trial', 'modules', 'institution-create',
+    if (!['save', 'assign', 'transition', 'trial', 'modules', 'pricing', 'institution-create',
       'institution-assign', 'institution-trial', 'institution-transition'].includes(intent) &&
       !Object.hasOwn(institutionalActions, intent)) return reply(422);
     const retryAfter = throttle.begin(request.socket.remoteAddress ?? '', account.email);
@@ -52,6 +52,7 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
       const credentials = store.credentials(account.email);
       if (password.length > 128 || !await verifyPassword(password, credentials) ||
           store.session(token)?.id !== account.id) return reply(403);
+      const optional = (field) => form.get(field) ? whole(form.get(field)) : null;
       const institution = (form.get('institution') ?? '').trim();
       if (intent === 'institution-create') {
         status = store.licensing.createOrganization(account.id, institution, (form.get('institution-name') ?? '').trim());
@@ -68,8 +69,10 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
           : store.licensing.changeInstitutionSeat(account.id, institution, email, intent.endsWith('-allocate'));
       } else if (intent === 'modules') {
         status = store.licensing.saveModules(account.id, code, form.getAll('module').map(whole), form.get('previous'));
+      } else if (intent === 'pricing') {
+        status = store.licensing.setPricing(account.id, code, (form.get('currency') ?? '').trim().toUpperCase(),
+          optional('monthly-minor'), optional('annual-minor'));
       } else if (intent === 'save') {
-        const optional = (field) => form.get(field) ? whole(form.get(field)) : null;
         status = store.licensing.save(account.id, code, whole(form.get('project-limit')), whole(form.get('ai-tokens')),
           optional('storage-mib'), optional('daily-reports'), optional('institutional-seats'));
       } else {
@@ -98,6 +101,17 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
           `<label><input name="module" type="checkbox" value="${module}"${modules.includes(module) ? ' checked' : ''}> <bdi>NRI-${String(module).padStart(2, '0')}</bdi></label>`).join('')}</div>
       </fieldset>
       ${passwordField}<button class="action" name="intent" value="modules">${t('Save module access', 'احفظ الوصول إلى الوحدات')}</button>
+    </form>`).join('');
+  const planPrices = data.plans.map(({ code, currency, monthly_minor, annual_minor }) => `
+    <form class="workspace-form" method="post" action="${url}">
+      <input type="hidden" name="plan" value="${escapeHtml(code)}">
+      <fieldset>
+        <legend><bdi>${escapeHtml(code)}</bdi></legend>
+        <label>${t('ISO currency code', 'رمز العملة الدولي')}<input name="currency" value="${currency ?? ''}" maxlength="3" pattern="[a-zA-Z]{3}" dir="ltr"></label>
+        <label>${t('Monthly price in minor units', 'السعر الشهري بالوحدات الصغرى للعملة')}<input name="monthly-minor" type="number" value="${monthly_minor ?? ''}" min="0" max="9999999999"></label>
+        <label>${t('Annual price in minor units', 'السعر السنوي بالوحدات الصغرى للعملة')}<input name="annual-minor" type="number" value="${annual_minor ?? ''}" min="0" max="9999999999"></label>
+      </fieldset>
+      ${passwordField}<button class="action" name="intent" value="pricing">${t('Save pricing', 'احفظ الأسعار')}</button>
     </form>`).join('');
   const institutionSelect = `<label>${t('Organization', 'المؤسسة')}<select name="institution" required>
     ${data.organizations.map(({ code, name }) => `<option value="${escapeHtml(code)}">${escapeHtml(name)} · ${escapeHtml(code)}</option>`).join('')}
@@ -176,6 +190,9 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
         <label>${t('Expiry date (UTC, optional)', 'تاريخ الانتهاء (UTC، اختياري)')}<input name="expires" type="date"></label>
         ${passwordField}<button class="action" name="intent" value="assign">${t('Assign plan', 'عيّن الخطة')}</button>
       </form>` : ''}
+      ${data.plans.length ? `<h2 id="plan-pricing">${t('Plan pricing', 'أسعار الخطط')}</h2>
+        <p>${t('Leave all pricing fields empty to clear pricing for a plan.', 'اترك حقول الأسعار فارغة لإلغاء تسعير الخطة.')}</p>
+        ${planPrices}` : ''}
       ${moduleForms}
       ${organizations}
       ${data.plans.length ? `<h2>${t('Start a trial', 'ابدأ فترة تجريبية')}</h2>
