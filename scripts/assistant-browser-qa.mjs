@@ -135,10 +135,12 @@ try {
       assert.deepEqual({ lang: layout.lang, direction: layout.direction, viewport: layout.viewport, svg: layout.svg },
         { lang, direction: lang === 'ar' ? 'rtl' : 'ltr', viewport: width, svg: true });
       const { cssContentSize } = await send('Page.getLayoutMetrics');
-      const { data } = await send('Page.captureScreenshot', {
-        format: 'webp', quality: 83, captureBeyondViewport: true,
-        clip: { x: 0, y: 0, width, height: Math.max(height, Math.ceil(cssContentSize.height)), scale: 1 },
-      });
+      const contentHeight = Math.ceil(cssContentSize.height);
+      const capture = contentHeight > height ? {
+        captureBeyondViewport: true,
+        clip: { x: 0, y: 0, width, height: contentHeight, scale: 1 },
+      } : {};
+      const { data } = await send('Page.captureScreenshot', { format: 'webp', quality: 83, ...capture });
       await writeFile(join(output, `assistant-${lang}-${name}.webp`), Buffer.from(data, 'base64'));
       client.socket.close();
     }
