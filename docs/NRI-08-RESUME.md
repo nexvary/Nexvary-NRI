@@ -6,4 +6,6 @@ Owner authorization to resume arrived on 2026-11-27 (Cairo). Keep [draft PR #19]
 - Real Chromium QA exercised project selection and saved-source results in Arabic and English at desktop (1440×920) and mobile (390×844) viewport sizes. Captures are linked from [STATUS.md](STATUS.md).
 - Historical [CI run 45905875325](https://github.com/nexvary/Nexvary-NRI/actions/runs/45905875325) passed the tests and timed out before Chrome exposed DevTools. The harness now reports failed launch details and uses the hosted CI runner isolation for its synthetic loopback fixture.
 
-Next: preserve offline mode and add encrypted BYOK provider/model settings, then explicit external sharing consent, cited replies with verification and unsupported-claim warnings, usage and budget enforcement, cancellation, timeouts and caching. Resume NRI-11 after NRI-08 acceptance.
+NRI-08b adds encrypted per-account OpenAI credentials and offline, OpenAI, or local model settings. `NRI_REPORT_PYTHON=<renderer-python> npm test` passes all 47 tests. Start with `src/assistant-settings.js` and `test/assistant-settings.test.js`.
+
+Next: wire the OpenAI and loopback-compatible providers with mocked requests. Require specific consent for external payloads and enforce configured budgets before enabling generation. Add cited replies with verification and unsupported-claim warnings, usage accounting, cancellation, timeouts and caching. Resume NRI-11 after NRI-08 acceptance.

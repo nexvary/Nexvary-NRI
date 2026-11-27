@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { closeSync, mkdirSync, openSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { assistantSettingsSchema, assistantSettingsStore } from './assistant-settings.js';
 import { bindDocumentKey } from './document-crypto.js';
 import { documentSchema, documentStore } from './document-store.js';
 import { educationSchema, educationStore } from './education.js';
@@ -16,7 +17,7 @@ import { evidenceSchema, evidenceStore } from './evidence-store.js';
 import { referenceSchema, referenceMigrationV4, referenceStore } from './reference-store.js';
 
 export const sessionLifetime = 8 * 60 * 60;
-const schemaVersion = 12;
+const schemaVersion = 13;
 const schema = `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -71,6 +72,7 @@ function initialize(db, path) {
     if (version < 10) db.exec(settingsSchema);
     if (version < 11) db.exec(sharingSchema);
     if (version < 12) db.exec(educationSchema);
+    if (version < 13) db.exec(assistantSettingsSchema);
     return bindDocumentKey(db, path);
   });
 }
@@ -90,13 +92,16 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
   }
 
   const db = new DatabaseSync(path, { enableForeignKeyConstraints: true, timeout: 3000 });
+  let assistantSettings;
   let documents;
   let references;
   let evidence;
   let readiness;
   let economics;
   try {
-    documents = documentStore(db, initialize(db, path), now, transact);
+    const workspaceKey = initialize(db, path);
+    documents = documentStore(db, workspaceKey, now, transact);
+    assistantSettings = assistantSettingsStore(db, workspaceKey);
     references = referenceStore(db, now, transact);
     evidence = evidenceStore(db, now, transact);
     readiness = readinessStore(db, now);
@@ -134,6 +139,7 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
   }
 
   return {
+    assistantSettings,
     documents,
     references,
     evidence,

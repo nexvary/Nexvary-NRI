@@ -1,3 +1,4 @@
+import { handleAssistantSettings } from './assistant-settings.js';
 import { showAssistant } from './assistant.js';
 import { createDocumentHandler, resolveDocumentRoute } from './documents.js';
 import { createEducationHandler } from './education.js';
@@ -26,6 +27,7 @@ const maxConcurrentLogins = 2;
 export function resolveWorkspaceRoute(pathname) {
   if (pathname === '/login') return { kind: 'login' };
   if (pathname === '/logout') return { kind: 'logout' };
+  if (pathname === '/workspace/assistant/settings') return { kind: 'assistant-settings' };
   if (pathname === '/workspace/assistant') return { kind: 'assistant' };
   if (pathname === '/workspace/education') return { kind: 'education' };
   if (pathname === '/workspace/settings') return { kind: 'settings' };
@@ -165,6 +167,10 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
       return;
     }
 
+    if (kind === 'assistant-settings') {
+      handleAssistantSettings({ reply, redirect, lang, form, store, account });
+      return;
+    }
     if (kind === 'assistant') {
       showAssistant({ reply, request, lang, store, account });
       return;

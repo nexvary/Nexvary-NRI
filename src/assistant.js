@@ -4,6 +4,7 @@ const path = '/workspace/assistant';
 const limit = 12;
 const labels = {
   title: ['AI assistant', 'المساعد الذكي'],
+  settings: ['Provider settings', 'إعدادات المزوّد'],
   local: ['Local source review', 'مراجعة المصادر محليًا'],
   boundary: [
     'Review saved reference metadata before using it in an answer. This tool sends no data to external providers and costs nothing.',
@@ -56,7 +57,7 @@ export function showAssistant({ reply, request, lang, store, account }) {
   reply(projectId && !selected ? 404 : 200, {
     title: t('title'), path,
     html: `<section class="surface panel detail workspace-page">
-      <h1>${t('title')}</h1><h2>${t('local')}</h2><p>${t('boundary')}</p>
+      <h1>${t('title')}</h1><p><a href="${path}/settings?lang=${lang}">${t('settings')}</a></p><h2>${t('local')}</h2><p>${t('boundary')}</p>
       <form class="workspace-form" action="${path}" method="get">
         <input type="hidden" name="lang" value="${lang}">
         <label>${t('project')}<select name="project" required>

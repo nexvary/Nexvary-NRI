@@ -1,5 +1,12 @@
 # Development status
 
+## NRI-08b · Private provider settings · 2026-11-27 (Cairo)
+
+The Assistant has a bilingual, account-scoped provider settings page with Offline, OpenAI, and local OpenAI-compatible model selections. The OpenAI key is encrypted in SQLite with an account-bound AES-256-GCM key derived from the existing workspace key. The form never echoes the key. Switching to Offline or Local removes the stored OpenAI credential.
+
+- 47/47 with the bilingual PDF/DOCX renderer enabled. The new HTTP regression covers origin enforcement, account isolation, model update, persistence, key removal, and plaintext absence in the database.
+- The configuration form performs zero provider calls. Provider connectivity and answer generation are pending.
+
 ## NRI-08a · Local source review · 2026-11-27 (Cairo)
 
 The signed-in Assistant reviews a project's saved provider snapshots and links back to the reference validator. It filters by title or identifier and shows the provider, retrieval date, and editorial or retraction notices. Missing provider results and unknown retraction status remain explicit. The page makes no external requests.
@@ -169,7 +176,7 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | NRI-05 | Partial | Claims, dated source snapshots, study type, limitations, conflicting evidence, owner review and JSON export are verified. Team reviewer roles and review revisions remain. |
 | NRI-06 | Partial | Six ordered dimensions, four qualitative categories, project evidence links, revision history, reviewer and safety/authorization blockers are verified. Independent team reviewer roles remain. |
 | NRI-07 | Verified | One-year operating model with explicit assumptions, currency, units, capacity, sensitivity, scenario comparison and reproducible JSON export. |
-| NRI-08 | Partial | NRI-08a exercises private saved-source review, provenance and retraction/editorial warnings in `test/assistant.test.js`. BYOK, provider and model options, consent, generated cited answers, cancellation, caching, and usage/cost accounting remain. |
+| NRI-08 | Partial | NRI-08a exercises private saved-source review, provenance and retraction/editorial warnings in `test/assistant.test.js`. NRI-08b adds private encrypted BYOK storage, offline/provider selection and model settings in `test/assistant-settings.test.js`. Provider requests, consent, cited generation, cancellation, caching, and usage/cost accounting remain. |
 | NRI-09 | Partial | Opt-in profiles, search, follow and block, bounded requests and private profile isolation verified. Verified ORCID ownership, posts, groups, publication sharing and moderation remain. |
 | NRI-10 | Partial | Collaboration requests and scoped project-summary invitations, acceptance/decline, revoke and access history are verified. Broader roles, notifications, shared notes and tasks remain. |
 | NRI-11 | Not started | Conversations, notification preferences and authorization remain. |

@@ -91,3 +91,9 @@
 - Resumed draft PR #19 at `02e2cb4`. The baseline passes 46/46 with the bilingual renderer.
 - Exercised saved-source review in Chromium in both languages and at desktop and mobile sizes. The four captures are linked from [STATUS.md](STATUS.md).
 - The old CI run timed out during DevTools startup. Added launch diagnostics and a hosted-runner launch setting for the isolated fixture.
+
+## 2026-11-27 · NRI-08b provider preferences and encrypted BYOK
+
+- Added bilingual provider/model settings and account-bound encryption for OpenAI keys using the existing paired workspace key. Saving preferences makes no provider requests.
+- Full regression with real reports: 47/47. Recaptured the Assistant after adding the settings link.
+- Browser QA can discover Chrome through DevToolsActivePort and checks overflow independently of vertical scrollbar width.

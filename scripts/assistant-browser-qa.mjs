@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { once } from 'node:events';
@@ -59,8 +59,8 @@ async function inspect(send, expression) {
   return result.value;
 }
 
-async function waitFor(check, description) {
-  for (let attempt = 0; attempt < 50; attempt += 1) {
+async function waitFor(check, description, attempts = 50) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
     const value = await check();
     if (value) return value;
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -69,7 +69,7 @@ async function waitFor(check, description) {
 }
 
 const chrome = spawn(process.env.NRI_CHROME ?? 'google-chrome', [
-  '--headless', '--disable-dev-shm-usage', '--remote-debugging-address=127.0.0.1', '--remote-debugging-port=0',
+  '--headless', '--enable-logging=stderr', '--disable-dev-shm-usage', '--remote-debugging-address=127.0.0.1', '--remote-debugging-port=0',
   // Hosted CI uses a disposable runner and opens only our synthetic loopback fixture.
   ...(process.env.GITHUB_ACTIONS === 'true' ? ['--no-sandbox'] : []),
   '--user-data-dir=' + profiles, 'about:blank',
@@ -86,13 +86,20 @@ const clients = [];
 
 try {
   await mkdir(output, { recursive: true });
-  const devtools = await waitFor(() => {
+  const devtools = await waitFor(async () => {
     if (launchError) throw launchError;
     if (chrome.exitCode !== null || chrome.signalCode !== null) {
       throw new Error('Chrome exited before DevTools was available:\n' + browserOutput.trim());
     }
+    // Full Chrome publishes the selected port here even when its launcher suppresses stderr.
+    const activePort = await readFile(join(profiles, 'DevToolsActivePort'), 'utf8').catch((error) => {
+      if (error.code !== 'ENOENT') throw error;
+      return '';
+    });
+    const port = activePort.split('\n', 1)[0];
+    if (/^\d+$/.test(port)) return '127.0.0.1:' + port;
     return browserOutput.match(/DevTools listening on ws:\/\/(127\.0\.0\.1:\d+)/)?.[1];
-  }, 'DevTools startup');
+  }, 'DevTools startup', 150);
   for (const lang of ['ar', 'en']) {
     for (const [name, width, height] of [['desktop', 1440, 920], ['mobile', 390, 844]]) {
       const tabResponse = await fetch('http://' + devtools + '/json/new?about:blank', { method: 'PUT' });
@@ -120,10 +127,13 @@ try {
       await waitFor(() => inspect(send, 'Boolean(document.body?.innerText.includes("Illustrative reference snapshot"))'), 'saved source result');
       const layout = await inspect(send, `document.fonts.ready.then(() => ({
         lang: document.documentElement.lang, direction: document.documentElement.dir,
-        viewport: document.documentElement.clientWidth, page: document.documentElement.scrollWidth,
+        viewport: window.innerWidth, client: document.documentElement.clientWidth,
+        page: document.documentElement.scrollWidth,
         svg: Boolean(document.querySelector('nav svg'))
       }))`);
-      assert.deepEqual(layout, { lang, direction: lang === 'ar' ? 'rtl' : 'ltr', viewport: width, page: width, svg: true });
+      assert.equal(layout.page, layout.client, 'Assistant layout has no horizontal overflow');
+      assert.deepEqual({ lang: layout.lang, direction: layout.direction, viewport: layout.viewport, svg: layout.svg },
+        { lang, direction: lang === 'ar' ? 'rtl' : 'ltr', viewport: width, svg: true });
       const { cssContentSize } = await send('Page.getLayoutMetrics');
       const { data } = await send('Page.captureScreenshot', {
         format: 'webp', quality: 83, captureBeyondViewport: true,
