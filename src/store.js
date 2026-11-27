@@ -26,7 +26,8 @@ import { evidenceSchema, evidenceStore } from './evidence-store.js';
 import { referenceSchema, referenceMigrationV4, referenceStore } from './reference-store.js';
 
 export const sessionLifetime = 8 * 60 * 60;
-const schemaVersion = 24;
+export const sessionIdle = 30 * 60_000;
+const schemaVersion = 25;
 const schema = `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -93,6 +94,15 @@ function initialize(db, path) {
     if (version < 22) db.exec(organizationSchema);
     if (version < 23) db.exec(citationSchema);
     if (version < 24) db.exec(resourceSchema);
+    if (version < 25) db.exec(`
+      CREATE TABLE IF NOT EXISTS session_activity (
+        token_hash TEXT PRIMARY KEY REFERENCES sessions(token_hash) ON DELETE CASCADE,
+        seen_at INTEGER NOT NULL
+      ) STRICT;
+      CREATE INDEX IF NOT EXISTS session_activity_seen ON session_activity(seen_at);
+      INSERT OR IGNORE INTO session_activity SELECT token_hash,expires_at - ${sessionLifetime * 1000} FROM sessions;
+      PRAGMA user_version = 25;
+    `);
     return bindDocumentKey(db, path);
   });
 }
@@ -136,12 +146,18 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
   const insertAccount = db.prepare('INSERT INTO accounts VALUES (?, ?, ?, ?)');
   const findAccount = db.prepare('SELECT id, salt, hash FROM accounts WHERE email = ?');
   const insertSession = db.prepare('INSERT INTO sessions VALUES (?, ?, ?)');
-  const clearExpired = db.prepare('DELETE FROM sessions WHERE expires_at <= ?');
+  const initializeActivity = db.prepare('INSERT INTO session_activity VALUES (?,?)');
+  const clearExpired = db.prepare(`DELETE FROM sessions WHERE expires_at<=? OR
+    token_hash IN (SELECT token_hash FROM session_activity WHERE seen_at<=?)`);
+  const touch = db.prepare(`UPDATE session_activity SET seen_at=:now WHERE token_hash=:key AND seen_at>:idle AND seen_at<=:refresh
+    AND EXISTS (SELECT 1 FROM sessions WHERE token_hash=:key AND expires_at>:now)`);
   const getSession = db.prepare(`
     SELECT accounts.id, accounts.email FROM sessions JOIN accounts ON accounts.id = sessions.account_id
-    WHERE sessions.token_hash = ? AND sessions.expires_at > ?
+    JOIN session_activity a ON a.token_hash = sessions.token_hash
+    WHERE sessions.token_hash = ? AND sessions.expires_at > ? AND a.seen_at > ?
   `);
-  const countOthers = db.prepare('SELECT count(*) AS count FROM sessions WHERE account_id = ? AND token_hash <> ? AND expires_at > ?');
+  const countOthers = db.prepare(`SELECT count(*) AS count FROM sessions s JOIN session_activity a ON a.token_hash=s.token_hash
+    WHERE s.account_id=? AND s.token_hash<>? AND s.expires_at>? AND a.seen_at>?`);
   const removeOthers = db.prepare('DELETE FROM sessions WHERE account_id = ? AND token_hash <> ? AND expires_at > ?');
   const settings = settingsStore(db, now);
   const sharing = sharingStore(db, now, transact);
@@ -158,11 +174,18 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
     return removed;
   }
 
+  function sessionFor(token) {
+    const at = now();
+    return token ? getSession.get(tokenHash(token), at, at - sessionIdle) : undefined;
+  }
+
   function issueSession(accountId) {
     const token = randomBytes(32).toString('base64url');
     const issuedAt = now();
-    clearExpired.run(issuedAt);
-    insertSession.run(tokenHash(token), accountId, issuedAt + sessionLifetime * 1000);
+    const key = tokenHash(token);
+    clearExpired.run(issuedAt,issuedAt - sessionIdle);
+    insertSession.run(key, accountId, issuedAt + sessionLifetime * 1000);
+    initializeActivity.run(key,issuedAt);
     return token;
   }
 
@@ -173,7 +196,7 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
   return {
     privacyAction(owner, token, code, action) {
       if (action !== 'export' && action !== 'delete') return { status: 422 };
-      return mfa.authorizePrivacy(owner, code, () => getSession.get(tokenHash(token), now())?.id === owner, () =>
+      return mfa.authorizePrivacy(owner, code, () => sessionFor(token)?.id === owner, () =>
         action === 'export' ? privacy.export(owner) : { status: privacy.delete(owner) ? 303 : 403 });
     },
     healthy: () => db.prepare('PRAGMA user_version').get().user_version === schemaVersion,
@@ -209,7 +232,7 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
     credentials(email) {
       return findAccount.get(email);
     },
-    newSession: issueSession,
+    newSession: (account) => transact(db, () => issueSession(account)),
     signIn(accountId, previousToken) {
       return transact(db, () => {
         const session = issueSession(accountId);
@@ -223,11 +246,15 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
         if (removeSession.run(tokenHash(token)).changes) settings.record(accountId, 'sign-out');
       });
     },
-    session(token) {
-      return token ? getSession.get(tokenHash(token), now()) : undefined;
+    session: sessionFor,
+    touchSession(token) {
+      if (!token) return;
+      const at = now();
+      touch.run({ key:tokenHash(token), now:at, idle:at-sessionIdle, refresh:at-60_000 });
     },
     otherSessions(owner, token) {
-      return countOthers.get(owner, tokenHash(token), now()).count;
+      const at = now();
+      return countOthers.get(owner,tokenHash(token),at,at - sessionIdle).count;
     },
     revokeOtherSessions(owner, token) {
       return transact(db, () => revokeOthers(owner, token));

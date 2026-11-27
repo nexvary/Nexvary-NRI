@@ -12,7 +12,7 @@ The bundle holds a consistent SQLite snapshot, the paired PDF encryption key, an
 
 Account and project metadata are stored in plaintext SQLite. PDF bytes are encrypted, and the bundle contains their decryption key. Keep backups on restricted, encrypted storage and never commit or publish them. Checksums detect accidental corruption and are not authentication for an untrusted backup. The local tool does not schedule backups or upload them.
 
-NRI remains a loopback preview. Production deployment needs HTTPS, shared-project authorization, hardened identity, monitoring, operational recovery drills and a hosting decision. Billing is disabled.
+The default preview binds to loopback. Direct HTTPS staging is available through the [deployment guide](DEPLOYMENT.md). Public production deployment and operational recovery objectives require verification on the selected host. Billing is disabled.
 
 ## Account deletion and retention
 
@@ -31,4 +31,4 @@ Team manuscripts, reviews, notes and tasks belong to their project. Deleting a c
 3. Check `GET /healthz`, sign in with a test account and verify an owned document, a project team, and any plan limits in use. The health endpoint returns HTTP 200 when the SQLite schema is available and current or 503 on failure. It exposes no account or plan details. Collect its status and service stderr using the operator's existing local monitoring.
 4. Promote the candidate only after the drill succeeds. For rollback, select the prior build and restore the pre-upgrade bundle into a separate directory. Reconcile deletions and other writes since the snapshot before switching workspaces. Record the measured restore time and data-loss window during the drill.
 
-The current release binds to loopback. Public hosting, reverse-proxy trust, HTTPS session cookies, production alerts, key administration and disaster-recovery objectives require their own verification before public deployment.
+Use the configured direct HTTPS mode for staging. Public hosting, production alerts, key rotation, and disaster-recovery objectives require their own verification before public deployment.

@@ -92,3 +92,7 @@ The stricter of the plan token limit and the workspace provider budget governs t
 ### Embedded PDF reader
 
 Run `npm ci --omit=optional --ignore-scripts` before starting NRI to install the pinned browser PDF.js assets. The reading page renders documents in a local worker. Select a version to read it or use a bookmark or annotation to open its recorded page. Authorized downloads remain available.
+
+### HTTPS staging
+
+NRI supports direct TLS, host-scoped secure session cookies, a schema health endpoint and structured operational logs. See [the staging deployment guide](docs/DEPLOYMENT.md) for installation, the service unit and local verification.

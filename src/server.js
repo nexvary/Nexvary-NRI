@@ -1,5 +1,7 @@
 import { createServer } from 'node:http';
-import { readFileSync } from 'node:fs';
+import { createServer as createTlsServer } from 'node:https';
+import { performance } from 'node:perf_hooks';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { createAssistantProvider } from './assistant-provider.js';
 import { createCrossrefClient } from './crossref.js';
@@ -22,10 +24,12 @@ function readerAssets(path) {
   const font = /^\/pdf-assets\/(cmaps\/[a-z0-9-]+\.bcmap|standard_fonts\/[a-z0-9_.-]+\.(?:ttf|pfb))$/i.exec(path);
   return font ? new URL(font[1], pdfAssets) : undefined;
 }
-const securityHeaders = {
+const baseSecurityHeaders = {
   'Content-Security-Policy': "default-src 'none'; style-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'same-origin',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
+  'X-Frame-Options': 'DENY',
 };
 
 export function createApp(store = openWorkspaceStore(), {
@@ -35,10 +39,22 @@ export function createApp(store = openWorkspaceStore(), {
   zenodo = createZenodoClient(),
   reportRenderer = createLocalReportRenderer(),
   assistantProvider = createAssistantProvider(),
+  tls = undefined,
+  log = undefined,
 } = {}) {
-  const workspace = createWorkspaceHandler(store, { crossref, openalex, orcid, zenodo }, version, reportRenderer, assistantProvider);
+  const origin = tls ? new URL(tls.origin) : undefined;
+  if (origin && (origin.protocol !== 'https:' || origin.origin !== tls.origin)) {
+    throw new Error('NRI public origin must be a canonical HTTPS origin.');
+  }
+  const securityHeaders = origin ? { ...baseSecurityHeaders, 'Strict-Transport-Security': 'max-age=31536000' } : baseSecurityHeaders;
+  const logEvent = (event, fields = {}) => log?.({ time: new Date().toISOString(), event, ...fields });
+  const workspace = createWorkspaceHandler(store, { crossref, openalex, orcid, zenodo }, version, reportRenderer, assistantProvider, origin?.origin);
 
   async function handle(request, response) {
+    if (origin && request.headers.host?.toLowerCase() !== origin.host) {
+      response.writeHead(421, { ...securityHeaders, 'Cache-Control': 'no-store' }).end();
+      return;
+    }
     if (!request.url?.startsWith('/')) {
       response.writeHead(400, securityHeaders).end();
       return;
@@ -46,11 +62,12 @@ export function createApp(store = openWorkspaceStore(), {
     const { pathname, searchParams } = new URL(`http://localhost${request.url}`);
     const lang = searchParams.get('lang') === 'en' ? 'en' : 'ar';
     if (pathname === '/healthz' && ['GET', 'HEAD'].includes(request.method)) {
+      request.nriRoute = 'health';
       let healthy = false;
       try {
         healthy = store.healthy();
       } catch {
-        console.error('NRI workspace health check failed');
+        logEvent('health.error');
       }
       response.writeHead(healthy ? 200 : 503, {
         ...securityHeaders, 'Cache-Control': 'no-store', 'Content-Type': 'application/json; charset=utf-8',
@@ -72,13 +89,22 @@ export function createApp(store = openWorkspaceStore(), {
       return;
     }
     const route = resolveWorkspaceRoute(pathname);
+    request.nriRoute = route?.kind ?? 'public';
+    const token = readSessionCookie(request.headers.cookie, Boolean(origin));
+    if ((route || pathname === '/') && token && !['cross-site','same-site'].includes(request.headers['sec-fetch-site'])) {
+      response.once('finish', () => {
+        if (response.statusCode >= 400) return;
+        try { store.touchSession(token); }
+        catch { logEvent('session.activity.error'); }
+      });
+    }
 
     const redirect = (location, headers) => {
       response.writeHead(303, { ...securityHeaders, 'Cache-Control': 'no-store', Location: location, ...headers }).end();
     };
 
     const sendPage = (status, view, page, headers, dashboard) => {
-      const session = store.session(readSessionCookie(request.headers.cookie));
+      const session = store.session(token);
       const unread = session && store.messages.notifications(session.id) ? store.messages.unread(session.id) : 0;
       const answer = request.method === 'HEAD' ? undefined : render({ lang, view, version, page, workspace: dashboard, unread, invitations: session ? store.teams.pending(session.id) : 0 });
       response.writeHead(status, {
@@ -114,7 +140,7 @@ export function createApp(store = openWorkspaceStore(), {
       return;
     }
     if (pathname === '/' && view === 'dashboard') {
-      const session = store.session(readSessionCookie(request.headers.cookie));
+      const session = store.session(token);
       let dashboard;
       if (session) {
         const owner = session.id;
@@ -158,26 +184,60 @@ export function createApp(store = openWorkspaceStore(), {
     sendPage(available ? 200 : 404, available ? view : 'not-found');
   }
 
-  const app = createServer({ requestTimeout: 15_000 }, (request, response) => {
+  const requestOptions = { requestTimeout: 15_000, headersTimeout: 10_000, keepAliveTimeout: 5_000 };
+  const onRequest = (request, response) => {
+    if (log) {
+      const started = performance.now();
+      response.once('finish', () => logEvent('http.request', {
+        route: request.nriRoute ?? 'rejected', method: ['GET','HEAD','POST'].includes(request.method) ? request.method : 'OTHER',
+        status: response.statusCode, durationMs: Math.round(performance.now() - started),
+      }));
+    }
     handle(request, response).catch((error) => {
-      console.error('NRI HTTP request failed:', error.code ?? error.name);
+      const code = String(error.code ?? error.name);
+      logEvent('http.error', { route: request.nriRoute ?? 'rejected', code: /^[A-Z][A-Z0-9_]{0,40}$/.test(code) ? code : 'INTERNAL' });
       if (response.headersSent) response.destroy();
       else response.writeHead(500, { ...securityHeaders, 'Cache-Control': 'no-store' }).end();
     });
-  });
+  };
+  const app = tls
+    ? createTlsServer({ ...requestOptions, cert:tls.cert, key:tls.key, minVersion:'TLSv1.2' }, onRequest)
+    : createServer(requestOptions,onRequest);
+  app.maxHeadersCount = 60;
   app.once('close', () => store.close());
   return app;
 }
 
+function assertPrivateFile(path) {
+  if (process.platform === 'win32') return;
+  const item = statSync(path);
+  if (!item.isFile() || (item.mode & 0o077)) throw new Error('Use owner-only permissions for the workspace and private keys.');
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const port = Number(process.env.PORT ?? 3000);
-  const host = process.env.HOST ?? '127.0.0.1';
-  if (!['127.0.0.1', '::1', 'localhost'].includes(host)) {
-    throw new Error('The private workspace preview requires a loopback host.');
+  const origin = process.env.NRI_PUBLIC_ORIGIN;
+  const certPath = process.env.NRI_TLS_CERT_FILE;
+  const keyPath = process.env.NRI_TLS_KEY_FILE;
+  if ([origin,certPath,keyPath].some(Boolean) && ![origin,certPath,keyPath].every(Boolean)) {
+    throw new Error('Set the HTTPS origin, certificate and key together.');
   }
-  const app = createApp(openWorkspaceStore(workspaceDatabasePath())).listen(port, host, () => {
-    const { address, port: selectedPort } = app.address();
-    const displayAddress = address.includes(':') ? `[${address}]` : address;
-    console.log(`NRI preview: http://${displayAddress}:${selectedPort}`);
+  const databasePath = workspaceDatabasePath();
+  if (origin) {
+    assertPrivateFile(keyPath);
+    for (const path of [databasePath,databasePath + '.key']) if (existsSync(path)) assertPrivateFile(path);
+  }
+  const tls = origin ? { origin, cert:readFileSync(certPath), key:readFileSync(keyPath) } : undefined;
+  const port = Number(process.env.PORT ?? (tls ? 8443 : 3000));
+  const host = process.env.HOST ?? '127.0.0.1';
+  if (!tls && !['127.0.0.1', '::1', 'localhost'].includes(host)) {
+    throw new Error('An HTTPS configuration is required for a non-loopback host.');
+  }
+  const log = (event) => console.log(JSON.stringify(event));
+  const app = createApp(openWorkspaceStore(databasePath), { tls,log }).listen(port, host, () => {
+    log({ time:new Date().toISOString(), event:'service.listening', transport:tls ? 'https' : 'http',
+      port:app.address().port });
   });
+  const shutdown = () => app.close();
+  process.once('SIGTERM',shutdown);
+  process.once('SIGINT',shutdown);
 }

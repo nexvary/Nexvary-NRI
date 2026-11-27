@@ -38,4 +38,6 @@ NRI-03c adds embedded PDF versions and page-linked reading marks. Install pinned
 
 NRI-10c adds explicit version/snapshot sharing for documents, references, readiness and reports. See `src/resource-sharing.js`, `src/resource-store.js`, and `test/resource-sharing.test.js`. Full regression: 60/60.
 
-Next: harden transport and sessions for a deployable staging build, add operational gates and exercise concurrent load. Continue from the [functional matrix](STATUS.md#functional-acceptance).
+NRI-19b adds opt-in HTTPS, host-prefixed cookies, session idle expiry, bounded login throttling, operational logs and a [staging guide](DEPLOYMENT.md). See `test/transport.test.js`. Full regression: 62/62. A v22-to-v25 migration and rollback from a paired backup were rehearsed. The report and installer dependencies were updated after auditing.
+
+Next: enforce configurable PDF storage and daily report quotas, including shared-report exports. Resume outstanding functional requirements from the [functional matrix](STATUS.md#functional-acceptance). Public infrastructure, alert destinations and any paid service remain subject to approval.

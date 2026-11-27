@@ -1,0 +1,34 @@
+[Unit]
+Description=NEXVARY Research Intelligence
+After=network.target
+
+[Service]
+Type=simple
+User=nri
+Group=nri
+WorkingDirectory=/opt/nri/current
+EnvironmentFile=/etc/nri/nri.env
+Environment=NRI_DB_PATH=/var/lib/nri/workspace.sqlite
+Environment=NRI_TLS_KEY_FILE=%d/tls-key.pem
+LoadCredential=tls-key.pem:/etc/nri/tls/key.pem
+ExecStart=/opt/nri/runtime/bin/node /opt/nri/current/src/server.js
+StateDirectory=nri
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=25
+
+[Install]
+WantedBy=multi-user.target

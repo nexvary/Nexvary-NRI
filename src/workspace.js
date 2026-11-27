@@ -1,3 +1,4 @@
+import { createLoginThrottle } from './login-throttle.js';
 import { createResourceHandler, resolveResourceRoute } from './resource-sharing.js';
 import { handleCitations, resolveCitationRoute } from './citations.js';
 import { handleOrganization, resolveOrganizationRoute } from './library-organization.js';
@@ -31,9 +32,6 @@ import { loginPath, workspacePage, workspacePath } from './workspace-view.js';
 
 const cookieName = 'nri_session';
 const formLimit = 24 * 1024;
-const loginWindow = 60_000;
-const maxLoginAttempts = 12;
-const maxConcurrentLogins = 2;
 
 export function resolveWorkspaceRoute(pathname) {
   if (pathname === '/login') return { kind: 'login' };
@@ -57,7 +55,8 @@ export function resolveWorkspaceRoute(pathname) {
   return resolveResourceRoute(pathname) ?? resolveCitationRoute(pathname) ?? resolveOrganizationRoute(pathname) ?? resolveTeamRoute(pathname) ?? resolveMessageRoute(pathname) ?? resolveDocumentRoute(pathname) ?? resolveReferenceRoute(pathname) ?? resolveEvidenceRoute(pathname) ?? resolveReadinessRoute(pathname) ?? resolveEconomicsRoute(pathname) ?? resolveObservatoryRoute(pathname) ?? resolveReportRoute(pathname) ?? resolveSharingRoute(pathname);
 }
 
-function acceptsPost(request) {
+function acceptsPost(request, origin) {
+  if (origin) return request.headers.origin === origin;
   const port = request.socket.localPort;
   const host = request.headers.host;
   const portSuffix = port === 80 ? '' : `:${port}`;
@@ -67,13 +66,16 @@ function acceptsPost(request) {
   return knownAuthority && request.headers.origin === `http://${host}`;
 }
 
-export function readSessionCookie(header = '') {
-  const value = header.match(/(?:^|;\s*)nri_session=([A-Za-z0-9_-]{43})(?:;|$)/);
-  return value?.[1];
+export function readSessionCookie(header = '', secure = false) {
+  const name = (secure ? '__Host-' : '') + cookieName + '=';
+  const matches = header.split(';').map((part) => part.trim()).filter((part) => part.startsWith(name));
+  const value = matches.length === 1 ? matches[0].slice(name.length) : '';
+  return /^[A-Za-z0-9_-]{43}$/.test(value) ? value : undefined;
 }
 
-function sessionCookie(token, maxAge) {
-  return `${cookieName}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}`;
+function sessionCookie(token, maxAge, secure) {
+  const name = (secure ? '__Host-' : '') + cookieName;
+  return `${name}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${secure ? '; Secure' : ''}`;
 }
 
 async function readForm(request, limit = formLimit) {
@@ -91,7 +93,7 @@ function projectFields(form) {
   };
 }
 
-export function createWorkspaceHandler(store, providers, version, reportRenderer, assistantProvider) {
+export function createWorkspaceHandler(store, providers, version, reportRenderer, assistantProvider, origin) {
   const handlePrivacy = createPrivacyHandler(store);
   const handleMfaSettings = createMfaSettingsHandler(store);
   const handleAssistantAnswer = createAssistantAnswerHandler(store, assistantProvider);
@@ -106,9 +108,7 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
   const handleReadiness = createReadinessHandler(store);
   const handleEvidence = createEvidenceHandler(store);
   const handleReferences = createReferenceHandler(store, providers);
-  let windowStarted = 0;
-  let attempts = 0;
-  let inFlight = 0;
+  const throttle = createLoginThrottle();
 
   return async function handle({ request, reply, redirect, route, lang }) {
     const { kind, id } = route;
@@ -124,10 +124,10 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
       return;
     }
 
-    const token = readSessionCookie(request.headers.cookie);
+    const token = readSessionCookie(request.headers.cookie, Boolean(origin));
     let form;
     if (method === 'POST') {
-      if (!acceptsPost(request)) {
+      if (!acceptsPost(request, origin)) {
         reply(403);
         return;
       }
@@ -149,19 +149,13 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
         return;
       }
 
-      const now = Date.now();
-      if (now - windowStarted >= loginWindow) {
-        windowStarted = now;
-        attempts = 0;
-      }
-      if (attempts >= maxLoginAttempts || inFlight >= maxConcurrentLogins) {
-        show(429, 'login', { error: 'rateLimit' }, { 'Retry-After': String(Math.ceil((windowStarted + loginWindow - now) / 1000)) });
+      const email = normalizeAddress(form.get('email') ?? '');
+      const retryAfter = throttle.begin(request.socket.remoteAddress ?? '',email);
+      if (retryAfter) {
+        show(429, 'login', { error: 'rateLimit' }, { 'Retry-After': String(retryAfter) });
         return;
       }
-      attempts++;
-      inFlight++;
       try {
-        const email = normalizeAddress(form.get('email') ?? '');
         const password = form.get('password') ?? '';
         const credentials = email ? store.credentials(email) : undefined;
         const valid = await verifyPassword(password.slice(0, 128), credentials);
@@ -172,9 +166,9 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
           return;
         }
         const session = store.signIn(credentials.id, token);
-        redirect(workspacePath(lang), { 'Set-Cookie': sessionCookie(session, sessionLifetime) });
+        redirect(workspacePath(lang), { 'Set-Cookie': sessionCookie(session, sessionLifetime, Boolean(origin)) });
       } finally {
-        inFlight--;
+        throttle.finish();
       }
       return;
     }
@@ -185,7 +179,7 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
     }
     if (kind === 'logout') {
       store.signOut(account.id, token);
-      redirect(loginPath(lang), { 'Set-Cookie': sessionCookie('', 0) });
+      redirect(loginPath(lang), { 'Set-Cookie': sessionCookie('', 0, Boolean(origin)) });
       return;
     }
 
@@ -234,7 +228,7 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
       return;
     }
     if (kind === 'settings-privacy') {
-      await handlePrivacy({ reply, redirect, lang, account, form, token, expiredCookie: sessionCookie('', 0) });
+      await handlePrivacy({ reply, redirect, lang, account, form, token, expiredCookie: sessionCookie('', 0, Boolean(origin)) });
       return;
     }
     if (kind === 'settings-mfa') {

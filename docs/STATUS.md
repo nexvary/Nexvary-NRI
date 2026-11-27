@@ -1,5 +1,14 @@
 # Development status
 
+## NRI-19b · HTTPS staging and operations · 2026-11-27 (Cairo)
+
+Direct HTTPS staging supports an exact configured authority, secure host-scoped session cookies, idle expiry and absolute lifetimes, login limits by source address and account, and structured operational logs. A hardened systemd template and [staging guide](DEPLOYMENT.md) are included.
+
+- 62/62 with actual bilingual PDF/DOCX rendering. Eight accounts completed 48 concurrent isolated HTTPS workspace reads. Tests also cover cookie scope, rejected origins, idle expiry and operational log redaction.
+- Migrated a backup fixture from the verified v22 baseline to v25, checked foreign keys and encrypted PDF integrity, and rehearsed rollback to v22 with sessions removed.
+- npm audit found no reported vulnerabilities in installed dependencies. Python audit initially found issues in the report renderer and installer. Upgraded WeasyPrint to 70.0 and pip to 26.3, then rescanned with no reported findings.
+- Chromium regression exercised the application in both locales. Public hosting, production alerting and workload sizing require host-specific validation.
+
 ## NRI-10c · Explicit resource grants · 2026-11-27 (Cairo)
 
 Owners can grant a named accepted team member read access to one PDF version, reference snapshot, readiness revision or frozen bilingual report. The grant records author and timestamps. Role changes, membership revocation and blocking invalidate old grants. Report downloads recheck access after rendering. Private owner routes retain their existing protections.
@@ -299,6 +308,6 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | NRI-16 | Partial | System About view shows the purpose, framework wording, build version and documentation links. Changelog, licensing, privacy, terms and support content remain. |
 | NRI-17 | Partial | Separate developer view identifies Nexvary Inc. and links to the official company site. Dedicated confirmed contact information remains. |
 | NRI-18 | Partial | Local authentication, session revocation, account audit, authorization, encrypted PDF bytes, RTL/LTR and verified recovery are implemented. NRI-18a adds optional MFA and one-use recovery codes. NRI-18b adds the operator-managed message moderator role and scoped report review. Project team RBAC is verified for manuscripts and evidence review. Password/account recovery, accessibility audit and broader administration remain. |
-| NRI-19 | Partial | Local restore and regression workflow configuration are implemented. Local plans, entitlement limits, an MFA-protected operator console, migration/restore drills and schema health checks are verified. Approved hosting, production security and monitoring, and optional billing remain. |
+| NRI-19 | Partial | Local restore and regression workflow configuration are implemented. Local plans, entitlement limits, an MFA-protected operator console, migration/restore drills and schema health checks are verified. Direct HTTPS staging, session hardening, structured logs, a service configuration and upgrade/rollback rehearsal are verified. Hosted alerting, capacity validation, key rotation and optional billing remain. |
 
-Next milestone: transport, session, operational and deployment hardening.
+Next milestone: report and PDF storage entitlements, then the remaining functional acceptance items.

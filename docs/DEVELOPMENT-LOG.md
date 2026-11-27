@@ -172,3 +172,8 @@
 
 - Added read-only, per-recipient grants tied to a specific membership acceptance. Verified snapshot scope, direct route protections and revocation during report generation.
 - 60/60 with real report rendering. Chromium granted an individual PDF version and captured both languages.
+
+## 2026-11-27 · NRI-19b transport and operations
+
+- Added direct TLS staging, secure cookies, idle session expiry, independent login limits, JSON request logs and a hardened service template.
+- 62/62 with real report rendering, 48 concurrent TLS reads, verified migration and rollback, and Chromium regression. Updated WeasyPrint and pip following the Python dependency audit.
