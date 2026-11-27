@@ -22,6 +22,8 @@ if mode == 'malformed':
 if mode == 'active':
     xml = xml.replace('<w:p>', '<w:p><w:object/>', 1)
 attributes = 'Target="word/document.xml"'
+if mode == 'scheme-relative':
+    attributes = 'Target="//word/document.xml"'
 if mode == 'external':
     attributes = 'TargetMode="External" Target="https://example.test/"'
 output = io.BytesIO()
@@ -37,7 +39,7 @@ sys.stdout.buffer.write(output.getvalue())
 `, variant]);
 
 test('rejects malformed and unsafe DOCX packages', async () => {
-  for (const variant of ['dtd', 'malformed', 'external', 'traversal', 'macro', 'bomb', 'active']) {
+  for (const variant of ['dtd', 'malformed', 'external', 'scheme-relative', 'traversal', 'macro', 'bomb', 'active']) {
     assert.equal((await inspectDocx(fixture(variant))).status, 422, variant);
   }
   assert.equal((await inspectDocx(Buffer.from('not a ZIP archive'))).status, 422);

@@ -102,7 +102,7 @@ def inspect(raw):
                 relationship = item.attrib["Type"]
                 require(item.tag == REL + "Relationship" and identifier not in seen)
                 seen.add(identifier)
-                require(item.get("TargetMode", "Internal") == "Internal" and valid_path(target.lstrip("/")))
+                require(item.get("TargetMode", "Internal") == "Internal" and not target.startswith("//") and valid_path(target.lstrip("/")))
                 relation_name = relationship.rsplit("/", 1)[-1].lower()
                 require(relation_name not in {"oleobject", "package", "activex", "vbaproject", "attachedtemplate", "afchunk", "control"})
                 folder = PurePosixPath(path).parent.parent
