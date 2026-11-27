@@ -1,3 +1,4 @@
+import { resourceSchema, resourceStore } from './resource-store.js';
 import { citationSchema, citationStore } from './citation-store.js';
 import { organizationSchema, organizationStore } from './library-organization.js';
 import { licenseSchema, licensingStore } from './licensing-store.js';
@@ -25,7 +26,7 @@ import { evidenceSchema, evidenceStore } from './evidence-store.js';
 import { referenceSchema, referenceMigrationV4, referenceStore } from './reference-store.js';
 
 export const sessionLifetime = 8 * 60 * 60;
-const schemaVersion = 23;
+const schemaVersion = 24;
 const schema = `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -91,6 +92,7 @@ function initialize(db, path) {
     if (version < 21) db.exec(manuscriptCatalogSchema);
     if (version < 22) db.exec(organizationSchema);
     if (version < 23) db.exec(citationSchema);
+    if (version < 24) db.exec(resourceSchema);
     return bindDocumentKey(db, path);
   });
 }
@@ -177,6 +179,7 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
     healthy: () => db.prepare('PRAGMA user_version').get().user_version === schemaVersion,
     licensing,
     teams,
+    resources: resourceStore(db, now, transact, teams),
     assistantSettings,
     mfa,
     messages: messageStore(db, workspaceKey, now, transact),

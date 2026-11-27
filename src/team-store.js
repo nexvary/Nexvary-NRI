@@ -144,7 +144,7 @@ export function teamStore(db, now, transact) {
     if (actor === row.owner_id) return { ...row, role: 'owner', rights: rights.owner };
     const grant = member.get(id, actor);
     if (grant?.state !== 'accepted' || isBlocked(row.owner_id, actor)) return undefined;
-    return { ...row, role: grant.role, rights: rights[grant.role] };
+    return { ...row, role: grant.role, rights: rights[grant.role], invitation: inviteId.get(id,actor)?.id };
   }
 
   function record(id, actor, subject, action, target = null) {
@@ -153,6 +153,10 @@ export function teamStore(db, now, transact) {
 
   return {
     access,
+    activeMembers(owner, project) {
+      if (access(owner,project)?.role !== 'owner') return [];
+      return members.all(project).filter((member) => member.state === 'accepted' && access(member.account_id,project));
+    },
     inbox: (actor) => inbox.all(actor),
     pending: (actor) => pending.get(actor).total,
     work(actor, id, offset) {

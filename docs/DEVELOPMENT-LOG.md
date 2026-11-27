@@ -167,3 +167,8 @@
 
 - Added local PDF.js rendering, version selection, page navigation and reading mark links.
 - 59/59 with real report rendering. Chromium verified actual page pixels and navigation, and npm audit found no reported vulnerabilities in installed dependencies.
+
+## 2026-11-27 · NRI-10c resource sharing
+
+- Added read-only, per-recipient grants tied to a specific membership acceptance. Verified snapshot scope, direct route protections and revocation during report generation.
+- 60/60 with real report rendering. Chromium granted an individual PDF version and captured both languages.

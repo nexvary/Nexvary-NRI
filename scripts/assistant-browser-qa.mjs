@@ -52,6 +52,9 @@ store.network.save(id, { name: 'NRI Researcher', interests: '', orcid: '', disco
 store.network.save(peer, { name: 'NRI Coauthor', interests: '', orcid: '', discoverable: true });
 store.network.interact(id, peer, 'request');
 store.network.interact(peer, id, 'accept');
+assert.equal(store.teams.grant(id,project,peer,'reviewer'),true);
+const [roleInvitation] = store.teams.inbox(peer);
+assert.equal(store.teams.decide(peer,project,'reviewer',roleInvitation.invitation,'accepted'),true);
 const thread = store.messages.open(id, peer);
 store.messages.send(peer, thread, 'Could we verify the reference metadata before submitting the report?');
 const moderatorEmail = 'moderator@example.test';
@@ -288,6 +291,16 @@ try {
         }
         await waitFor(() => inspect(send, 'document.body?.textContent.includes("Illustrative catalog citation")'), 'imported citation');
         await captureLayout(send, 'citations', lang, name, width, height);
+        await send('Page.navigate', { url: origin + '/workspace/projects/' + project + '/shared-resources?lang=' + lang });
+        await waitFor(() => inspect(send, 'Boolean(document.querySelector("button[value=share]"))'), 'resource grant form');
+        if (lang === 'ar') {
+          await inspect(send, `(() => {
+            const button = document.querySelector('button[value=share]');
+            setTimeout(() => button.form.requestSubmit(button), 0);
+          })()`);
+        }
+        await waitFor(() => inspect(send, 'Boolean(document.querySelector("button[value=revoke]"))'), 'approved document grant');
+        await captureLayout(send, 'resource-sharing', lang, name, width, height);
         await send('Page.navigate', { url: origin + '/workspace/settings/mfa?lang=' + lang });
         await waitFor(() => inspect(send, 'Boolean(document.querySelector("button[value=begin]"))'), 'MFA settings');
         await captureLayout(send, 'mfa', lang, name, width, height);

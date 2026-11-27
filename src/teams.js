@@ -123,7 +123,7 @@ export function handleTeam({ request, reply, redirect, route, account, form, lan
   const lines = (value) => value ? JSON.parse(value).join('\n') : '';
   const listLabels = (value) => value ? JSON.parse(value).join(' · ') : '';
   return page(t('Project team', 'فريق المشروع'), path, `
-    <nav class="project-tools">${tab(inboxTitle,inbox)} ${tab(t('Notes and tasks','الملاحظات والمهام'),path + '/work')}</nav><h2 dir="auto">${escapeHtml(current.title)}</h2><p>${roleLabel(current.role)}</p>
+    <nav class="project-tools">${tab(inboxTitle,inbox)} ${tab(t('Notes and tasks','الملاحظات والمهام'),path + '/work')} ${tab(t('Shared resources','الموارد المشتركة'), '/workspace/projects/' + id + '/shared-resources')}</nav><h2 dir="auto">${escapeHtml(current.title)}</h2><p>${roleLabel(current.role)}</p>
     ${manage ? `<h2>${t('Team access', 'صلاحيات الفريق')}</h2>
     <p>${t('Accepted team roles can read manuscripts and evidence. A changed role requires renewed acceptance.', 'يمكن لأعضاء الفريق الذين قبلوا أدوارهم قراءة المخطوطات والأدلة. يتطلب تغيير الدور قبولًا جديدًا.')}</p>
     ${peers.length ? `<form class="workspace-form" method="post" action="${action}">

@@ -1,5 +1,13 @@
 # Development status
 
+## NRI-10c · Explicit resource grants · 2026-11-27 (Cairo)
+
+Owners can grant a named accepted team member read access to one PDF version, reference snapshot, readiness revision or frozen bilingual report. The grant records author and timestamps. Role changes, membership revocation and blocking invalidate old grants. Report downloads recheck access after rendering. Private owner routes retain their existing protections.
+
+- 60/60 with real report rendering. HTTP tests cover every role, direct routes, foreign origins, immutable report inputs, revoke during rendering and stale invitation access.
+- Chromium granted one PDF version in the running application. [Arabic desktop](qa/nri-10/resource-sharing-ar-desktop.webp) · [English mobile](qa/nri-10/resource-sharing-en-mobile.webp).
+- Resource grants allow read and download. Editing, provider lookups and private reading notes use their owner-only routes.
+
 ## NRI-03c · Embedded PDF versions · 2026-11-27 (Cairo)
 
 The reading page renders an authorized PDF version locally with a pinned PDF.js worker. Page controls and saved reading marks open the exact version/page. Downloads remain available for reading outside NRI.
@@ -282,7 +290,7 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | NRI-07 | Verified | One-year operating model with explicit assumptions, currency, units, capacity, sensitivity, scenario comparison and reproducible JSON export. |
 | NRI-08 | Verified | NRI-08a exercises private saved-source review, provenance and retraction/editorial warnings in `test/assistant.test.js`. NRI-08b adds private encrypted BYOK storage, offline/provider selection and model settings in `test/assistant-settings.test.js`. NRI-08c verifies mocked local cited answers, cancellation and bounded caching in `test/assistant-answer.test.js`. NRI-08d verifies external consent, mocked OpenAI requests and durable reservations in the same test suite. |
 | NRI-09 | Partial | Opt-in profiles, search, follow and block, bounded requests and private profile isolation verified. Verified ORCID ownership, posts, groups, publication sharing and moderation remain. |
-| NRI-10 | Partial | Collaboration requests and scoped project-summary invitations, acceptance/decline, revoke and access history are verified. Team invitations, five roles, revocation, audit history and manuscript/evidence review are verified. NRI-10b verifies in-app invitation notices, shared notes and tasks. Team access scope remains manuscripts, evidence and shared work. |
+| NRI-10 | Partial | Collaboration requests and scoped project-summary invitations, acceptance/decline, revoke and access history are verified. Team invitations, five roles, revocation, audit history and manuscript/evidence review are verified. NRI-10b verifies in-app invitation notices, shared notes and tasks. Explicit resource grants extend read access to individual document versions, reference snapshots, readiness revisions and frozen reports. |
 | NRI-11 | Verified | Private direct conversations, independent unread state, in-app notification preferences, reports, participant and origin checks, blocking, encrypted message bodies and rate limits verified in `test/messages.test.js` and Chromium. |
 | NRI-12 | Verified | Private watchlists, saved library searches, date-stamped manual updates, filters and provider provenance. |
 | NRI-13 | Verified | Bounded UTF-8 CSV import, numeric validation, descriptive metrics, histogram, IQR outlier flags, units and reproducible JSON export. |
@@ -293,4 +301,4 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | NRI-18 | Partial | Local authentication, session revocation, account audit, authorization, encrypted PDF bytes, RTL/LTR and verified recovery are implemented. NRI-18a adds optional MFA and one-use recovery codes. NRI-18b adds the operator-managed message moderator role and scoped report review. Project team RBAC is verified for manuscripts and evidence review. Password/account recovery, accessibility audit and broader administration remain. |
 | NRI-19 | Partial | Local restore and regression workflow configuration are implemented. Local plans, entitlement limits, an MFA-protected operator console, migration/restore drills and schema health checks are verified. Approved hosting, production security and monitoring, and optional billing remain. |
 
-Next milestone: explicit resource-level collaboration.
+Next milestone: transport, session, operational and deployment hardening.

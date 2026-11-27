@@ -36,4 +36,6 @@ NRI-03b adds BibTeX/RIS exchange, DOI and provider identifier grouping, title ca
 
 NRI-03c adds embedded PDF versions and page-linked reading marks. Install pinned browser assets with `npm ci --omit=optional --ignore-scripts`. See `public/pdf-reader.mjs`, `src/library-organization.js`, and `test/library.test.js`. Full regression: 59/59.
 
-Next: extend project team access with explicit owner-controlled grants on documents, reference snapshots, reports and readiness. Cover direct URL and download authorization for every role and after revocation. Continue production readiness from the [functional matrix](STATUS.md#functional-acceptance).
+NRI-10c adds explicit version/snapshot sharing for documents, references, readiness and reports. See `src/resource-sharing.js`, `src/resource-store.js`, and `test/resource-sharing.test.js`. Full regression: 60/60.
+
+Next: harden transport and sessions for a deployable staging build, add operational gates and exercise concurrent load. Continue from the [functional matrix](STATUS.md#functional-acceptance).

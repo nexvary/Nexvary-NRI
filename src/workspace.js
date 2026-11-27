@@ -1,3 +1,4 @@
+import { createResourceHandler, resolveResourceRoute } from './resource-sharing.js';
 import { handleCitations, resolveCitationRoute } from './citations.js';
 import { handleOrganization, resolveOrganizationRoute } from './library-organization.js';
 import { handleTeamWork } from './team-work.js';
@@ -53,7 +54,7 @@ export function resolveWorkspaceRoute(pathname) {
   if (pathname === '/workspace') return { kind: 'index' };
   const match = pathname.match(/^\/workspace\/projects\/([0-9a-f-]{36})(\/delete)?$/);
   if (match) return { kind: match[2] ? 'delete' : 'project', id: match[1] };
-  return resolveCitationRoute(pathname) ?? resolveOrganizationRoute(pathname) ?? resolveTeamRoute(pathname) ?? resolveMessageRoute(pathname) ?? resolveDocumentRoute(pathname) ?? resolveReferenceRoute(pathname) ?? resolveEvidenceRoute(pathname) ?? resolveReadinessRoute(pathname) ?? resolveEconomicsRoute(pathname) ?? resolveObservatoryRoute(pathname) ?? resolveReportRoute(pathname) ?? resolveSharingRoute(pathname);
+  return resolveResourceRoute(pathname) ?? resolveCitationRoute(pathname) ?? resolveOrganizationRoute(pathname) ?? resolveTeamRoute(pathname) ?? resolveMessageRoute(pathname) ?? resolveDocumentRoute(pathname) ?? resolveReferenceRoute(pathname) ?? resolveEvidenceRoute(pathname) ?? resolveReadinessRoute(pathname) ?? resolveEconomicsRoute(pathname) ?? resolveObservatoryRoute(pathname) ?? resolveReportRoute(pathname) ?? resolveSharingRoute(pathname);
 }
 
 function acceptsPost(request) {
@@ -97,6 +98,7 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
   const handleDocuments = createDocumentHandler(store);
   const handleNetwork = createNetworkHandler(store);
   const handleObservatory = createObservatoryHandler(store);
+  const handleResources = createResourceHandler(store, version, reportRenderer);
   const handleReports = createReportHandler(store, version, reportRenderer);
   const handleSharing = createSharingHandler(store);
   const handleEducation = createEducationHandler(store);
@@ -205,6 +207,10 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
     }
     if (kind === 'education') {
       handleEducation({ request, reply, lang, account, form });
+      return;
+    }
+    if (kind === 'shared-resources') {
+      await handleResources({ request,reply,redirect,route,lang,account,form,stillSignedIn: () => store.session(token)?.id === account.id });
       return;
     }
     if (kind === 'team-work') {
