@@ -1,3 +1,4 @@
+import { billingSchema, billingStore } from './billing-store.js';
 import { resourceSchema, resourceStore } from './resource-store.js';
 import { citationSchema, citationStore } from './citation-store.js';
 import { organizationSchema, organizationStore } from './library-organization.js';
@@ -28,7 +29,7 @@ import { referenceSchema, referenceMigrationV4, referenceStore } from './referen
 
 export const sessionLifetime = 8 * 60 * 60;
 export const sessionIdle = 30 * 60_000;
-const schemaVersion = 30;
+const schemaVersion = 31;
 const schema = `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -109,6 +110,7 @@ function initialize(db, path) {
     if (version < 28) db.exec(workspaceKeyVersionSchema);
     if (version < 29) db.exec(readinessReviewSchema);
     if (version < 30) db.exec(subscriptionSchema);
+    if (version < 31) db.exec(billingSchema);
     return bindDocumentKey(db, path);
   });
 }
@@ -211,6 +213,7 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
     },
     healthy: () => db.prepare('PRAGMA user_version').get().user_version === schemaVersion,
     licensing,
+    billing: billingStore(db, now, transact),
     teams,
     resources: resourceStore(db, now, transact, teams),
     assistantSettings,

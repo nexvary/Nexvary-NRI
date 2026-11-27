@@ -243,3 +243,9 @@
 - Added a separate bilingual Control Center at `/control-center` for existing licensed operators with confirmed MFA. The previous licensing path uses the same handler and checks.
 - All commercial mutations require rate-limited current-password confirmation and an active session. Existing origin protection and transactional audit writes apply.
 - Local regression: 73 passed, zero failed, zero skipped, with actual bilingual PDF and DOCX rendering.
+
+## 2026-11-27 · Sandbox billing event ingress
+
+- Added a provider-independent verifier contract with a synthetic HMAC adapter. The adapter authenticates the original bytes, checks a five-minute timestamp window, and rejects malformed or oversized envelopes.
+- Schema v31 records normalized invoice, payment, refund, renewal and cancellation events with a unique provider and event ID. Identical retries are idempotent and conflicting retries preserve the first event.
+- This increment exposes an internal interface only. Invoice projections, subscription reconciliation and administration are pending. Local regression: 74 passed, zero failed, zero skipped.
