@@ -24,6 +24,15 @@ test('institutional subscriptions require a seat and preserve ownership and data
   const outsider = account('outsider');
   const projectPath = (user) => '/workspace/projects/' + store.createProject(user.id, { title: user.email, description: '' });
   const paths = new Map([first, second, outsider].map((user) => [user, projectPath(user)]));
+  const projectId = (user) => paths.get(user).split('/').at(-1);
+  const version = (user) => {
+    const project = projectId(user);
+    const document = store.documents.create(user.id, project, {
+      name: 'institutional-fixture.txt', bytes: Buffer.from('Owned version for ' + user.email),
+    });
+    return project + ':' + document + ':1';
+  };
+  const versions = new Map([first, second, outsider].map((user) => [user, version(user)]));
   const licensing = store.licensing;
   licensing.setOperator(operator.id, true);
   assert.equal(licensing.createOrganization(operator.id, 'research-center', 'Research Center'), 403);
@@ -99,6 +108,18 @@ test('institutional subscriptions require a seat and preserve ownership and data
   assert.match(archive, new RegExp(winner.email));
   assert.equal(JSON.parse(archive).institutionalMemberships[0].has_seat, 1);
   assert.doesNotMatch(archive, new RegExp(outsider.email));
+  const privacy = '/workspace/settings/privacy';
+  const list = await (await request(winner, privacy)).text();
+  assert.ok(list.includes(versions.get(winner)));
+  assert.ok(!list.includes(versions.get(outsider)));
+  const download = (version, proof = password) =>
+    request(winner, privacy, { intent: 'export-document', password: proof, version });
+  assert.equal((await download(versions.get(outsider))).status, 404);
+  assert.equal((await download(versions.get(winner), 'Wrong fixture password')).status, 401);
+  const ownFile = await download(versions.get(winner));
+  assert.equal(ownFile.status, 200);
+  assert.match(ownFile.headers.get('content-disposition'), /^attachment/);
+  assert.equal(await ownFile.text(), 'Owned version for ' + winner.email);
   assert.equal(licensing.transitionInstitution(operator.id, code, 'expired', 'active', null), 303);
   assert.equal((await request(winner, paths.get(winner))).status, 200);
 

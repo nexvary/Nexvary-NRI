@@ -273,3 +273,8 @@
 - Exposed the existing signed synthetic ledger in a bilingual, paginated Control Center view. Owners and explicitly assigned billing reviewers with MFA can read the ledger. Billing review does not confer licensing writes or access to research.
 - The local operator CLI can grant or revoke `billing-reviewer`. No payment endpoint or live payment provider was added.
 - Local regression: 77 passed, zero failed, zero skipped, with signed synthetic invoice display and access and revocation checks. The preceding [pricing](https://github.com/nexvary/Nexvary-NRI/actions/runs/46070596059) and [institutional seat](https://github.com/nexvary/Nexvary-NRI/actions/runs/46070436861) increments passed hosted regression and browser QA.
+
+## 2026-11-27 · Post-expiry document portability
+
+- Added a paginated list of owned document versions on the account Privacy screen. Downloads use existing password, conditional MFA, session and document ownership checks, independent of a subscription.
+- Direct requests for other accounts' files are denied. The full account archive keeps its existing size limit and individual downloads support large libraries.

@@ -249,7 +249,7 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
       return;
     }
     if (kind === 'settings-privacy') {
-      await handlePrivacy({ reply, redirect, lang, account, form, token, expiredCookie: sessionCookie('', 0, Boolean(origin)) });
+      await handlePrivacy({ request, reply, redirect, lang, account, form, token, expiredCookie: sessionCookie('', 0, Boolean(origin)) });
       return;
     }
     if (kind === 'settings-mfa') {

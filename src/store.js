@@ -216,6 +216,12 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
       return mfa.authorizePrivacy(owner, code, () => sessionFor(token)?.id === owner, () =>
         action === 'export' ? privacy.export(owner) : { status: privacy.delete(owner) ? 303 : 403 });
     },
+    exportDocument(owner, token, code, project, document, version) {
+      return mfa.authorizePrivacy(owner, code, () => sessionFor(token)?.id === owner, () => {
+        const file = documents.download(owner, project, document, version);
+        return file ? { status: 200, file } : { status: 404 };
+      });
+    },
     healthy: () => db.prepare('PRAGMA user_version').get().user_version === schemaVersion,
     licensing,
     billing: billingStore(db, now, transact),
