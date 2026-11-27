@@ -22,4 +22,6 @@ NRI-18c adds credential-confirmed account export/deletion in `src/privacy.js` an
 
 NRI-10a adds project team roles, invitation consent, manuscript versions, and manuscript/evidence review. See `src/team-store.js`, `src/teams.js` and `test/teams.test.js`. Full regression: 54/54 with real report rendering.
 
-Next: implement local commercial plans and operator-managed entitlements against the existing SQLite and Assistant usage infrastructure. Keep external billing disabled. Then extend team collaboration and operational readiness using the [functional matrix](STATUS.md#functional-acceptance).
+NRI-19a adds local plan assignments, project and daily external AI limits, an MFA-protected operator console and SQLite health reporting. See `src/licensing-store.js`, `src/licensing.js`, `test/licensing.test.js`, and [RECOVERY.md](RECOVERY.md#local-release-and-recovery-drill). Full regression: 55/55.
+
+Next: use actual account-scoped data for dashboard network and metered usage, then continue the [functional matrix](STATUS.md#functional-acceptance). Production setup and billing require separate verification and owner authorization.

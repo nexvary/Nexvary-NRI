@@ -1,5 +1,13 @@
 # Development status
 
+## NRI-19a · Local licensing and readiness · 2026-11-27 (Cairo)
+
+An MFA-protected operator console manages plans, assignments, expiration, owned-project limits, and daily external AI token entitlements. Limits are enforced at project creation and Assistant reservation. The console shows aggregate data and an attributable change history. `/healthz` checks SQLite schema readiness and the [local release drill](RECOVERY.md#local-release-and-recovery-drill) covers migration, backup and rollback.
+
+- 55/55 with real report rendering. HTTP acceptance verifies operator/MFA gating, foreign-origin rejection, expiry, plan ceilings, and readiness responses.
+- Chromium saved a plan and captured [Arabic desktop](qa/nri-19/licensing-ar-desktop.webp) and [English mobile](qa/nri-19/licensing-en-mobile.webp).
+- Billing remains disabled. The platform runs as a local preview and production deployment and monitoring remain pending.
+
 ## NRI-10a · Project team permissions and review · 2026-11-27 (Cairo)
 
 Projects have owner, administrator, researcher, reviewer and read-only roles in a dedicated team workspace. Role changes require renewed acceptance, and owner-to-member blocking revokes team access. Manuscript revisions and manuscript/evidence reviews record their participants and timestamps. Stale manuscript edits are rejected.
@@ -239,6 +247,6 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | NRI-16 | Partial | System About view shows the purpose, framework wording, build version and documentation links. Changelog, licensing, privacy, terms and support content remain. |
 | NRI-17 | Partial | Separate developer view identifies Nexvary Inc. and links to the official company site. Dedicated confirmed contact information remains. |
 | NRI-18 | Partial | Local authentication, session revocation, account audit, authorization, encrypted PDF bytes, RTL/LTR and verified recovery are implemented. NRI-18a adds optional MFA and one-use recovery codes. NRI-18b adds the operator-managed message moderator role and scoped report review. Project team RBAC is verified for manuscripts and evidence review. Password/account recovery, accessibility audit and broader administration remain. |
-| NRI-19 | Partial | Local restore and regression workflow configuration are implemented. Entitlements, approved hosting, operational monitoring and billing remain. |
+| NRI-19 | Partial | Local restore and regression workflow configuration are implemented. Local plans, entitlement limits, an MFA-protected operator console, migration/restore drills and schema health checks are verified. Approved hosting, production security and monitoring, and optional billing remain. |
 
-Next milestone: local commercial entitlements and secure operator controls.
+Next milestone: dashboard network, ORCID profile and metered usage.

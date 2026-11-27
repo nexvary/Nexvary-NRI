@@ -14,7 +14,7 @@ export const assistantUsageSchema = `
   PRAGMA user_version = 14;
 `;
 
-export function assistantUsageStore(db, now, transact) {
+export function assistantUsageStore(db, now, transact, accountTokenLimit) {
   const usage = db.prepare(`
     SELECT COALESCE(SUM(MAX(token_reservation, COALESCE(observed_input + observed_output, 0))), 0) AS tokens,
       COALESCE(SUM(MAX(cost_reservation, COALESCE(observed_cost, 0))), 0) AS cost,
@@ -39,7 +39,7 @@ export function assistantUsageStore(db, now, transact) {
       return transact(db, () => {
         const currentDay = day();
         const current = usage.get(account, currentDay);
-        if (current.tokens + estimate.tokens > limits.tokens || current.cost + estimate.cost > limits.cost) return undefined;
+        if (current.tokens + estimate.tokens > Math.min(limits.tokens, accountTokenLimit(account)) || current.cost + estimate.cost > limits.cost) return undefined;
         return insert.run(account, currentDay, model, estimate.tokens, estimate.cost).lastInsertRowid;
       });
     },

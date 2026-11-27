@@ -1,3 +1,4 @@
+import { licenseSchema, licensingStore } from './licensing-store.js';
 import { teamSchema, teamStore } from './team-store.js';
 import { privacyStore } from './privacy-store.js';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
@@ -22,7 +23,7 @@ import { evidenceSchema, evidenceStore } from './evidence-store.js';
 import { referenceSchema, referenceMigrationV4, referenceStore } from './reference-store.js';
 
 export const sessionLifetime = 8 * 60 * 60;
-const schemaVersion = 18;
+const schemaVersion = 19;
 const schema = `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -83,6 +84,7 @@ function initialize(db, path) {
     if (version < 16) db.exec(mfaSchema);
     if (version < 17) db.exec(moderationSchema);
     if (version < 18) db.exec(teamSchema);
+    if (version < 19) db.exec(licenseSchema);
     return bindDocumentKey(db, path);
   });
 }
@@ -157,6 +159,7 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
   }
 
   const mfa = mfaStore(db, workspaceKey, now, transact, revokeOthers);
+  const licensing = licensingStore(db, now, transact);
   const teams = teamStore(db, now, transact);
   const privacy = privacyStore(db, workspaceKey, now);
   return {
@@ -165,11 +168,13 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
       return mfa.authorizePrivacy(owner, code, () => getSession.get(tokenHash(token), now())?.id === owner, () =>
         action === 'export' ? privacy.export(owner) : { status: privacy.delete(owner) ? 303 : 403 });
     },
+    healthy: () => db.prepare('PRAGMA user_version').get().user_version === schemaVersion,
+    licensing,
     teams,
     assistantSettings,
     mfa,
     messages: messageStore(db, workspaceKey, now, transact),
-    assistantUsage: assistantUsageStore(db, now, transact),
+    assistantUsage: assistantUsageStore(db, now, transact, licensing.aiTokens),
     documents,
     references,
     evidence,
@@ -223,9 +228,12 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
       return getProject.get(owner, id);
     },
     createProject(owner, { title, description }) {
-      const id = randomUUID();
-      insertProject.run(id, owner, title, description, now());
-      return id;
+      return transact(db, () => {
+        if (!licensing.canCreateProject(owner)) return undefined;
+        const id = randomUUID();
+        insertProject.run(id, owner, title, description, now());
+        return id;
+      });
     },
     updateProject(owner, id, { title, description }) {
       return updateProject.run(title, description, now(), owner, id).changes === 1;

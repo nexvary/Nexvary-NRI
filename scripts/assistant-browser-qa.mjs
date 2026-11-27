@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { once } from 'node:events';
+import { totp } from '../src/mfa.js';
 import { hashPassword } from '../src/password.js';
 import { createApp } from '../src/server.js';
 import { openWorkspaceStore } from '../src/store.js';
@@ -35,6 +36,12 @@ store.addAccount(moderatorEmail, { salt: Buffer.alloc(16), hash: Buffer.alloc(32
 const moderator = store.credentials(moderatorEmail).id;
 store.messages.setModerator(moderator, true);
 const moderatorSession = store.newSession(moderator);
+store.licensing.setOperator(moderator, true);
+assert.equal(store.mfa.begin(moderator), true);
+const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+const bits = [...store.mfa.pending(moderator)].map((character) => alphabet.indexOf(character).toString(2).padStart(5, '0')).join('');
+const seed = Buffer.from(bits.match(/.{8}/g).map((byte) => parseInt(byte, 2)));
+assert.equal(store.mfa.confirm(moderator, totp(seed, Math.floor(Date.now() / 30_000)), moderatorSession).length, 8);
 const app = createApp(store);
 await new Promise((resolve) => app.listen(0, '127.0.0.1', resolve));
 const origin = 'http://127.0.0.1:' + app.address().port;
@@ -225,6 +232,19 @@ try {
         await send('Page.navigate', { url: origin + '/workspace/settings/message-moderation?lang=' + lang });
         await waitFor(() => inspect(send, 'Boolean(document.querySelector("button[value=upheld]"))'), 'message moderation queue');
         await captureLayout(send, 'moderation', lang, name, width, height);
+        await send('Page.navigate', { url: origin + '/workspace/settings/licensing?lang=' + lang });
+        await waitFor(() => inspect(send, 'Boolean(document.querySelector("button[value=save]"))'), 'operator licensing form');
+        if (lang === 'ar') {
+          await inspect(send, `(() => {
+            const button = document.querySelector('button[value=save]');
+            button.form.elements.plan.value = 'research';
+            button.form.elements['project-limit'].value = 10;
+            button.form.elements['ai-tokens'].value = 5000;
+            setTimeout(() => button.form.requestSubmit(button), 0);
+          })()`);
+        }
+        await waitFor(() => inspect(send, 'Boolean(document.querySelector("select[name=plan] option[value=research]"))'), 'saved workspace plan');
+        await captureLayout(send, 'licensing', lang, name, width, height);
       }
       client.socket.close();
     }

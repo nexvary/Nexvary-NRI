@@ -37,6 +37,18 @@ export function createApp(store = openWorkspaceStore(), {
     }
     const { pathname, searchParams } = new URL(`http://localhost${request.url}`);
     const lang = searchParams.get('lang') === 'en' ? 'en' : 'ar';
+    if (pathname === '/healthz' && ['GET', 'HEAD'].includes(request.method)) {
+      let healthy = false;
+      try {
+        healthy = store.healthy();
+      } catch {
+        console.error('NRI workspace health check failed');
+      }
+      response.writeHead(healthy ? 200 : 503, {
+        ...securityHeaders, 'Cache-Control': 'no-store', 'Content-Type': 'application/json; charset=utf-8',
+      }).end(request.method === 'HEAD' ? undefined : JSON.stringify({ status: healthy ? 'ok' : 'unavailable' }));
+      return;
+    }
     const route = resolveWorkspaceRoute(pathname);
 
     const redirect = (location, headers) => {

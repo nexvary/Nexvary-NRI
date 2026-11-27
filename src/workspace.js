@@ -1,3 +1,4 @@
+import { handleLicensing } from './licensing.js';
 import { handleTeam, resolveTeamRoute } from './teams.js';
 import { createPrivacyHandler } from './privacy.js';
 import { handleMessageModeration } from './moderation.js';
@@ -38,6 +39,7 @@ export function resolveWorkspaceRoute(pathname) {
   if (pathname === '/workspace/assistant') return { kind: 'assistant' };
   if (pathname === '/workspace/education') return { kind: 'education' };
   if (pathname === '/workspace/settings/message-moderation') return { kind: 'settings-message-moderation' };
+  if (pathname === '/workspace/settings/licensing') return { kind: 'settings-licensing' };
   if (pathname === '/workspace/settings/privacy') return { kind: 'settings-privacy' };
   if (pathname === '/workspace/settings/mfa') return { kind: 'settings-mfa' };
   if (pathname === '/workspace/settings') return { kind: 'settings' };
@@ -214,6 +216,10 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
       handleMessageModeration({ request, reply, redirect, lang, account, form, store });
       return;
     }
+    if (kind === 'settings-licensing') {
+      handleLicensing({ reply, redirect, lang, account, form, store });
+      return;
+    }
     if (kind === 'settings-privacy') {
       await handlePrivacy({ reply, redirect, lang, account, form, token, expiredCookie: sessionCookie('', 0) });
       return;
@@ -321,6 +327,11 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
       else redirect(workspacePath(lang, id));
       return;
     }
-    redirect(workspacePath(lang, store.createProject(account.id, values)));
+    const created = store.createProject(account.id, values);
+    if (!created) {
+      show(429, 'index', { account, projects: store.listProjects(account.id), values, error: 'projectLimit' });
+      return;
+    }
+    redirect(workspacePath(lang, created));
   };
 }

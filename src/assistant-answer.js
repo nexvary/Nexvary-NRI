@@ -36,7 +36,8 @@ export function createAssistantAnswerHandler(store, provider) {
     if (!project) return reply(404);
     const configuration = store.assistantSettings.summary(account.id);
     const sources = candidates(store, account.id, project.id);
-    const external = configuration.provider === 'openai' && provider.policy?.model === configuration.model;
+    const entitlementTokens = store.licensing.aiTokens(account.id);
+    const external = entitlementTokens > 0 && configuration.provider === 'openai' && provider.policy?.model === configuration.model;
     const available = external || (configuration.provider === 'local' && provider.localAvailable);
     const disclosure = createHash('sha256').update(JSON.stringify([configuration.model, sources])).digest('hex');
     const question = (form?.get('question') ?? '').trim();
@@ -119,7 +120,7 @@ export function createAssistantAnswerHandler(store, provider) {
         ${notice ? `<p role="alert">${notice}</p>` : ''}
         ${available ? `<p>${t('Model', 'النموذج')} <bdi>${escapeHtml(configuration.model)}</bdi></p>` : ''}
         ${usage ? `<p>${t('Today (UTC) · reserved tokens and estimated cost', 'اليوم (UTC) · الرموز المحجوزة والتكلفة التقديرية')}
-          <bdi>${usage.tokens} / ${provider.policy.limits.tokens} · ${dollars(usage.cost)} / ${dollars(provider.policy.limits.cost)}</bdi></p>
+          <bdi>${usage.tokens} / ${Math.min(provider.policy.limits.tokens, entitlementTokens)} · ${dollars(usage.cost)} / ${dollars(provider.policy.limits.cost)}</bdi></p>
           <p>${t('Provider-reported tokens and estimated cost', 'الرموز التي أبلغ عنها المزوّد والتكلفة التقديرية')}
           <bdi>${usage.observedTokens} · ${dollars(usage.observedCost)}</bdi></p>` : ''}
         ${available && sources.length ? `<form class="workspace-form" method="post" action="${path}?lang=${lang}">

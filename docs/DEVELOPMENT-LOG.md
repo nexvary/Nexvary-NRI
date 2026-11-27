@@ -132,3 +132,8 @@
 
 - Added five team roles, version-bound invitations, role-aware contribution and review, and attributable access and version history.
 - 54/54 with real report rendering. Chromium created a manuscript and captured both locales.
+
+## 2026-11-27 · NRI-19a local licensing and readiness
+
+- Added MFA-gated operator plans, dated entitlements, project and external token ceilings, audit history and a SQLite health endpoint.
+- 55/55 with real report rendering. Chromium saved a plan and captured bilingual layouts. The recovery guide records deployment rehearsal and rollback for the loopback release.

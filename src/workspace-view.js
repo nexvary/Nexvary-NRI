@@ -2,6 +2,7 @@ const labels = {
   signIn: ['Sign in', 'تسجيل الدخول'],
   signOut: ['Sign out', 'تسجيل الخروج'],
   email: ['Email address', 'البريد الإلكتروني'],
+  projectLimit: ['Your plan’s project limit has been reached.', 'بلغت الحد الأقصى للمشاريع في خطتك.'],
   mfaCode: ['Authenticator or recovery code (if enabled)', 'رمز المصادقة أو الاسترداد، إذا كان التحقق مفعّلًا'],
   password: ['Password', 'كلمة المرور'],
   credentials: ['The sign-in details are incorrect.', 'بيانات تسجيل الدخول غير صحيحة.'],

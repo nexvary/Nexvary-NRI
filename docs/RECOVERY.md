@@ -23,3 +23,12 @@ The app has no scheduled backup retention on a local workspace. The operator con
 Account export is a sensitive JSON download and includes owned PDF versions as base64. It includes the user's sent message bodies and excludes other participants' message bodies, credential material, recovery codes, session tokens and provider API keys. The response has a 64 MiB limit. Large documents can also be downloaded individually through the owned project library.
 
 Team manuscripts and reviews belong to their project. Deleting a contributor removes their memberships and clears their identity on surviving project contributions and audit records. Deleting the project owner removes those projects and team records. An export includes manuscript versions and review records from owned projects or authored by the exporting account.
+
+## Local release and recovery drill
+
+1. Stop writes before a release and create a new protected backup using the commands above.
+2. Restore the bundle to a separate directory. Start the candidate build against the restored database on a spare loopback port. Startup applies versioned schema changes transactionally and rejects a database newer than the running build.
+3. Check `GET /healthz`, sign in with a test account and verify an owned document, a project team, and any plan limits in use. The health endpoint returns HTTP 200 when the SQLite schema is available and current or 503 on failure. It exposes no account or plan details. Collect its status and service stderr using the operator's existing local monitoring.
+4. Promote the candidate only after the drill succeeds. For rollback, select the prior build and restore the pre-upgrade bundle into a separate directory. Reconcile deletions and other writes since the snapshot before switching workspaces. Record the measured restore time and data-loss window during the drill.
+
+The current release binds to loopback. Public hosting, reverse-proxy trust, HTTPS session cookies, production alerts, key administration and disaster-recovery objectives require their own verification before public deployment.
