@@ -29,6 +29,7 @@ export function settingsStore(db, now) {
 }
 
 const labels = {
+  privacy: ['Account data and privacy', 'بيانات الحساب والخصوصية'],
   moderation: ['Message reports', 'بلاغات الرسائل'],
   mfa: ['Two-step verification', 'التحقق بخطوتين'],
   title: ['Account security', 'أمان الحساب'],
@@ -54,6 +55,7 @@ export function settingsPage(store, lang, account, token) {
     html: `<section class="surface panel detail workspace-page"><h1>${t('title')}</h1>
       <a href="${workspacePath(lang)}">${t('back')}</a>
       <a href="/workspace/settings/mfa?lang=${lang}">${t('mfa')}</a>
+      <a href="/workspace/settings/privacy?lang=${lang}">${t('privacy')}</a>
       ${store.messages.isModerator(account.id) ? `<a href="/workspace/settings/message-moderation?lang=${lang}">${t('moderation')}</a>` : ''}
       <dl class="reference-meta"><div><dt>${t('email')}</dt><dd><bdi>${escapeHtml(account.email)}</bdi></dd></div>
         <div><dt>${t('other')}</dt><dd>${current}</dd></div></dl>

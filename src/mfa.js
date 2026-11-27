@@ -99,6 +99,14 @@ export function mfaStore(db, workspaceKey, now, transact, revokeOthers) {
         });
       });
     },
+    authorizePrivacy(account, code, stillSignedIn, operation) {
+      return transact(db, () => {
+        if (!stillSignedIn()) return { status: 403 };
+        const row = get.get(account);
+        if (row?.pending_until === 0 && !verify(account, row, code)) return { status: 401 };
+        return operation();
+      });
+    },
     verify(account, code) {
       return transact(db, () => verify(account, get.get(account), code));
     },

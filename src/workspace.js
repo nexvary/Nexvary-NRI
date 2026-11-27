@@ -1,3 +1,4 @@
+import { createPrivacyHandler } from './privacy.js';
 import { handleMessageModeration } from './moderation.js';
 import { createMfaSettingsHandler } from './mfa-settings.js';
 import { handleMessages, resolveMessageRoute } from './messages.js';
@@ -36,6 +37,7 @@ export function resolveWorkspaceRoute(pathname) {
   if (pathname === '/workspace/assistant') return { kind: 'assistant' };
   if (pathname === '/workspace/education') return { kind: 'education' };
   if (pathname === '/workspace/settings/message-moderation') return { kind: 'settings-message-moderation' };
+  if (pathname === '/workspace/settings/privacy') return { kind: 'settings-privacy' };
   if (pathname === '/workspace/settings/mfa') return { kind: 'settings-mfa' };
   if (pathname === '/workspace/settings') return { kind: 'settings' };
   if (pathname === '/workspace/analytics') return { kind: 'analytics' };
@@ -83,6 +85,7 @@ function projectFields(form) {
 }
 
 export function createWorkspaceHandler(store, providers, version, reportRenderer, assistantProvider) {
+  const handlePrivacy = createPrivacyHandler(store);
   const handleMfaSettings = createMfaSettingsHandler(store);
   const handleAssistantAnswer = createAssistantAnswerHandler(store, assistantProvider);
   const handleDocuments = createDocumentHandler(store);
@@ -204,6 +207,10 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
     }
     if (kind === 'settings-message-moderation') {
       handleMessageModeration({ request, reply, redirect, lang, account, form, store });
+      return;
+    }
+    if (kind === 'settings-privacy') {
+      await handlePrivacy({ reply, redirect, lang, account, form, token, expiredCookie: sessionCookie('', 0) });
       return;
     }
     if (kind === 'settings-mfa') {

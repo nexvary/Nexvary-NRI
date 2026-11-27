@@ -122,3 +122,8 @@
 
 - Added a locally provisioned moderator role and decision queue limited to reported messages. Review conflicts, immutable decisions and live role revocation are verified.
 - 52/52 with real report rendering. Chromium captured bilingual report review. Remaining NRI-18 work starts with account export and deletion.
+
+## 2026-11-27 · NRI-18c account privacy
+
+- Added password/MFA-confirmed data export and transactional deletion with explicit confirmation.
+- Verified isolation, credential and data removal, and restoration semantics for pre- and post-deletion backups. Chromium exercised export and captured the privacy page.

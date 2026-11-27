@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { once } from 'node:events';
+import { hashPassword } from '../src/password.js';
 import { createApp } from '../src/server.js';
 import { openWorkspaceStore } from '../src/store.js';
 
@@ -11,7 +12,8 @@ const profiles = await mkdtemp(join(tmpdir(), 'nri-visual-'));
 const output = process.argv[2] ?? join(profiles, 'screenshots');
 const store = openWorkspaceStore();
 const email = 'visual@example.test';
-store.addAccount(email, { salt: Buffer.alloc(16), hash: Buffer.alloc(32) });
+const fixturePassword = 'browser fixture password';
+store.addAccount(email, await hashPassword(fixturePassword));
 const { id } = store.credentials(email);
 const session = store.newSession(id);
 const project = store.createProject(id, { title: 'Source review sample', description: '' });
@@ -183,6 +185,23 @@ try {
         await send('Page.navigate', { url: origin + '/workspace/settings/mfa?lang=' + lang });
         await waitFor(() => inspect(send, 'Boolean(document.querySelector("button[value=begin]"))'), 'MFA settings');
         await captureLayout(send, 'mfa', lang, name, width, height);
+        await send('Page.navigate', { url: origin + '/workspace/settings/privacy?lang=' + lang });
+        await waitFor(() => inspect(send, 'Boolean(document.querySelector("button[value=export]"))'), 'account privacy settings');
+        await captureLayout(send, 'privacy', lang, name, width, height);
+        if (lang === 'ar') {
+          const downloads = join(profiles, 'downloads');
+          await mkdir(downloads, { recursive: true });
+          await send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: downloads });
+          await inspect(send, `(() => {
+            const button = document.querySelector('button[value=export]');
+            button.form.elements.password.value = ${JSON.stringify(fixturePassword)};
+            setTimeout(() => button.form.requestSubmit(button), 0);
+          })()`);
+          const exported = await waitFor(() => readFile(join(downloads, 'nri-account-export.json'), 'utf8').catch((error) => {
+            if (error.code !== 'ENOENT') throw error;
+          }), 'reauthenticated JSON download');
+          assert.equal(JSON.parse(exported).account.email, email);
+        }
         const moderatorCookie = await send('Network.setCookie', {
           url: origin, name: 'nri_session', value: moderatorSession, httpOnly: true, sameSite: 'Strict',
         });

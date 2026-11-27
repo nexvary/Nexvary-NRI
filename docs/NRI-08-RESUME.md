@@ -18,4 +18,6 @@ NRI-18a adds optional authenticator MFA, one-use recovery codes and transactiona
 
 NRI-18b adds the local operator-managed message moderator role and report decisions, with private threads still participant-only. See `src/message-store.js`, `src/moderation.js` and `test/messages.test.js`. Full regression: 52/52. The browser harness now captures Assistant, messaging, MFA settings and report review.
 
-Next: fetch and fast-forward to the PR head. Implement owner-scoped account export and deletion in the authenticated settings routes. Verify foreign-origin denial, destructive confirmation, cleanup of files/credentials/sessions and recovery behavior from paired workspace backups. Continue broader project RBAC, commercial readiness and the other incomplete items in the [functional matrix](STATUS.md#functional-acceptance).
+NRI-18c adds credential-confirmed account export/deletion in `src/privacy.js` and `src/privacy-store.js`. `test/privacy.test.js` covers isolation, deletion and restore behavior. Keep the backup policy in [RECOVERY.md](RECOVERY.md#account-deletion-and-retention) aligned with future data stores.
+
+Next: add project RBAC and expand invitations from summary-only to attributable, role-scoped access. Preserve existing summary-only grants, verify direct URL denial, and integrate immutable manuscript and evidence review history. Continue commercial readiness and remaining items from the [functional matrix](STATUS.md#functional-acceptance).

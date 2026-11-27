@@ -1,3 +1,4 @@
+import { privacyStore } from './privacy-store.js';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { closeSync, mkdirSync, openSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -107,6 +108,7 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
   let readiness;
   let economics;
   try {
+    db.exec('PRAGMA secure_delete = ON');
     workspaceKey = initialize(db, path);
     documents = documentStore(db, workspaceKey, now, transact);
     assistantSettings = assistantSettingsStore(db, workspaceKey);
@@ -152,9 +154,15 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
     return token;
   }
 
+  const mfa = mfaStore(db, workspaceKey, now, transact, revokeOthers);
+  const privacy = privacyStore(db, workspaceKey, now);
   return {
+    privacyAction(owner, token, code, action) {
+      return mfa.authorizePrivacy(owner, code, () => getSession.get(tokenHash(token), now())?.id === owner, () =>
+        action === 'export' ? privacy.export(owner) : { status: privacy.delete(owner) ? 303 : 403 });
+    },
     assistantSettings,
-    mfa: mfaStore(db, workspaceKey, now, transact, revokeOthers),
+    mfa,
     messages: messageStore(db, workspaceKey, now, transact),
     assistantUsage: assistantUsageStore(db, now, transact),
     documents,

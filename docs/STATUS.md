@@ -1,5 +1,12 @@
 # Development status
 
+## NRI-18c · Account export and deletion · 2026-11-27 (Cairo)
+
+Authenticated users can export their account data and owned PDFs or permanently delete the live account. Both actions require password confirmation and a fresh MFA or recovery code when configured. Deletion also requires typing DELETE. The transaction removes credentials, sessions, owned projects, linked documents and messaging data. The [retention and recovery policy](RECOVERY.md#account-deletion-and-retention) describes backup behavior.
+
+- HTTP coverage verifies MFA replay rejection, explicit confirmation, cross-origin and cross-account isolation, credential and private data cleanup, and restores from before and after deletion.
+- Chromium exercised the export and captured [Arabic desktop](qa/nri-18/privacy-ar-desktop.webp) and [English mobile](qa/nri-18/privacy-en-mobile.webp).
+
 ## NRI-18b · Scoped message moderation · 2026-11-27 (Cairo)
 
 A local operator can grant or revoke the message moderator role. Moderators see reported messages and can record one attributed decision per report. The rest of a conversation remains participant-only. Moderators cannot adjudicate their own reports or reports about messages they sent.
@@ -223,7 +230,7 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | NRI-15 | Verified | Versioned Arabic/English PDF and DOCX downloads with citations, evidence, L-READY findings and limitations. Requires the documented local renderer. |
 | NRI-16 | Partial | System About view shows the purpose, framework wording, build version and documentation links. Changelog, licensing, privacy, terms and support content remain. |
 | NRI-17 | Partial | Separate developer view identifies Nexvary Inc. and links to the official company site. Dedicated confirmed contact information remains. |
-| NRI-18 | Partial | Local authentication, session revocation, account audit, authorization, encrypted PDF bytes, RTL/LTR and verified recovery are implemented. NRI-18a adds optional MFA and one-use recovery codes. NRI-18b adds the operator-managed message moderator role and scoped report review. Team RBAC, password/account recovery, export/deletion, accessibility audit and broader administration remain. |
+| NRI-18 | Partial | Local authentication, session revocation, account audit, authorization, encrypted PDF bytes, RTL/LTR and verified recovery are implemented. NRI-18a adds optional MFA and one-use recovery codes. NRI-18b adds the operator-managed message moderator role and scoped report review. Team RBAC, password/account recovery, accessibility audit and broader administration remain. |
 | NRI-19 | Partial | Local restore and regression workflow configuration are implemented. Entitlements, approved hosting, operational monitoring and billing remain. |
 
-Next milestone: account data export and deletion, then broader roles and commercial readiness.
+Next milestone: project roles, collaborative manuscript and evidence workflows, and commercial readiness.
