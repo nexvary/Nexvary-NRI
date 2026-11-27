@@ -6,7 +6,8 @@ The signed-in Assistant reviews a project's saved provider snapshots and links b
 
 - Baseline: main at `0c643a4` (merged PR #18).
 - Targeted tests: 6 passed. The full Node suite passed 45 tests, with the bilingual report renderer integration test skipped because the optional local report runtime was unavailable.
-- HTTP acceptance covered English and Arabic, guest redirects, cross-account denial, escaped metadata, provider-status distinctions, bounded results and a read-only route. Browser capture remains pending.
+- HTTP acceptance covered English and Arabic, guest redirects, cross-account denial, escaped metadata, provider-status distinctions, bounded results and a read-only route. Chromium submitted the project selector and verified the saved source, text direction and viewport width at all four sizes. Captures: [Arabic desktop](qa/nri-08a/assistant-ar-desktop.webp), [Arabic mobile](qa/nri-08a/assistant-ar-mobile.webp), [English desktop](qa/nri-08a/assistant-en-desktop.webp), [English mobile](qa/nri-08a/assistant-en-mobile.webp).
+- Resumption regression: 46/46 with the real PDF/DOCX renderer enabled.
 - Next: BYOK provider and model selection, consent for external data, grounded answers, durable usage and cost limits, cancellation and caching. NRI-11 follows.
 
 ## P7c · Bilingual research learning library · 2026-11-27 (Cairo)

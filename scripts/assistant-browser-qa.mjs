@@ -59,20 +59,24 @@ async function inspect(send, expression) {
   return result.value;
 }
 
-async function waitFor(check) {
+async function waitFor(check, description) {
   for (let attempt = 0; attempt < 50; attempt += 1) {
     const value = await check();
     if (value) return value;
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  throw new Error('Browser condition timed out');
+  throw new Error('Browser condition timed out: ' + description);
 }
 
 const chrome = spawn(process.env.NRI_CHROME ?? 'google-chrome', [
-  '--headless', '--disable-dev-shm-usage', '--remote-debugging-port=0',
+  '--headless', '--disable-dev-shm-usage', '--remote-debugging-address=127.0.0.1', '--remote-debugging-port=0',
+  // Hosted CI uses a disposable runner and opens only our synthetic loopback fixture.
+  ...(process.env.GITHUB_ACTIONS === 'true' ? ['--no-sandbox'] : []),
   '--user-data-dir=' + profiles, 'about:blank',
 ], { stdio: ['ignore', 'ignore', 'pipe'] });
-const exited = once(chrome, 'exit');
+const exited = new Promise((resolve) => {
+  chrome.once('close', resolve);
+});
 let browserOutput = '';
 let launchError;
 chrome.on('error', (error) => { launchError = error; });
@@ -84,8 +88,11 @@ try {
   await mkdir(output, { recursive: true });
   const devtools = await waitFor(() => {
     if (launchError) throw launchError;
+    if (chrome.exitCode !== null || chrome.signalCode !== null) {
+      throw new Error('Chrome exited before DevTools was available:\n' + browserOutput.trim());
+    }
     return browserOutput.match(/DevTools listening on ws:\/\/(127\.0\.0\.1:\d+)/)?.[1];
-  });
+  }, 'DevTools startup');
   for (const lang of ['ar', 'en']) {
     for (const [name, width, height] of [['desktop', 1440, 920], ['mobile', 390, 844]]) {
       const tabResponse = await fetch('http://' + devtools + '/json/new?about:blank', { method: 'PUT' });
@@ -103,14 +110,14 @@ try {
       });
       assert.equal(success, true);
       await send('Page.navigate', { url: origin + '/workspace/assistant?lang=' + lang });
-      await waitFor(() => inspect(send, 'Boolean(document.querySelector("select[name=project]"))'));
+      await waitFor(() => inspect(send, 'Boolean(document.querySelector("select[name=project]"))'), 'Assistant project selector');
       assert.equal(await inspect(send, `(() => {
         const field = document.querySelector('select[name=project]');
         field.value = ${JSON.stringify(project)};
         field.form.requestSubmit();
         return Boolean(field.value);
       })()`), true);
-      await waitFor(() => inspect(send, 'Boolean(document.body?.innerText.includes("Illustrative reference snapshot"))'));
+      await waitFor(() => inspect(send, 'Boolean(document.body?.innerText.includes("Illustrative reference snapshot"))'), 'saved source result');
       const layout = await inspect(send, `document.fonts.ready.then(() => ({
         lang: document.documentElement.lang, direction: document.documentElement.dir,
         viewport: document.documentElement.clientWidth, page: document.documentElement.scrollWidth,

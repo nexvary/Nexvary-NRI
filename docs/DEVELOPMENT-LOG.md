@@ -85,3 +85,9 @@
 - Replaced the Assistant placeholder with a signed-in bilingual source review. Uses saved, owner-scoped snapshots, including historical provider notices. The local review uses no external APIs.
 - Targeted regression: 6/6. Full suite: 45 passed, zero failures and one optional report-renderer integration test skipped locally. Browser captures are pending.
 - Continue with BYOK, explicit external sharing consent and metered, cited answers before starting messaging.
+
+## 2026-11-27 · NRI-08a visual acceptance after resumption
+
+- Resumed draft PR #19 at `02e2cb4`. The baseline passes 46/46 with the bilingual renderer.
+- Exercised saved-source review in Chromium in both languages and at desktop and mobile sizes. The four captures are linked from [STATUS.md](STATUS.md).
+- The old CI run timed out during DevTools startup. Added launch diagnostics and a hosted-runner launch setting for the isolated fixture.
