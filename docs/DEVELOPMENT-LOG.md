@@ -198,3 +198,7 @@
 
 - Added authenticated archive export and restore, preserving local paired bundles for compatibility.
 - Verified preservation of PDF content and isolation of failed restores, with 66/66 local tests. Added optional systemd backup units with syntax verification.
+
+## 2026-11-27 · Local concurrent workspace load
+
+- Ran 24- and 48-client mixed read/write/isolation workloads against disposable on-disk SQLite stores. The runs completed 1,440 and 2,880 requests respectively with no unexpected outcomes. Recorded throughput, latency and resource measurements in [DEPLOYMENT.md](DEPLOYMENT.md#sqlite-workload-measurements).

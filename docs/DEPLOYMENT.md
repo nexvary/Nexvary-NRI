@@ -33,3 +33,14 @@ Run one application process per SQLite database. Use direct TLS in this configur
 On Debian or Ubuntu with systemd credentials support, install `deploy/nri-backup.service` and `deploy/nri-backup.timer` beside the application unit. Create `/var/backups/nri` on a protected encrypted volume with ownership `nri:nri` and mode `0700`. Provision a separate 32-byte archive key at `/etc/nri/backup.key` using the [recovery guide](RECOVERY.md#encrypted-export-and-restore). Keep the key accessible to systemd with owner-only permissions. Adjust paths for the selected host.
 
 After installation, run `systemctl start nri-backup.service`, inspect its journal and restore the archive to a separate staging directory. Enable recurring exports with `systemctl enable --now nri-backup.timer` after the restore drill. Monitor failed units and the age of the latest successful archive using the host's alerting. Set retention and off-host replication with the operator. Keep backup keys separate from replicated archives.
+
+## SQLite workload measurements
+
+Run `node scripts/workspace-load.mjs 24 20` and `node scripts/workspace-load.mjs 48 20` from the checkout. The harness provisions a disposable on-disk SQLite database, warms it with one project per account, and uses one loopback HTTP process with concurrent client sessions. Each round loads the account's project list, checks rejection of another account's direct project URL, and creates a project through the normal form endpoint. It checks every response and the final per-account project count.
+
+| Concurrent clients | Total requests | Requests/sec | Read p95 | Write p95 | Denial p95 | Process RSS at end | SQLite size |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 24 | 1,440 | 1,142 | 40 ms | 28 ms | 29 ms | 148 MiB | 704,512 B |
+| 48 | 2,880 | 1,280 | 57 ms | 46 ms | 46 ms | 211 MiB | 847,872 B |
+
+Measured on 2026-11-27 using Node.js 24.22.3 in the development environment. Both runs completed with all expected results and cross-account denials. RSS includes the client and server in the same process. These short runs support retaining SQLite for the measured workload. On the target host, repeat with realistic data volume, concurrent report rendering and uploads, HTTPS, backups, and a sustained workload before setting capacity limits or evaluating a different database.

@@ -49,3 +49,5 @@ Release acceptance increment from `596c855`: DOI registration agency lookups thr
 Operator recovery increment: `npm run account:reset -- researcher@example.org` requires a private terminal and the existing workspace database. Migration preserves security history and password reset preserves MFA. Self-service recovery and workspace key rotation remain open.
 
 Encrypted backup increment: use `workspace:export` and `workspace:import` with a separate private 32-byte key file. The restore integration test covers authentication and PDF recovery. See [RECOVERY.md](RECOVERY.md) and the optional timer in [DEPLOYMENT.md](DEPLOYMENT.md). Key rotation must account for existing MFA recovery digests as well as encrypted records.
+
+The bounded SQLite load harness covers project-list reads, project creation and cross-account direct routes. The [deployment guide](DEPLOYMENT.md#sqlite-workload-measurements) records both measurements and remaining target-host checks.

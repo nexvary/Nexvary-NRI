@@ -1,5 +1,9 @@
 # Development status
 
+## SQLite mixed-workload baseline · 2026-11-27 (Cairo)
+
+Verified 1,440 requests with 24 clients and 2,880 with 48 clients across bilingual workspace reads, project writes and cross-account access denials. See [measurements and scope](DEPLOYMENT.md#sqlite-workload-measurements).
+
 ## Encrypted backup export and restore · 2026-11-27 (Cairo)
 
 Authenticated archives protect SQLite data and its paired workspace key. Disposable-workspace tests cover restoration of encrypted documents, dropped sessions, wrong keys, tampering, truncation and existing destinations. The full local suite passes 66/66 with real bilingual report rendering. A systemd backup timer template passes unit-file verification. Host scheduling and retention require a host drill.
@@ -331,6 +335,6 @@ The matrix records accumulated module evidence and the current increment. The ap
 | NRI-16 | Partial | Bilingual purpose, version, changelog, licensing status, privacy and terms drafts, support and framework limitations are verified in HTTP tests and Chromium. Final legal text and distribution license require owner approval. |
 | NRI-17 | Verified | Bilingual developer page names Nexvary Inc. and provides the official website, contact form, email, GitHub, YouTube and X. HTTP tests verify its separation from the System page. Chromium captures both locales. |
 | NRI-18 | Partial | Local authentication, session revocation, account audit, authorization, encrypted PDF bytes, RTL/LTR and verified recovery are implemented. NRI-18a adds optional MFA and one-use recovery codes. NRI-18b adds the operator-managed message moderator role and scoped report review. Project team RBAC is verified for manuscripts and evidence review. Audited local operator password reset is verified. Authenticated backup export and restore are verified. Self-service recovery, key rotation, the accessibility audit and broader administration remain. |
-| NRI-19 | Partial | Local restore and regression workflow configuration are implemented. Local plans, entitlement limits, an MFA-protected operator console, migration/restore drills and schema health checks are verified. Direct HTTPS staging, session hardening, structured logs, a service configuration and upgrade/rollback rehearsal are verified. Encrypted backup export and restore are verified locally. Host backup scheduling, alerting, capacity validation, key rotation and optional billing remain. |
+| NRI-19 | Partial | Local restore and regression workflow configuration are implemented. Local plans, entitlement limits, an MFA-protected operator console, migration/restore drills and schema health checks are verified. Direct HTTPS staging, session hardening, structured logs, a service configuration and upgrade/rollback rehearsal are verified. Encrypted backup export and restore are verified locally. Short SQLite mixed-workload runs with 24 and 48 clients passed. Host backup scheduling, alerting, sustained capacity validation, key rotation and optional billing remain. |
 
 Next milestone: remaining functional acceptance items and final release review.
