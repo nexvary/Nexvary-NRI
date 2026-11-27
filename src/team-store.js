@@ -137,6 +137,26 @@ export function teamStore(db, now, transact) {
     FROM team_reviews r LEFT JOIN team_manuscript_versions v ON v.id=r.manuscript_version
     LEFT JOIN team_manuscripts m ON m.id=v.manuscript_id WHERE r.project_id=? ORDER BY r.id DESC LIMIT 100`);
 
+  const reviewableReadiness = db.prepare(`
+    SELECT r.revision, r.assessment_id, r.intended_use, r.reviewer AS author, r.recorded_at, r.dimensions, r.safety, r.authorization
+    FROM readiness_revisions r WHERE r.project_id = ?
+      AND r.revision = (SELECT MAX(v.revision) FROM readiness_revisions v WHERE v.assessment_id = r.assessment_id AND v.project_id = r.project_id)
+    ORDER BY r.revision DESC LIMIT 100
+  `);
+  const readinessRevision = db.prepare(`
+    SELECT r.reviewer AS author, r.revision = (SELECT MAX(v.revision) FROM readiness_revisions v
+      WHERE v.assessment_id = r.assessment_id AND v.project_id = r.project_id) AS latest
+    FROM readiness_revisions r WHERE r.project_id = ? AND r.revision = ?
+  `);
+  const insertReadinessReview = db.prepare(`
+    INSERT INTO readiness_reviews VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(revision, reviewer) DO NOTHING
+  `);
+  const readinessHistory = db.prepare(`
+    SELECT x.*, r.intended_use FROM readiness_reviews x JOIN readiness_revisions r ON r.revision = x.revision
+    WHERE r.project_id = ? ORDER BY x.recorded_at DESC, x.rowid DESC LIMIT 100
+  `);
+
   const isBlocked = (first, second) => Boolean(blocked.get(first, second, second, first));
   function access(actor, id) {
     const row = project.get(id);
@@ -230,6 +250,7 @@ export function teamStore(db, now, transact) {
         versions: manuscript ? versions.all(id, manuscript) : [],
         metadata: manuscript ? metadata.all(id, manuscript) : [],
         evidence: evidence.all(id), reviews: reviews.all(id),
+        readiness: reviewableReadiness.all(id), readinessHistory: readinessHistory.all(id),
         members: current.rights.includes('manage') ? members.all(id) : [],
         events: current.rights.includes('audit') ? audit.all(id) : [],
       };
@@ -266,6 +287,20 @@ export function teamStore(db, now, transact) {
         addVersion.run(manuscript, version, actor, body, now());
         record(id, actor, null, 'version', manuscript + ':' + version);
         return manuscript;
+      });
+    },
+    reviewReadiness(actor, id, { revision, decision, note, independence }) {
+      return transact(db, () => {
+        if (access(actor, id)?.role !== 'reviewer') return 403;
+        if (!Number.isSafeInteger(revision) || revision <= 0 || independence !== 'declared' ||
+            !['accepted', 'changes-requested'].includes(decision) || !note || note.length > 2000) return 422;
+        const target = readinessRevision.get(id, revision);
+        if (!target) return 404;
+        if (target.author === actor) return 403;
+        if (!target.latest) return 409;
+        if (!insertReadinessReview.run(revision, actor, decision, note, now()).changes) return 409;
+        record(id, actor, null, 'review', 'readiness:' + revision);
+        return 303;
       });
     },
     review(actor, id, { version, item, outcome, note }) {

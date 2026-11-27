@@ -22,13 +22,13 @@ import { observatorySchema, observatoryStore } from './observatory-store.js';
 import { networkSchema, networkStore } from './network-store.js';
 import { libraryStore } from './library.js';
 import { economicsSchema, economicsStore } from './economics.js';
-import { readinessSchema, readinessStore } from './readiness-store.js';
+import { readinessReviewSchema, readinessSchema, readinessStore } from './readiness-store.js';
 import { evidenceSchema, evidenceStore } from './evidence-store.js';
 import { referenceSchema, referenceMigrationV4, referenceStore } from './reference-store.js';
 
 export const sessionLifetime = 8 * 60 * 60;
 export const sessionIdle = 30 * 60_000;
-const schemaVersion = 28;
+const schemaVersion = 29;
 const schema = `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -107,6 +107,7 @@ function initialize(db, path) {
     if (version < 26) db.exec(quotaSchema);
     if (version < 27) db.exec(passwordRecoverySchema);
     if (version < 28) db.exec(workspaceKeyVersionSchema);
+    if (version < 29) db.exec(readinessReviewSchema);
     return bindDocumentKey(db, path);
   });
 }

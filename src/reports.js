@@ -76,6 +76,15 @@ export function buildReport(store, owner, project, lang, release, now = Date.now
   for (const revision of store.readiness.list(owner, project.id)) {
     if (!revisions.has(revision.id)) revisions.set(revision.id, revision);
   }
+  const independent = new Map();
+  for (const review of store.readiness.reviews(owner, project.id)) {
+    if (!independent.has(review.revision)) independent.set(review.revision, []);
+    independent.get(review.revision).push(review);
+  }
+  const reviewRows = [...revisions.values()].flatMap((revision) => (independent.get(revision.revision) ?? []).map((review) => [
+    revision.intendedUse, String(revision.revision),
+    `${review.decision === 'accepted' ? tr(['Accepted','مقبول']) : tr(['Changes requested','طُلبت تعديلات'])} · ${utc(review.recorded_at)}\n${review.note}`,
+  ]));
   const table = (title, keys, rows) => rows.length
     ? { title: t(title), headers: keys.map(t), rows } : { title: t(title), text: [t('empty')] };
   const notice = (metadata) => {
@@ -103,6 +112,10 @@ export function buildReport(store, owner, project, lang, release, now = Date.now
           row.evidence ? sourceLine(row.evidence.source) : '', row.limits,
           `${t(readinessState(revision))}\n${utc(revision.recordedAt)}`,
         ]))),
+      ...(reviewRows.length ? [{
+        title: tr(['Independent L-READY reviews', 'مراجعات L-READY المستقلة']),
+        headers: [t('intended'), t('version'), t('review')], rows: reviewRows,
+      }] : []),
       { title: t('limitations'), text: [t('scope'), ...(project.description ? [project.description] : [])] },
     ],
   };

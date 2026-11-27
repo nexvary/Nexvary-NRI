@@ -59,3 +59,6 @@ Private TXT upload, preview, versioning and quota enforcement passed [CI](https:
 
 
 Private DOCX upload and plain-text preview passed [CI](https://github.com/nexvary/Nexvary-NRI/actions/runs/46010490212). Install Python 3.10+ for DOCX upload and preview. `NRI_DOCX_PYTHON` may select a specific interpreter.
+
+
+Workspace key rotation passed [CI](https://github.com/nexvary/Nexvary-NRI/actions/runs/46011042141) on disposable workspaces. Follow [RECOVERY.md](RECOVERY.md#workspace-encryption-key-rotation) for staging, promotion and rollback.

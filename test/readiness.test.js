@@ -1,3 +1,4 @@
+import { buildReport } from '../src/reports.js';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { test } from 'node:test';
@@ -55,5 +56,46 @@ test('records a private six-dimension L-READY assessment and preserves revisions
     assert.match(page, /Revision history/);
   } finally {
     await new Promise((resolve, reject) => app.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
+
+test('binds independent readiness review to a current project revision and exports it', () => {
+  const store = openWorkspaceStore();
+  try {
+    const accounts = ['owner', 'reviewer', 'outsider'].map((name) => {
+      const email = name + '@readiness.test';
+      store.addAccount(email, { salt: Buffer.alloc(16), hash: Buffer.alloc(32) });
+      return store.credentials(email).id;
+    });
+    const [owner, reviewer, outsider] = accounts;
+    const project = store.createProject(owner, { title: 'Independent review', description: '' });
+    const assessment = {
+      intendedUse: 'Fixture use', dimensions: [...'LREADY'].map((letter) => ({ letter, level: 'unavailable', limits: 'Evidence missing' })),
+      safety: 'unresolved', authorization: 'missing',
+    };
+    assert.equal(store.readiness.save(owner, project, assessment), true);
+    const [first] = store.readiness.list(owner, project);
+    store.network.save(reviewer, { name: 'Fixture reviewer', interests: '', orcid: '', discoverable: true });
+    assert.equal(store.teams.grant(owner, project, reviewer, 'reviewer'), true);
+    const [invitation] = store.teams.inbox(reviewer);
+    assert.equal(store.teams.decide(reviewer, project, 'reviewer', invitation.invitation, 'accepted'), true);
+    const input = { revision: first.revision, decision: 'changes-requested', note: 'Verify safety evidence', independence: 'declared' };
+    assert.equal(store.teams.reviewReadiness(owner, project, input), 403);
+    assert.equal(store.teams.reviewReadiness(outsider, project, input), 403);
+    assert.equal(store.teams.reviewReadiness(reviewer, project, { ...input, independence: '' }), 422);
+    assert.equal(store.teams.reviewReadiness(reviewer, project, input), 303);
+    assert.equal(store.teams.reviewReadiness(reviewer, project, input), 409);
+    const report = buildReport(store, owner, store.getProject(owner, project), 'en', 'test');
+    assert.match(JSON.stringify(report), /Verify safety evidence/);
+    assert.equal(store.readiness.reviews(outsider, project).length, 0);
+    assert.equal(store.readiness.save(owner, project, { ...assessment, id: first.id, revision: first.revision }), true);
+    assert.equal(store.teams.reviewReadiness(reviewer, project, input), 409);
+    assert.equal(store.teams.revoke(owner, project, reviewer), true);
+    const [current] = store.readiness.list(owner, project);
+    assert.equal(store.teams.reviewReadiness(reviewer, project, { ...input, revision: current.revision }), 403);
+    assert.equal(store.readiness.reviews(owner, project).length, 1);
+  } finally {
+    store.close();
   }
 });

@@ -90,6 +90,15 @@ export function handleTeam({ request, reply, redirect, route, account, form, lan
       });
       return result === 303 ? redirect(action + '&manuscript=' + manuscript) : reply(result);
     }
+    if (intent === 'review-readiness') {
+      const result = teams.reviewReadiness(actor, id, {
+        revision: Number(form.get('revision')),
+        independence: form.get('independence'),
+        decision: form.get('outcome'),
+        note: (form.get('note') ?? '').trim(),
+      });
+      return result === 303 ? redirect(action) : reply(result);
+    }
     if (intent === 'review') {
       const version = form.get('version') ?? '';
       if (version && !/^[1-9]\d{0,14}$/.test(version)) return reply(422);
@@ -113,10 +122,10 @@ export function handleTeam({ request, reply, redirect, route, account, form, lan
   const review = current.rights.includes('review');
   const peers = manage ? store.network.discover(actor, '') : [];
   const options = teamRoles.filter((role) => current.role === 'owner' || role !== 'administrator');
-  const instance = (target) => `<form class="workspace-form" method="post" action="${action}">${target}
+  const instance = (target, intent = 'review') => `<form class="workspace-form" method="post" action="${action}">${target}
     <label>${t('Outcome', 'النتيجة')}<select name="outcome"><option value="accepted">${statusLabel('accepted')}</option><option value="changes-requested">${statusLabel('changes-requested')}</option></select></label>
     <label>${t('Review note', 'ملاحظة المراجعة')}<textarea name="note" required maxlength="2000" dir="auto"></textarea></label>
-    ${button('review', t('Record review', 'سجّل المراجعة'))}</form>`;
+    ${button(intent, t('Record review', 'سجّل المراجعة'))}</form>`;
   const latest = current.versions[0];
   const meta = current.metadata[0];
   const more = (next) => action + '&amp;' + escapeHtml(new URLSearchParams({ q: query, stage, offset: next }).toString());
@@ -173,6 +182,21 @@ export function handleTeam({ request, reply, redirect, route, account, form, lan
     <ul class="project-list">${current.evidence.map((item) => `<li class="provider-block"><p dir="auto">${escapeHtml(item.statement)}</p>
       <details><summary>${t('Source snapshot', 'لقطة المصدر')}</summary><p dir="auto">${escapeHtml(item.source_snapshot)}</p></details>
       ${review ? instance(hidden('item',item.id)) : ''}</li>`).join('')}</ul>
+    <h2>${t('L-READY independent reviews','مراجعات مستقلة لتقييم L-READY')}</h2>
+    <ul class="project-list">${current.readiness.map((entry) => `<li class="provider-block">
+      <h3 dir="auto">${escapeHtml(entry.intended_use)} · v${entry.revision}</h3>
+      <details><summary>${t('Assessment snapshot', 'لقطة التقييم')}</summary>
+      <p>${t('Safety', 'السلامة')} · <bdi>${escapeHtml(entry.safety)}</bdi> ·
+      ${t('Authorization', 'التصريح')} · <bdi>${escapeHtml(entry.authorization)}</bdi></p>
+      <dl>${JSON.parse(entry.dimensions).map((row) => `<div><dt><bdi>${escapeHtml(row.letter)} · ${escapeHtml(row.level)}</bdi></dt>
+        <dd dir="auto">${escapeHtml(row.limits ?? '')}
+        ${row.evidence?.source ? `<p><bdi>${escapeHtml(row.evidence.source.identifier)} · ${escapeHtml(row.evidence.source.provider)}</bdi></p>` : ''}</dd></div>`).join('')}</dl></details>
+      ${current.role === 'reviewer' && entry.author !== actor ? instance(hidden('revision',entry.revision) +
+        `<label><input type="checkbox" name="independence" value="declared" required> ${t('I did not contribute to this assessment and have no conflict of interest.', 'لم أشارك في هذا التقييم وليس لدي تضارب مصالح.')}</label>`, 'review-readiness') : ''}</li>`).join('')}</ul>
+    <ol class="activity">${current.readinessHistory.map((entry) => `<li>
+      <bdi>${escapeHtml(entry.intended_use)}</bdi> · v${entry.revision} · ${statusLabel(entry.decision)}
+      <small><bdi>${author(entry.reviewer)}</bdi> · ${when(entry.recorded_at)}</small>
+      <p dir="auto">${escapeHtml(entry.note)}</p></li>`).join('')}</ol>
     <h2>${t('Recorded reviews', 'المراجعات المسجّلة')}</h2>
     <ul class="project-list">${current.reviews.map((item) => `<li class="provider-block">
       <p>${item.manuscript_id ? `<a href="${action}&amp;manuscript=${item.manuscript_id}"><bdi>${escapeHtml(item.manuscript_title)} · v${item.version}</bdi></a>` :

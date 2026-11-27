@@ -39,6 +39,9 @@ fixturePdf += 'xref\n0 8\n0000000000 65535 f \n' + offsets.map((offset) =>
   String(offset).padStart(10, '0') + ' 00000 n \n').join('') +
   'trailer\n<< /Size 8 /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF\n';
 const sampleDocument = store.documents.create(id, project, { name: 'Reference review.pdf', bytes: Buffer.from(fixturePdf) });
+const textDocument = store.documents.create(id, project, {
+  name: 'Research notes.txt', bytes: Buffer.from('Research notes\nملاحظات البحث <source>'),
+});
 const collection = store.organization.create(id, 'Research methods');
 store.organization.membership(id, project, sampleDocument, collection, true);
 store.references.save(id, project, {
@@ -361,6 +364,12 @@ try {
         await waitFor(() => inspect(send, 'Boolean(document.querySelector("select[name=plan] option[value=research]"))'), 'saved workspace plan');
         await captureLayout(send, 'licensing', lang, name, width, height);
       }
+      await send('Page.navigate', { url: origin + '/workspace/projects/' + project + '/documents/' +
+        textDocument + '/versions/1/preview?lang=' + lang });
+      await waitFor(() => inspect(send,
+        'document.querySelector(".document-text-preview")?.textContent.includes("ملاحظات البحث <source>")'),
+      'private TXT preview');
+      await captureLayout(send, 'txt-preview', lang, name, width, height);
       for (const view of ['about', 'developer']) {
         await send('Page.navigate', { url: origin + '/?lang=' + lang + '&view=' + view });
         await waitFor(() => inspect(send, `location.search.includes('view=${view}') &&
