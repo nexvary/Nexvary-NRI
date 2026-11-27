@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { test } from 'node:test';
+import { hashPassword } from '../src/password.js';
 import { totp } from '../src/mfa.js';
 import { createApp } from '../src/server.js';
 import { openWorkspaceStore } from '../src/store.js';
@@ -8,9 +9,11 @@ import { openWorkspaceStore } from '../src/store.js';
 test('MFA-protected operator plans govern project capacity and external token reservations', async (t) => {
   let now = 1_800_000_000_000;
   const store = openWorkspaceStore(':memory:', () => now);
-  const [operator, researcher] = ['operator', 'researcher'].map((name) => {
+  const password = 'local fixture operator password';
+  const operatorCredentials = await hashPassword(password);
+  const [operator, researcher, trialResearcher] = ['operator', 'researcher', 'trial'].map((name) => {
     const email = name + '@plans.test';
-    store.addAccount(email, { salt: Buffer.alloc(16), hash: Buffer.alloc(32) });
+    store.addAccount(email, name === 'operator' ? operatorCredentials : { salt: Buffer.alloc(16), hash: Buffer.alloc(32) });
     const { id } = store.credentials(email);
     const token = store.newSession(id);
     return { id, email, token, cookie: 'nri_session=' + token };
@@ -85,6 +88,36 @@ test('MFA-protected operator plans govern project capacity and external token re
   assert.ok(store.assistantUsage.reserve(researcher.id, 'test', { tokens: 900, cost: 100 }, caps));
   assert.equal(store.assistantUsage.reserve(researcher.id, 'test', { tokens: 101, cost: 1 }, caps), undefined);
   assert.equal(store.licensing.dashboard(operator.id).recent[0].subject, researcher.id);
+  const change = (from, to, other = {}) => ({
+    intent: 'transition', email: researcher.email, 'current-state': from, 'next-state': to, password, ...other,
+  });
+  assert.equal((await request(researcher, path, change('active', 'suspended'))).status, 403);
+  assert.equal((await request(operator, path, change('active', 'suspended', { password: 'incorrect' }))).status, 403);
+  assert.equal((await request(operator, path, change('active', 'grace'))).status, 422);
+  assert.equal((await request(operator, path, change('active', 'suspended'))).status, 303);
+  assert.equal((await request(operator, path, change('active', 'revoked'))).status, 409);
+  assert.equal((await request(operator, path, assign)).status, 409);
+  assert.equal((await request(researcher, project.headers.get('location'))).status, 200);
+  assert.equal(store.licensing.aiTokens(researcher.id), 0);
+  assert.equal(store.licensing.reserveReport(researcher.id), undefined);
+  assert.equal(store.licensing.canStore(researcher.id, 0), false);
+  assert.equal(store.licensing.dashboard(operator.id).recent[0].action, 'subscription:active:suspended');
+  assert.equal((await request(operator, path, change('suspended', 'active', { expires: assign.expires }))).status, 303);
+  assert.equal(store.licensing.aiTokens(researcher.id), 1000);
+
+  const trial = { ...assign, intent: 'trial', email: trialResearcher.email, expires: '2027-11-01', password };
+  assert.equal((await request(operator, path, trial)).status, 303);
+  assert.equal(store.licensing.aiTokens(trialResearcher.id), 1000);
+  assert.equal(store.licensing.dashboard(operator.id).subscriptions.find((item) => item.email === trial.email).state, 'trial');
+  now = Date.UTC(2027, 10, 1);
+  assert.equal(store.licensing.aiTokens(trialResearcher.id), 0);
+  assert.equal(store.licensing.dashboard(operator.id).subscriptions.find((item) => item.email === trial.email).state, 'expired');
+  operator.cookie = 'nri_session=' + store.newSession(operator.id);
+  const revoked = await request(operator, path, change('expired', 'revoked', { email: trial.email }));
+  assert.equal(revoked.status, 303);
+  assert.equal(revoked.headers.get('location'), path);
+  assert.equal(store.licensing.dashboard(operator.id).recent[0].action, 'subscription:expired:revoked');
+  assert.equal((await request(operator, path, change('revoked', 'active', { email: trial.email }))).status, 409);
   now = Date.UTC(2027, 11, 1);
   assert.equal(store.licensing.aiTokens(researcher.id), 0);
   assert.equal(store.createProject(researcher.id, { title: 'Expired', description: '' }), undefined);

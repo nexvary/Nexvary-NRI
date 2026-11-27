@@ -228,7 +228,7 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
       return;
     }
     if (kind === 'settings-licensing') {
-      handleLicensing({ reply, redirect, lang, account, form, store });
+      await handleLicensing({ request, reply, redirect, lang, account, token, form, store });
       return;
     }
     if (kind === 'settings-privacy') {

@@ -1,7 +1,7 @@
 import { resourceSchema, resourceStore } from './resource-store.js';
 import { citationSchema, citationStore } from './citation-store.js';
 import { organizationSchema, organizationStore } from './library-organization.js';
-import { licenseSchema, licensingStore, quotaSchema } from './licensing-store.js';
+import { licenseSchema, licensingStore, quotaSchema, subscriptionSchema } from './licensing-store.js';
 import { manuscriptCatalogSchema, teamSchema, teamStore, teamWorkSchema } from './team-store.js';
 import { privacyStore } from './privacy-store.js';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
@@ -28,7 +28,7 @@ import { referenceSchema, referenceMigrationV4, referenceStore } from './referen
 
 export const sessionLifetime = 8 * 60 * 60;
 export const sessionIdle = 30 * 60_000;
-const schemaVersion = 29;
+const schemaVersion = 30;
 const schema = `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -108,6 +108,7 @@ function initialize(db, path) {
     if (version < 27) db.exec(passwordRecoverySchema);
     if (version < 28) db.exec(workspaceKeyVersionSchema);
     if (version < 29) db.exec(readinessReviewSchema);
+    if (version < 30) db.exec(subscriptionSchema);
     return bindDocumentKey(db, path);
   });
 }

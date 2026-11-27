@@ -39,6 +39,25 @@ export const quotaSchema = `
   PRAGMA user_version = 26;
 `;
 
+export const subscriptionSchema = `
+  ALTER TABLE license_assignments ADD COLUMN state TEXT NOT NULL DEFAULT 'active'
+    CHECK(state IN ('trial','active','grace','past_due','expired','suspended','cancelled','revoked'));
+  PRAGMA user_version = 30;
+`;
+
+const subscriptionTransitions = Object.freeze({
+  trial: ['active', 'expired', 'suspended', 'cancelled', 'revoked'],
+  active: ['grace', 'past_due', 'expired', 'suspended', 'cancelled', 'revoked'],
+  grace: ['active', 'past_due', 'expired', 'suspended', 'cancelled', 'revoked'],
+  past_due: ['active', 'grace', 'expired', 'suspended', 'cancelled', 'revoked'],
+  expired: ['active', 'cancelled', 'revoked'],
+  suspended: ['active', 'cancelled', 'revoked'],
+  cancelled: ['revoked'],
+  revoked: [],
+});
+
+const usableStates = new Set(['trial', 'active', 'grace']);
+
 const dayMs = 86_400_000;
 const optionalLimit = (value, max) => value === null || (Number.isInteger(value) && value >= 0 && value <= max);
 
@@ -53,15 +72,15 @@ export function licensingStore(db, now, transact) {
   const save = db.prepare(`INSERT INTO license_plans VALUES (?,?,?)
     ON CONFLICT(code) DO UPDATE SET project_limit=excluded.project_limit,daily_ai_tokens=excluded.daily_ai_tokens`);
   const lookup = db.prepare('SELECT id FROM accounts WHERE email = ?');
-  const entitlement = db.prepare(`SELECT p.code,p.project_limit,p.daily_ai_tokens,a.expires_at,q.storage_mib,q.daily_reports
+  const entitlement = db.prepare(`SELECT p.code,p.project_limit,p.daily_ai_tokens,a.expires_at,a.state,q.storage_mib,q.daily_reports
     FROM license_assignments a JOIN license_plans p ON p.code=a.plan LEFT JOIN license_plan_quotas q ON q.code=p.code WHERE a.account_id = ?`);
-  const assign = db.prepare(`INSERT INTO license_assignments VALUES (?,?,?)
+  const assign = db.prepare(`INSERT INTO license_assignments(account_id,plan,expires_at,state) VALUES (?,?,?,'active')
     ON CONFLICT(account_id) DO UPDATE SET plan=excluded.plan,expires_at=excluded.expires_at`);
   const events = db.prepare('SELECT actor,subject,plan,action,recorded_at FROM license_events ORDER BY id DESC LIMIT 50');
   const record = db.prepare('INSERT INTO license_events(actor,subject,plan,action,recorded_at) VALUES (?,?,?,?,?)');
   const metrics = db.prepare(`SELECT (SELECT count(*) FROM accounts) AS accounts,
     (SELECT count(*) FROM projects) AS projects,
-    (SELECT count(*) FROM license_assignments WHERE expires_at IS NULL OR expires_at > ?) AS active`);
+    (SELECT count(*) FROM license_assignments WHERE state IN ('trial','active','grace') AND (expires_at IS NULL OR expires_at > ?)) AS active`);
   const ownedProjects = db.prepare('SELECT count(*) AS total FROM projects WHERE owner_id = ?');
   const saveQuotas = db.prepare(`INSERT INTO license_plan_quotas VALUES (?,?,?)
     ON CONFLICT(code) DO UPDATE SET storage_mib=excluded.storage_mib,daily_reports=excluded.daily_reports`);
@@ -71,10 +90,18 @@ export function licensingStore(db, now, transact) {
   const reserve = db.prepare('INSERT INTO report_reservations(account_id,day) VALUES (?,?)');
   const release = db.prepare('DELETE FROM report_reservations WHERE id=? AND account_id=?');
   const prune = db.prepare('DELETE FROM report_reservations WHERE day<?');
+  const subscriptions = db.prepare(`SELECT a.email,s.plan,s.state,s.expires_at FROM license_assignments s
+    JOIN accounts a ON a.id=s.account_id ORDER BY a.email LIMIT 50`);
+  const updateSubscription = db.prepare('UPDATE license_assignments SET state=?,expires_at=? WHERE account_id=?');
+  function stateAt(current, timestamp) {
+    if (usableStates.has(current.state) && current.expires_at !== null && current.expires_at <= timestamp) return 'expired';
+    return current.state;
+  }
+
   function limits(account) {
     const current = entitlement.get(account);
     if (!current) return { projectLimit: Infinity, aiTokens: Infinity, storage: Infinity, reports: Infinity };
-    if (current.expires_at !== null && current.expires_at <= now()) return { projectLimit: 0, aiTokens: 0, storage: 0, reports: 0 };
+    if (!usableStates.has(stateAt(current, now()))) return { projectLimit: 0, aiTokens: 0, storage: 0, reports: 0 };
     return { projectLimit: current.project_limit, aiTokens: current.daily_ai_tokens,
       storage: (current.storage_mib ?? Infinity) * 1024 * 1024, reports: current.daily_reports ?? Infinity };
   }
@@ -86,7 +113,9 @@ export function licensingStore(db, now, transact) {
     },
     dashboard(actor) {
       if (!authorized.get(actor)) return undefined;
-      return { plans: plans.all(), metrics: metrics.get(now()), recent: events.all() };
+      const timestamp = now();
+      return { plans: plans.all(), metrics: metrics.get(timestamp), recent: events.all(),
+        subscriptions: subscriptions.all().map((current) => ({ ...current, state: stateAt(current, timestamp) })) };
     },
     save(actor, code, projectLimit, aiTokens, storage = null, dailyReports = null) {
       return transact(db, () => {
@@ -100,22 +129,46 @@ export function licensingStore(db, now, transact) {
         return 303;
       });
     },
-    assign(actor, email, code, expiresAt) {
+    assign(actor, email, code, expiresAt, initialState = 'active') {
       return transact(db, () => {
         if (!authorized.get(actor)) return 403;
         const account = lookup.get(email);
         if (!account || !plan.get(code) || (expiresAt !== null && !Number.isSafeInteger(expiresAt))) return 422;
+        const timestamp = now();
+        if (initialState !== 'active' && (initialState !== 'trial' || expiresAt === null || expiresAt <= timestamp)) return 422;
+        const current = entitlement.get(account.id);
+        if (current && (stateAt(current, timestamp) !== 'active' || initialState !== 'active')) return 409;
         assign.run(account.id, code, expiresAt);
-        record.run(actor, account.id, code, 'assigned', now());
+        if (initialState === 'trial') updateSubscription.run('trial', expiresAt, account.id);
+        record.run(actor, account.id, code, initialState === 'trial' ? 'trial-started' : 'assigned', timestamp);
         return 303;
       });
+    },
+    transition(actor, email, expected, next, expiresAt) {
+      return transact(db, () => {
+        if (!authorized.get(actor)) return 403;
+        const account = lookup.get(email);
+        const current = account && entitlement.get(account.id);
+        if (!current || !Object.hasOwn(subscriptionTransitions, expected) || !Object.hasOwn(subscriptionTransitions, next)) return 422;
+        const timestamp = now();
+        const previous = stateAt(current, timestamp);
+        if (previous !== expected || !subscriptionTransitions[previous].includes(next)) return 409;
+        if ((expiresAt !== null && (!Number.isSafeInteger(expiresAt) || expiresAt <= timestamp || !usableStates.has(next))) ||
+            (next === 'grace' && expiresAt === null)) return 422;
+        updateSubscription.run(next, expiresAt, account.id);
+        record.run(actor, account.id, current.code, `subscription:${previous}:${next}`, timestamp);
+        return 303;
+      });
+    },
+    canDeliverReport(owner) {
+      return limits(owner).reports > 0;
     },
     canCreateProject(owner) {
       return ownedProjects.get(owner).total < limits(owner).projectLimit;
     },
     canStore(owner, amount) {
       const maximum = limits(owner).storage;
-      return maximum === Infinity || bytes.get(owner).total + amount <= maximum;
+      return maximum > 0 && (maximum === Infinity || bytes.get(owner).total + amount <= maximum);
     },
     reserveReport(owner) {
       return transact(db, () => {
@@ -141,6 +194,7 @@ export async function renderLicensedReport(licensing, actor, render, authorized)
   try {
     const file = await render();
     if (!authorized()) return { status:404 };
+    if (!licensing.canDeliverReport(actor)) return { status:429 };
     delivered = true;
     return { status:200,file };
   } catch {

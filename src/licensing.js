@@ -1,6 +1,13 @@
-import { normalizeAddress } from './password.js';
+import { createLoginThrottle } from './login-throttle.js';
+import { normalizeAddress, verifyPassword } from './password.js';
 import { escapeHtml } from './workspace-view.js';
 
+const throttle = createLoginThrottle();
+const states = {
+  trial: ['Trial', 'تجريبية'], active: ['Active', 'نشطة'], grace: ['Grace period', 'فترة السماح'],
+  past_due: ['Past due', 'متأخرة السداد'], expired: ['Expired', 'منتهية'], suspended: ['Suspended', 'معلّقة'],
+  cancelled: ['Cancelled', 'ملغاة'], revoked: ['Revoked', 'مسحوبة'],
+};
 const path = '/workspace/settings/licensing';
 
 function whole(value) {
@@ -15,7 +22,7 @@ function endDate(value) {
   return date.getTime();
 }
 
-export function handleLicensing({ reply, redirect, lang, account, form, store }) {
+export async function handleLicensing({ request, reply, redirect, lang, account, token, form, store }) {
   const t = (en, ar) => lang === 'ar' ? ar : en;
   const data = store.licensing.dashboard(account.id);
   if (!data) return reply(403);
@@ -28,12 +35,30 @@ export function handleLicensing({ reply, redirect, lang, account, form, store })
       form.get('daily-reports') ? whole(form.get('daily-reports')) : null);
     else if (intent === 'assign') status = store.licensing.assign(account.id, normalizeAddress(form.get('email') ?? ''),
       code, endDate(form.get('expires')));
+    else if (intent === 'transition' || intent === 'trial') {
+      const retryAfter = throttle.begin(request.socket.remoteAddress ?? '', account.email);
+      if (retryAfter) return reply(429, null, { 'Retry-After': String(retryAfter) });
+      try {
+        const password = form.get('password') ?? '';
+        const credentials = store.credentials(account.email);
+        if (password.length > 128 || !await verifyPassword(password, credentials) ||
+            store.session(token)?.id !== account.id) return reply(403);
+        const email = normalizeAddress(form.get('email') ?? '');
+        const expiresAt = endDate(form.get('expires'));
+        status = intent === 'trial' ? store.licensing.assign(account.id, email, code, expiresAt, 'trial')
+          : store.licensing.transition(account.id, email, form.get('current-state'), form.get('next-state'), expiresAt);
+      } finally {
+        throttle.finish();
+      }
+    }
     else status = 422;
     if (status === 303) return redirect(url);
   }
   const title = t('Plans and entitlements', 'الخطط والصلاحيات');
   const count = new Intl.NumberFormat(lang);
   const date = new Intl.DateTimeFormat(lang, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' });
+  const stateOptions = Object.entries(states).map(([value, labels]) => `<option value="${value}">${t(...labels)}</option>`).join('');
+  const passwordField = `<label>${t('Current password', 'كلمة المرور الحالية')}<input name="password" type="password" required maxlength="128" autocomplete="current-password"></label>`;
   reply(status, {
     title, path,
     html: `<section class="surface panel detail workspace-page">
@@ -41,6 +66,7 @@ export function handleLicensing({ reply, redirect, lang, account, form, store })
       <p><a href="/workspace/settings?lang=${lang}">${t('Account security', 'أمان الحساب')}</a></p>
       <p>${t('Assign plans and limits for this workspace.', 'عيّن الخطط والحدود لمساحة العمل هذه.')}</p>
       ${status === 422 ? `<p role="alert">${t('Check the plan, limits, and account information.', 'تحقق من الخطة والحدود وبيانات الحساب.')}</p>` : ''}
+      ${status === 409 ? `<p role="alert">${t('The subscription state changed or does not allow this action.', 'تغيّرت حالة الاشتراك أو لا تسمح بهذا الإجراء.')}</p>` : ''}
       <dl class="reference-meta">
         <div><dt>${t('Accounts', 'الحسابات')}</dt><dd>${count.format(data.metrics.accounts)}</dd></div>
         <div><dt>${t('Projects', 'المشاريع')}</dt><dd>${count.format(data.metrics.projects)}</dd></div>
@@ -64,8 +90,24 @@ export function handleLicensing({ reply, redirect, lang, account, form, store })
         <label>${t('Expiry date (UTC, optional)', 'تاريخ الانتهاء (UTC، اختياري)')}<input name="expires" type="date"></label>
         <button class="action" name="intent" value="assign">${t('Assign plan', 'عيّن الخطة')}</button>
       </form>` : ''}
+      ${data.plans.length ? `<h2>${t('Start a trial', 'ابدأ فترة تجريبية')}</h2>
+      <form class="workspace-form" method="post" action="${url}">
+        <label>${t('Account email', 'البريد الإلكتروني للحساب')}<input name="email" type="email" maxlength="254" required dir="ltr"></label>
+        <label>${t('Plan', 'الخطة')}<select name="plan">${data.plans.map((item) => `<option>${escapeHtml(item.code)}</option>`).join('')}</select></label>
+        <label>${t('Expiry date (UTC)', 'تاريخ الانتهاء (UTC)')}<input name="expires" type="date" required></label>
+        ${passwordField}<button class="action" name="intent" value="trial">${t('Start trial', 'ابدأ التجربة')}</button>
+      </form>` : ''}
+      ${data.subscriptions.length ? `<h2>${t('Subscriptions', 'الاشتراكات')}</h2>
+      <ul>${data.subscriptions.map((item) => `<li><bdi>${escapeHtml(item.email)}</bdi> · <bdi>${escapeHtml(item.plan)}</bdi> · ${t(...states[item.state])}</li>`).join('')}</ul>
+      <form class="workspace-form" method="post" action="${url}">
+        <label>${t('Account email', 'البريد الإلكتروني للحساب')}<input name="email" type="email" maxlength="254" required dir="ltr"></label>
+        <label>${t('Current state', 'الحالة الحالية')}<select name="current-state">${stateOptions}</select></label>
+        <label>${t('New state', 'الحالة الجديدة')}<select name="next-state">${stateOptions}</select></label>
+        <label>${t('New expiry (UTC, required for grace)', 'تاريخ الانتهاء الجديد (UTC، مطلوب لفترة السماح)')}<input name="expires" type="date"></label>
+        ${passwordField}<button class="action" name="intent" value="transition">${t('Change subscription status', 'غيّر حالة الاشتراك')}</button>
+      </form>` : ''}
       ${data.recent.length ? `<h2>${t('Recent changes', 'آخر التغييرات')}</h2><ol class="activity">${data.recent.map((item) => `<li>
-        ${item.action === 'assigned' ? t('Assigned', 'تم التعيين') : t('Plan saved', 'حُفظت الخطة')} · <bdi>${escapeHtml(item.plan)}</bdi>
+        ${item.action === 'assigned' ? t('Assigned', 'تم التعيين') : item.action === 'plan-saved' ? t('Plan saved', 'حُفظت الخطة') : escapeHtml(item.action)} · <bdi>${escapeHtml(item.plan)}</bdi>
         · <bdi>${escapeHtml(item.actor ?? '')}</bdi> ${item.subject ? `· <bdi>${escapeHtml(item.subject)}</bdi>` : ''}
         · <time>${date.format(item.recorded_at)} UTC</time></li>`).join('')}</ol>` : ''}
     </section>`,

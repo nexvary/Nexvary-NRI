@@ -210,6 +210,7 @@ test('migrates a P1a database and persists encrypted files across restarts', asy
       DROP TABLE readiness_revisions;
       DROP TABLE evidence_items;
       DROP TABLE claims;
+      ALTER TABLE license_assignments DROP COLUMN state;
       PRAGMA user_version = 1;
     `);
     db.close();

@@ -224,3 +224,10 @@
 ## 2026-11-27 · Independent L-READY decisions
 
 - Added accepted-reviewer-only decisions with an independence declaration, one write per revision and attributable history. Current-revision decisions appear in Report Studio. [Regression and browser evidence](https://github.com/nexvary/Nexvary-NRI/actions/runs/46011593215).
+
+## 2026-11-27 · NRI-20 account subscription lifecycle
+
+- Adopted the centralized Debian SaaS architecture and added NRI-20 to the acceptance matrix.
+- Migrated existing assignments as active with their prior expiry dates. Added audited, validated state changes, trials and current-password confirmation in the existing operator console.
+- Project creation, document storage, report rendering and external AI reservations use the effective subscription state. Existing private data and resource access checks are preserved.
+- Local regression: 73 passed, zero failed, zero skipped, with the pinned bilingual report renderer. Hosted browser verification follows in PR #19.

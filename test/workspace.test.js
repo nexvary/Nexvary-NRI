@@ -209,7 +209,7 @@ test('migrates security history, resets one password and rejects sessions based 
     try {
       db.exec('ALTER TABLE security_events RENAME TO later_events; DROP INDEX security_events_account;');
       db.exec(settingsSchema);
-      db.exec('INSERT INTO security_events SELECT * FROM later_events; DROP TABLE later_events; PRAGMA user_version = 26;');
+      db.exec('INSERT INTO security_events SELECT * FROM later_events; DROP TABLE later_events; ALTER TABLE license_assignments DROP COLUMN state; PRAGMA user_version = 26;');
     } finally {
       db.close();
     }

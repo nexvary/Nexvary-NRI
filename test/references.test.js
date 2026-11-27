@@ -234,6 +234,7 @@ test('migrates a P1b database and persists reference snapshots and the local cac
       DROP TABLE claims;
       DROP TABLE project_references;
       DROP TABLE reference_cache;
+      ALTER TABLE license_assignments DROP COLUMN state;
       PRAGMA user_version = 2;`);
     raw.close();
     store = openWorkspaceStore(path, now);

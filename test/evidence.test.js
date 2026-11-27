@@ -42,6 +42,7 @@ test('migrates v4, links a saved source to a claim, records human review and exp
       DROP TABLE readiness_revisions;
       DROP TABLE evidence_items;
       DROP TABLE claims;
+      ALTER TABLE license_assignments DROP COLUMN state;
       PRAGMA user_version = 4;`);
     raw.close();
     const store = openWorkspaceStore(dbPath);
