@@ -27,9 +27,9 @@ Credentials, sessions and projects persist in `.nri/workspace.sqlite`. The accou
 After verifying the account holder through your organization's recovery process, run
 `npm run account:reset -- researcher@example.org` from a private terminal using the service account and the same `NRI_DB_PATH` as the server. The command generates a replacement password, revokes that account's sessions and records an audit event. Deliver the replacement through an approved private channel. Existing two-step verification stays active. Users who also lost their authenticator need an unused recovery code.
 
-## Use private PDF versions
+## Use private document versions
 
-Open a project, select **Private PDFs**, and upload a PDF up to 8 MiB. Open the file history to download an existing version or upload the next one. Deleting a file removes all its versions. Deleting a project also removes its files.
+Open a project, select **Private PDFs**, and upload a PDF or DOCX up to 8 MiB, or a UTF-8 TXT file up to 256 KiB. Open the file history to download an existing version or upload the next one. Deleting a file removes all its versions. Deleting a project also removes its files.
 
 NRI creates a 32-byte key in `<database path>.key` and encrypts PDF bytes in SQLite. File names, version dates, sizes and project metadata are stored in plaintext. Preserve both the database and its key for recovery. The preview runs on loopback for development with synthetic data. See the [document architecture decision](docs/decisions/0003-private-pdf-versions.md).
 
@@ -104,3 +104,5 @@ Run `npm ci --omit=optional --ignore-scripts` before starting NRI to install the
 NRI supports direct TLS, host-scoped secure session cookies, a schema health endpoint and structured operational logs. See [the staging deployment guide](docs/DEPLOYMENT.md) for installation, the service unit and local verification.
 
 Plans can also limit stored PDF versions and daily report downloads. Leave either quota blank for unlimited usage. The report counter resets at midnight UTC and applies to owned and shared report exports.
+
+DOCX upload and text preview require Python 3.10+ and use only its standard library. Set `NRI_DOCX_PYTHON` to select the interpreter. Previews display escaped main-document text. Packages with external links, active or embedded files, or unsupported parts are rejected.

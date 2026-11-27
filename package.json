@@ -12,6 +12,7 @@
     "account:create": "node src/account-cli.js",
     "account:reset": "node src/account-cli.js --reset",
     "account:role": "node src/account-role-cli.js",
+    "workspace:rotate-key": "node src/recovery-cli.js rotate-key",
     "workspace:backup": "node src/recovery-cli.js backup",
     "workspace:export": "node src/recovery-cli.js export",
     "workspace:import": "node src/recovery-cli.js import",

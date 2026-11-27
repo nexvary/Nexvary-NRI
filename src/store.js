@@ -12,6 +12,7 @@ import { mfaSchema, mfaStore } from './mfa.js';
 import { messageSchema, messageStore, moderationSchema } from './message-store.js';
 import { assistantUsageSchema, assistantUsageStore } from './assistant-usage.js';
 import { assistantSettingsSchema, assistantSettingsStore } from './assistant-settings.js';
+import { workspaceKeyVersionSchema } from './workspace-key-version.js';
 import { bindDocumentKey } from './document-crypto.js';
 import { documentSchema, documentStore } from './document-store.js';
 import { educationSchema, educationStore } from './education.js';
@@ -27,7 +28,7 @@ import { referenceSchema, referenceMigrationV4, referenceStore } from './referen
 
 export const sessionLifetime = 8 * 60 * 60;
 export const sessionIdle = 30 * 60_000;
-const schemaVersion = 27;
+const schemaVersion = 28;
 const schema = `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -105,6 +106,7 @@ function initialize(db, path) {
     `);
     if (version < 26) db.exec(quotaSchema);
     if (version < 27) db.exec(passwordRecoverySchema);
+    if (version < 28) db.exec(workspaceKeyVersionSchema);
     return bindDocumentKey(db, path);
   });
 }

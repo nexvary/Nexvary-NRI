@@ -56,3 +56,6 @@ The Chromium CI harness now verifies DevTools readiness and bounds command waits
 
 
 Private TXT upload, preview, versioning and quota enforcement passed [CI](https://github.com/nexvary/Nexvary-NRI/actions/runs/46009913116). Both document types use the existing encrypted storage and project access rules.
+
+
+Private DOCX upload and plain-text preview passed [CI](https://github.com/nexvary/Nexvary-NRI/actions/runs/46010490212). Install Python 3.10+ for DOCX upload and preview. `NRI_DOCX_PYTHON` may select a specific interpreter.

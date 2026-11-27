@@ -212,3 +212,7 @@
 ## 2026-11-27 · Private TXT documents
 
 - Added versioned UTF-8 TXT uploads and escaped previews, with private downloads, filtering and shared storage quotas. [CI passed](https://github.com/nexvary/Nexvary-NRI/actions/runs/46009913116) at `1d4d604`.
+
+## 2026-11-27 · Private DOCX documents
+
+- Added bounded archive and XML validation and escaped plain-text previews. Security tests cover malformed XML, DTD declarations, ZIP traversal and expansion limits, macros and external relationships. [CI passed](https://github.com/nexvary/Nexvary-NRI/actions/runs/46010490212) at `7004239`.

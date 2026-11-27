@@ -12,6 +12,22 @@ export const assistantSettingsSchema = `
   PRAGMA user_version = 13;
 `;
 
+export function sealProviderKey(key, accountId, apiKey) {
+  const nonce = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', key, nonce, { authTagLength: 16 });
+  cipher.setAAD(Buffer.from(accountId));
+  const ciphertext = Buffer.concat([cipher.update(apiKey), cipher.final()]);
+  return Buffer.concat([nonce, cipher.getAuthTag(), ciphertext]);
+}
+
+export function openProviderKey(key, accountId, envelope) {
+  const encrypted = Buffer.from(envelope);
+  const decipher = createDecipheriv('aes-256-gcm', key, encrypted.subarray(0, 12), { authTagLength: 16 });
+  decipher.setAAD(Buffer.from(accountId));
+  decipher.setAuthTag(encrypted.subarray(12, 28));
+  return Buffer.concat([decipher.update(encrypted.subarray(28)), decipher.final()]);
+}
+
 export function assistantSettingsStore(db, workspaceKey) {
   const key = createHmac('sha256', workspaceKey).update('nri-assistant-settings-v1').digest();
   const get = db.prepare('SELECT provider, model, api_key FROM assistant_settings WHERE account_id = ?');
@@ -39,14 +55,7 @@ export function assistantSettingsStore(db, workspaceKey) {
       if (provider === 'openai' && !apiKey) {
         return Boolean(updateModel.run(model, accountId).changes);
       }
-      let encrypted = null;
-      if (apiKey) {
-        const nonce = randomBytes(12);
-        const cipher = createCipheriv('aes-256-gcm', key, nonce);
-        cipher.setAAD(Buffer.from(accountId));
-        const ciphertext = Buffer.concat([cipher.update(apiKey, 'utf8'), cipher.final()]);
-        encrypted = Buffer.concat([nonce, cipher.getAuthTag(), ciphertext]);
-      }
+      const encrypted = apiKey ? sealProviderKey(key, accountId, Buffer.from(apiKey)) : null;
       set.run(accountId, provider, model, encrypted);
       return true;
     },
@@ -54,11 +63,7 @@ export function assistantSettingsStore(db, workspaceKey) {
       const row = get.get(accountId);
       if (!row) return undefined;
       if (!row.api_key) return { provider: row.provider, model: row.model };
-      const encrypted = Buffer.from(row.api_key);
-      const decipher = createDecipheriv('aes-256-gcm', key, encrypted.subarray(0, 12));
-      decipher.setAAD(Buffer.from(accountId));
-      decipher.setAuthTag(encrypted.subarray(12, 28));
-      const apiKey = Buffer.concat([decipher.update(encrypted.subarray(28)), decipher.final()]).toString('utf8');
+      const apiKey = openProviderKey(key, accountId, row.api_key).toString('utf8');
       return { provider: row.provider, model: row.model, apiKey };
     },
   };

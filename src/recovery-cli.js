@@ -1,3 +1,4 @@
+import { rotateWorkspaceKey } from './key-rotation.js';
 import { exportEncryptedBackup, readBackupKey, restoreEncryptedBackup } from './encrypted-backup.js';
 import { resolve } from 'node:path';
 import { backupWorkspace, restoreWorkspace } from './recovery.js';
@@ -19,8 +20,11 @@ try {
     const key = await readBackupKey(process.env.NRI_BACKUP_KEY_FILE);
     const database = await restoreEncryptedBackup(resolve(source), resolve(destination), key);
     console.log('Authenticated workspace restored to ' + database);
+  } else if (command === 'rotate-key' && source && !destination && rest.length === 0) {
+    const rotated = await rotateWorkspaceKey(workspaceDatabasePath(), resolve(source));
+    console.log('Verified workspace key generation ' + rotated.generation + ' prepared at ' + rotated.database);
   } else {
-    throw new Error('Usage: npm run workspace:backup -- NEW_DIRECTORY or npm run workspace:restore -- BACKUP_DIRECTORY NEW_DIRECTORY, workspace:export -- NEW_ARCHIVE, or workspace:import -- ARCHIVE NEW_DIRECTORY');
+    throw new Error('Usage: npm run workspace:backup -- NEW_DIRECTORY or npm run workspace:restore -- BACKUP_DIRECTORY NEW_DIRECTORY, workspace:export -- NEW_ARCHIVE, or workspace:import -- ARCHIVE NEW_DIRECTORY, or workspace:rotate-key -- NEW_DIRECTORY');
   }
 } catch (error) {
   console.error(error.message);

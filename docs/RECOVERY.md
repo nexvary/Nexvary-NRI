@@ -49,3 +49,18 @@ Team manuscripts, reviews, notes and tasks belong to their project. Deleting a c
 4. Promote the candidate only after the drill succeeds. For rollback, select the prior build and restore the pre-upgrade bundle into a separate directory. Reconcile deletions and other writes since the snapshot before switching workspaces. Record the measured restore time and data-loss window during the drill.
 
 Use the configured direct HTTPS mode for staging. Public hosting, production alerts, key rotation, and disaster-recovery objectives require their own verification before public deployment.
+
+
+## Workspace encryption key rotation
+
+Stop all service processes using the source before preparing and checking a rotated copy. Use a protected encrypted volume and a new destination directory.
+
+```sh
+NRI_DB_PATH=/private/current/workspace.sqlite npm run workspace:rotate-key -- /private/new-generation
+```
+
+Rotation takes a SQLite writer lock, snapshots the source, and migrates the candidate in one database transaction. It verifies the document, message, MFA seed and provider credential envelopes with the new key. Existing one-time recovery codes retain their purpose-specific HMAC key, wrapped under the new workspace key. The audit table records the generation and time. The source remains available for rollback and is never switched by the command.
+
+An interrupted run can leave a private `.nri-rotation-*` staging directory or a destination containing only a key. Keep the original source in service or roll back to it, remove incomplete staging directories with the process stopped, then run again with a new destination. Only promote a candidate after authenticated restore and application smoke tests. Keep the old workspace and compatible backup for the approved rollback window, then retire them under the operator's storage and key-retention policy. Ordinary file deletion does not guarantee sanitization on SSDs, copy-on-write filesystems or snapshots. Pre-rotation backups still contain their original workspace key and require the archive key used to protect them.
+
+Application-layer encryption covers document bytes, private message bodies, authenticator seeds, provider API credentials and the wrapped recovery HMAC key. Filenames, project metadata, manuscript text and other structured SQLite fields can remain readable on disk. Store the live SQLite database and paired key separately from archives, with restricted permissions and volume encryption.

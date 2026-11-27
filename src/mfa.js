@@ -1,4 +1,5 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { readMfaRecoveryKey } from './workspace-key-version.js';
 import { decryptDocument, encryptDocument } from './document-crypto.js';
 
 const step = 30_000;
@@ -41,7 +42,7 @@ function matchCounter(secret, code, at, last) {
 
 export function mfaStore(db, workspaceKey, now, transact, revokeOthers) {
   const key = createHmac('sha256', workspaceKey).update('nri-mfa-encryption-v1').digest();
-  const recoveryKey = createHmac('sha256', workspaceKey).update('nri-mfa-recovery-v1').digest();
+  const recoveryKey = readMfaRecoveryKey(db, workspaceKey);
   const get = db.prepare('SELECT * FROM account_mfa WHERE account_id = ?');
   const upsert = db.prepare(`
     INSERT INTO account_mfa(account_id, nonce, ciphertext, tag, pending_until) VALUES (?, ?, ?, ?, ?)
