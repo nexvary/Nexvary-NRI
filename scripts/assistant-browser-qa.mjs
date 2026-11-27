@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { createHmac } from 'node:crypto';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { once } from 'node:events';
+import { createSandboxBillingAdapter } from '../src/billing-sandbox.js';
 import { totp } from '../src/mfa.js';
 import { hashPassword } from '../src/password.js';
 import { createApp } from '../src/server.js';
@@ -72,6 +74,15 @@ const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 const bits = [...store.mfa.pending(moderator)].map((character) => alphabet.indexOf(character).toString(2).padStart(5, '0')).join('');
 const seed = Buffer.from(bits.match(/.{8}/g).map((byte) => parseInt(byte, 2)));
 assert.equal(store.mfa.confirm(moderator, totp(seed, Math.floor(Date.now() / 30_000)), moderatorSession).length, 8);
+const billingTime = Date.now();
+const billingKey = Buffer.alloc(32, 43);
+const billingBody = Buffer.from(JSON.stringify({
+  id: 'browser_invoice_issued', kind: 'invoice.issued', objectId: 'browser_invoice',
+  amountMinor: 1234, currency: 'EUR', occurredAt: billingTime,
+}));
+const billingSignature = createHmac('sha256', billingKey).update(String(billingTime) + '.').update(billingBody).digest('hex');
+assert.deepEqual(store.billing.accept(createSandboxBillingAdapter('sandbox-browser', billingKey),
+  { body: billingBody, signature: billingSignature, timestamp: billingTime }), { status: 'accepted' });
 const app = createApp(store);
 await new Promise((resolve) => app.listen(0, '127.0.0.1', resolve));
 const origin = 'http://127.0.0.1:' + app.address().port;
@@ -390,6 +401,9 @@ try {
           'Boolean(document.querySelector("button[value=institution-seat-allocate]"))'), 'institutional seat allocation form');
         await captureLayout(send, 'licensing', lang, name, width, height);
       }
+      await send('Page.navigate', { url: origin + '/control-center/billing?lang=' + lang });
+      await waitFor(() => inspect(send, 'document.body?.textContent.includes("browser_invoice")'), 'verified sandbox invoice');
+      await captureLayout(send, 'billing', lang, name, width, height);
       for (const view of ['about', 'developer']) {
         await send('Page.navigate', { url: origin + '/?lang=' + lang + '&view=' + view });
         await waitFor(() => inspect(send, `location.search.includes('view=${view}') &&

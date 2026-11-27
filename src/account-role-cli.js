@@ -3,8 +3,8 @@ import { openWorkspaceStore, workspaceDatabasePath } from './store.js';
 
 const [, , input = '', action] = process.argv;
 const email = normalizeAddress(input);
-if (!email || !['grant-message-moderator', 'revoke-message-moderator', 'grant-license-operator', 'revoke-license-operator'].includes(action)) {
-  console.error('Usage: npm run account:role -- EMAIL grant-message-moderator|revoke-message-moderator|grant-license-operator|revoke-license-operator');
+if (!email || !['grant-message-moderator', 'revoke-message-moderator', 'grant-license-operator', 'revoke-license-operator', 'grant-billing-reviewer', 'revoke-billing-reviewer'].includes(action)) {
+  console.error('Usage: npm run account:role -- EMAIL grant-message-moderator|revoke-message-moderator|grant-license-operator|revoke-license-operator|grant-billing-reviewer|revoke-billing-reviewer');
   process.exitCode = 2;
 } else {
   const store = openWorkspaceStore(workspaceDatabasePath());
@@ -16,6 +16,7 @@ if (!email || !['grant-message-moderator', 'revoke-message-moderator', 'grant-li
     } else {
       const enabled = action.startsWith('grant-');
       if (action.endsWith('license-operator')) store.licensing.setOperator(account.id, enabled);
+      else if (action.endsWith('billing-reviewer')) store.billing.setReviewer(account.id, enabled);
       else store.messages.setModerator(account.id, enabled);
       console.log('Account role updated.');
     }

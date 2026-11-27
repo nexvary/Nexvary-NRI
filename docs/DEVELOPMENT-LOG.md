@@ -267,3 +267,9 @@
 
 - Added optional ISO currency and independently configurable monthly and annual prices in integer minor units. Existing plans stay unpriced. Pricing edits and clearing require the existing MFA and password checks and are audited.
 - Local regression: 76 passed, zero failed, zero skipped, including protected pricing edits and bilingual report rendering. Price configuration does not initiate billing.
+
+## 2026-11-27 · Scoped sandbox billing review
+
+- Exposed the existing signed synthetic ledger in a bilingual, paginated Control Center view. Owners and explicitly assigned billing reviewers with MFA can read the ledger. Billing review does not confer licensing writes or access to research.
+- The local operator CLI can grant or revoke `billing-reviewer`. No payment endpoint or live payment provider was added.
+- Local regression: 77 passed, zero failed, zero skipped, with signed synthetic invoice display and access and revocation checks. The preceding [pricing](https://github.com/nexvary/Nexvary-NRI/actions/runs/46070596059) and [institutional seat](https://github.com/nexvary/Nexvary-NRI/actions/runs/46070436861) increments passed hosted regression and browser QA.

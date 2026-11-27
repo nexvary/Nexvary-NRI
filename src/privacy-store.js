@@ -58,6 +58,7 @@ export function privacyStore(db, workspaceKey, now) {
     teamReviews: `SELECT r.* FROM team_reviews r JOIN projects p ON p.id = r.project_id
       WHERE p.owner_id = :owner OR r.reviewer = :owner`,
     roles: 'SELECT role FROM account_roles WHERE account_id = ?',
+    controlCenterRoles: 'SELECT role FROM control_center_roles WHERE account_id = ?',
   };
   const sections = Object.entries(queries).map(([name, sql]) => [name, db.prepare(sql), sql.includes(':owner')]);
 

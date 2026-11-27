@@ -17,6 +17,7 @@ const states = {
   cancelled: ['Cancelled', 'ملغاة'], revoked: ['Revoked', 'مسحوبة'],
 };
 export const controlCenterPath = '/control-center';
+export const billingRecordsPath = '/control-center/billing';
 export const legacyLicensingPath = '/workspace/settings/licensing';
 
 function whole(value) {
@@ -29,6 +30,40 @@ function endDate(value) {
   const date = new Date(value + 'T00:00:00Z');
   if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== value) return NaN;
   return date.getTime();
+}
+
+const billingLabels = {
+  'invoice.issued': ['Invoice issued', 'صدرت فاتورة'],
+  'payment.recorded': ['Payment recorded', 'سُجّلت دفعة'],
+  'payment.refunded': ['Refund recorded', 'سُجّل رد المبلغ'],
+  'subscription.renewed': ['Renewal recorded', 'سُجّل تجديد'],
+  'subscription.cancelled': ['Cancellation recorded', 'سُجّل إلغاء'],
+};
+
+export function handleBillingRecords({ request, reply, lang, account, store }) {
+  if (!store.billing.canReview(account.id)) return reply(403);
+  const t = (en, ar) => lang === 'ar' ? ar : en;
+  const query = new URL(request.url, 'http://localhost').searchParams;
+  const page = whole(query.get('page') ?? '0');
+  if (!Number.isInteger(page) || page > 10_000) return reply(422);
+  const records = store.billing.records(account.id, page * 50);
+  if (!records) return reply(403);
+  const count = new Intl.NumberFormat(lang);
+  const date = new Intl.DateTimeFormat(lang, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' });
+  const pageLink = (number) => billingRecordsPath + '?lang=' + lang + '&amp;page=' + number;
+  const title = t('Sandbox billing records', 'سجلات الفوترة التجريبية');
+  reply(200, { title, path: billingRecordsPath, controlCenter: true, billingOnly: true,
+    html: `<section class="surface panel detail workspace-page">
+      <h1>${title}</h1>
+      ${records.length ? `<ol class="activity">${records.slice(0, 50).map((event) => `<li>
+        ${t(...billingLabels[event.kind])} · <bdi>${escapeHtml(event.provider)}</bdi> · <bdi>${escapeHtml(event.objectId)}</bdi>
+        ${event.amountMinor === undefined ? '' : ` · <bdi>${count.format(event.amountMinor)} ${escapeHtml(event.currency)}</bdi> ${t('minor units', 'وحدة صغرى')}`}
+        · <time>${date.format(event.recordedAt)} UTC</time></li>`).join('')}</ol>`
+        : `<p>${t('No verified sandbox billing records on this page.', 'لا توجد سجلات فوترة تجريبية متحققة في هذه الصفحة.')}</p>`}
+      ${page > 0 ? `<a href="${pageLink(page - 1)}">${t('Previous page', 'الصفحة السابقة')}</a>` : ''}
+      ${records.length > 50 && page < 10_000 ? `<a href="${pageLink(page + 1)}">${t('Next page', 'الصفحة التالية')}</a>` : ''}
+    </section>`,
+  });
 }
 
 export async function handleLicensing({ request, reply, redirect, lang, account, token, form, store }) {
@@ -162,6 +197,7 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
     title, path, controlCenter: true,
     html: `<section class="surface panel detail workspace-page">
       <h1>${title}</h1>
+      <p><a href="${billingRecordsPath}?lang=${lang}">${t('Sandbox billing records', 'سجلات الفوترة التجريبية')}</a></p>
       <p>${t('Assign plans and limits for this workspace.', 'عيّن الخطط والحدود لمساحة العمل هذه.')}</p>
       ${status === 422 ? `<p role="alert">${t('Check the plan, limits, and account information.', 'تحقق من الخطة والحدود وبيانات الحساب.')}</p>` : ''}
       ${status === 409 ? `<p role="alert">${t('The subscription or plan changed, or this action is unavailable.', 'تغيّر الاشتراك أو الخطة، أو أن الإجراء غير متاح.')}</p>` : ''}

@@ -4,7 +4,7 @@ import { createResourceHandler, resolveResourceRoute } from './resource-sharing.
 import { handleCitations, resolveCitationRoute } from './citations.js';
 import { handleOrganization, resolveOrganizationRoute } from './library-organization.js';
 import { handleTeamWork } from './team-work.js';
-import { controlCenterPath, handleLicensing, legacyLicensingPath } from './licensing.js';
+import { billingRecordsPath, controlCenterPath, handleBillingRecords, handleLicensing, legacyLicensingPath } from './licensing.js';
 import { handleTeam, resolveTeamRoute } from './teams.js';
 import { createPrivacyHandler } from './privacy.js';
 import { handleMessageModeration } from './moderation.js';
@@ -42,6 +42,7 @@ export function resolveWorkspaceRoute(pathname) {
   if (pathname === '/workspace/assistant') return { kind: 'assistant' };
   if (pathname === '/workspace/education') return { kind: 'education' };
   if (pathname === '/workspace/settings/message-moderation') return { kind: 'settings-message-moderation' };
+  if (pathname === billingRecordsPath) return { kind: 'control-billing' };
   if (pathname === controlCenterPath || pathname === legacyLicensingPath) return { kind: 'settings-licensing' };
   if (pathname === '/workspace/settings/privacy') return { kind: 'settings-privacy' };
   if (pathname === '/workspace/settings/mfa') return { kind: 'settings-mfa' };
@@ -118,7 +119,7 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
     };
     const postOnly = kind === 'delete' || kind === 'logout' || kind === 'delete-document';
     const allowed = postOnly ? ['POST'] : ['GET', 'HEAD'];
-    if (!postOnly && !['download-document', 'preview-document', 'reference-projects', 'evidence-projects', 'evidence-export', 'readiness-projects', 'economics-projects', 'economics-export', 'library', 'report-projects', 'sharing-project', 'assistant'].includes(kind)) allowed.push('POST');
+    if (!postOnly && !['control-billing', 'download-document', 'preview-document', 'reference-projects', 'evidence-projects', 'evidence-export', 'readiness-projects', 'economics-projects', 'economics-export', 'library', 'report-projects', 'sharing-project', 'assistant'].includes(kind)) allowed.push('POST');
     const method = request.method;
     if (!allowed.includes(method)) {
       reply(405, null, { Allow: allowed.join(', ') });
@@ -237,6 +238,10 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
     }
     if (kind === 'settings-message-moderation') {
       handleMessageModeration({ request, reply, redirect, lang, account, form, store });
+      return;
+    }
+    if (kind === 'control-billing') {
+      handleBillingRecords({ request, reply, lang, account, store });
       return;
     }
     if (kind === 'settings-licensing') {

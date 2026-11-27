@@ -72,6 +72,7 @@ export function settingsPage(store, lang, account, token) {
       <a href="${workspacePath(lang)}">${t('back')}</a>
       <a href="/workspace/settings/mfa?lang=${lang}">${t('mfa')}</a>
       <a href="/workspace/settings/privacy?lang=${lang}">${t('privacy')}</a>
+      ${store.billing.canReview(account.id) ? `<a href="/control-center/billing?lang=${lang}">${lang === 'ar' ? 'سجلات الفوترة التجريبية' : 'Sandbox billing records'}</a>` : ''}
       ${store.licensing.isOperator(account.id) && store.mfa.enabled(account.id) ? `<a href="/control-center?lang=${lang}">${t('licensing')}</a>` : ''}
       ${store.messages.isModerator(account.id) ? `<a href="/workspace/settings/message-moderation?lang=${lang}">${t('moderation')}</a>` : ''}
       <dl class="reference-meta"><div><dt>${t('email')}</dt><dd><bdi>${escapeHtml(account.email)}</bdi></dd></div>

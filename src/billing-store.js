@@ -9,6 +9,16 @@ export const billingSchema = `
   PRAGMA user_version = 31;
 `;
 
+export const billingAccessSchema = `
+  CREATE TABLE IF NOT EXISTS control_center_roles (
+    account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    role TEXT NOT NULL CHECK(role = 'billing'),
+    PRIMARY KEY(account_id,role)
+  ) STRICT;
+  CREATE INDEX IF NOT EXISTS billing_events_recent ON billing_events(recorded_at DESC,provider,event_id);
+  PRAGMA user_version = 36;
+`;
+
 const eventKinds = new Set([
   'invoice.issued', 'payment.recorded', 'payment.refunded', 'subscription.renewed', 'subscription.cancelled',
 ]);
@@ -39,7 +49,24 @@ export function billingStore(db, now, transact) {
   `);
   const existing = db.prepare('SELECT payload FROM billing_events WHERE provider=? AND event_id=?');
 
+  const authorized = db.prepare(`SELECT 1 FROM account_mfa m WHERE m.account_id=:account AND m.pending_until=0
+    AND (EXISTS(SELECT 1 FROM license_operators WHERE account_id=:account)
+      OR EXISTS(SELECT 1 FROM control_center_roles WHERE account_id=:account AND role='billing'))`);
+  const grantBilling = db.prepare("INSERT OR IGNORE INTO control_center_roles VALUES (?, 'billing')");
+  const revokeBilling = db.prepare("DELETE FROM control_center_roles WHERE account_id=? AND role='billing'");
+  const records = db.prepare(`SELECT provider,payload,recorded_at FROM billing_events
+    ORDER BY recorded_at DESC,provider,event_id LIMIT 51 OFFSET ?`);
   return {
+    canReview: (account) => Boolean(authorized.get({ account })),
+    setReviewer(account, enabled) {
+      return (enabled ? grantBilling : revokeBilling).run(account);
+    },
+    records(account, offset) {
+      if (!authorized.get({ account })) return undefined;
+      return records.all(offset).map(({ provider, payload, recorded_at }) => ({
+        ...JSON.parse(payload), provider, recordedAt: recorded_at,
+      }));
+    },
     // An injected sandbox adapter verifies the original bytes and returns a provider-neutral event.
     accept(adapter, envelope) {
       if (adapter?.mode !== 'sandbox' || typeof adapter.provider !== 'string' ||

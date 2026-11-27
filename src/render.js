@@ -127,8 +127,8 @@ export function render({ lang, view, version, page, workspace, unread = 0, invit
   </header>
   <main id="main" class="control-center" tabindex="-1">
     <nav class="project-tools" aria-label="${tr(['Control Center', 'مركز التحكم'])}">
-      <a href="#overview">${tr(['Dashboard', 'لوحة التحكم'])}</a>
-      <a href="#plans">${tr(['Subscription plans', 'خطط الاشتراك'])}</a>
+      ${page.billingOnly ? '' : `<a href="#overview">${tr(['Dashboard', 'لوحة التحكم'])}</a>
+      <a href="#plans">${tr(['Subscription plans', 'خطط الاشتراك'])}</a>`}
       <a href="/workspace/settings?lang=${lang}">${tr(['Researcher settings', 'إعدادات الباحث'])}</a>
     </nav>
     ${content}
