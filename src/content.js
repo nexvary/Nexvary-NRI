@@ -65,6 +65,7 @@ export const metrics = [
   ['📚', 'pdfs', ['Private PDFs', 'ملفات PDF الخاصة']],
   ['🔗', 'sources', ['Saved sources', 'المصادر المحفوظة']],
   ['🔎', 'evidence', ['Evidence links', 'روابط الأدلة']],
+  ['🤝', 'collaborations', ['Accepted collaborators', 'المتعاونون المقبولون']],
 ];
 
 export const providers = {

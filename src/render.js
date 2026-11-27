@@ -10,6 +10,7 @@ const additional = ['references', 'messages', 'observatory', 'analytics', 'educa
 const repo = 'https://github.com/nexvary/Nexvary-NRI';
 
 export function render({ lang, view, version, page, workspace, unread = 0 }) {
+  const formatCost = new Intl.NumberFormat(lang, { style: 'currency', currency: 'USD', maximumFractionDigits: 6 });
   const tr = (pair) => pair[lang === 'ar' ? 1 : 0];
   const t = (key) => tr(copy[key]);
   const href = (target, language = lang) => `/?lang=${language}&amp;view=${target}`;
@@ -61,7 +62,14 @@ export function render({ lang, view, version, page, workspace, unread = 0 }) {
           <h2>${icon('📊')}${t('statistics')}</h2>
           ${workspace ? `<dl class="metrics">${metrics.map(([glyph, key, name]) =>
             `<div>${icon(glyph)}<dt>${tr(name)}</dt><dd>${new Intl.NumberFormat(lang).format(workspace.metrics[key])}</dd></div>`).join('')}</dl>` : ''}
-          <dl class="metrics"><div>${icon('🧾')}<dt>${t('api')}</dt><dd class="inactive">${t('inactive')}</dd></div></dl>
+          ${workspace ? `<dl class="metrics">
+            <div>${icon('🧾')}<dt>${tr(['Estimated API usage today (UTC)', 'تكلفة الاستخدام التقديرية اليوم (UTC)'])}</dt>
+              <dd><bdi>${formatCost.format(workspace.usage.observedCost / 1_000_000)}</bdi></dd></div>
+            <div>${icon('📊')}<dt>${tr(['Provider-reported tokens', 'الرموز التي أبلغ عنها المزوّد'])}</dt>
+              <dd>${new Intl.NumberFormat(lang).format(workspace.usage.observedTokens)}</dd></div>
+          </dl>` : `<dl class="metrics"><div>${icon('🧾')}<dt>${t('api')}</dt><dd class="inactive">${t('inactive')}</dd></div></dl>`}
+          ${workspace?.orcid ? `<p><a href="https://orcid.org/${escapeHtml(workspace.orcid)}"><bdi>ORCID ${escapeHtml(workspace.orcid)}</bdi></a>
+            · ${tr(['Self-reported', 'أضافه صاحب الحساب'])}</p>` : ''}
         </section>
         ${workspace ? `<section class="surface panel">
           <h2>${icon('🕒')}${t('activity')}</h2>

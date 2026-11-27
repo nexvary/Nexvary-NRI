@@ -1,5 +1,12 @@
 # Development status
 
+## NRI-01a · Private dashboard metrics · 2026-11-27 (Cairo)
+
+The signed-in dashboard shows accepted collaborators, self-reported ORCID, provider-reported tokens and estimated cost for the current UTC day. Data is queried for the active account.
+
+- 56/56 with real report rendering. Cross-account HTTP acceptance verifies identity, collaboration counts and metered usage.
+- Chromium captures: [Arabic desktop](qa/nri-01/dashboard-ar-desktop.webp) and [English mobile](qa/nri-01/dashboard-en-mobile.webp).
+
 ## NRI-19a · Local licensing and readiness · 2026-11-27 (Cairo)
 
 An MFA-protected operator console manages plans, assignments, expiration, owned-project limits, and daily external AI token entitlements. Limits are enforced at project creation and Assistant reservation. The console shows aggregate data and an attributable change history. `/healthz` checks SQLite schema readiness and the [local release drill](RECOVERY.md#local-release-and-recovery-drill) covers migration, backup and rollback.
@@ -229,7 +236,7 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 
 | ID | Status | Implemented evidence and remaining acceptance |
 |---|---|---|
-| NRI-01 | Partial | Verified real private project, PDF, reference and evidence counts, recent activity, sign-in/empty states and account isolation. Network, ORCID profile and metered cost metrics remain. |
+| NRI-01 | Partial | Verified real private project, PDF, reference and evidence counts, recent activity, sign-in/empty states and account isolation. Accepted collaborator counts, self-reported ORCID and metered cost are verified. Verified ORCID ownership remains. |
 | NRI-02 | Partial | Personal project CRUD, project PDF versions, project DOI records and access denial are verified. The team workspace adds versioned manuscripts and author attribution. Tags, search, notes, tasks and publication status remain. |
 | NRI-03 | Partial | Project-bound PDF upload, metadata, encrypted persistence, version downloads and deletion are verified. Cross-project search and type filtering for PDFs and saved sources are verified. Other formats, collections, reading and annotation, citation import/export and deduplication remain. |
 | NRI-04 | Partial | Crossref and OpenAlex DOI lookups, dated per-provider source links, correction/retraction metadata, per-provider local cache, rate limits and unknown/failure outcomes are verified. Side-by-side provider comparison view implemented. Agency resolution, additional providers, claim-to-source mapping and evidence review remain. |
@@ -249,4 +256,4 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | NRI-18 | Partial | Local authentication, session revocation, account audit, authorization, encrypted PDF bytes, RTL/LTR and verified recovery are implemented. NRI-18a adds optional MFA and one-use recovery codes. NRI-18b adds the operator-managed message moderator role and scoped report review. Project team RBAC is verified for manuscripts and evidence review. Password/account recovery, accessibility audit and broader administration remain. |
 | NRI-19 | Partial | Local restore and regression workflow configuration are implemented. Local plans, entitlement limits, an MFA-protected operator console, migration/restore drills and schema health checks are verified. Approved hosting, production security and monitoring, and optional billing remain. |
 
-Next milestone: dashboard network, ORCID profile and metered usage.
+Next milestone: project team notes, tasks and invitation notifications.

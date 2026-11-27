@@ -189,6 +189,10 @@ try {
         assert.equal(store.messages.report(peer, thread, reported.id, 'other'), 303);
       }
       if ((lang === 'ar' && name === 'desktop') || (lang === 'en' && name === 'mobile')) {
+        await send('Page.navigate', { url: origin + '/?lang=' + lang });
+        const tokenLabel = lang === 'ar' ? 'الرموز التي أبلغ عنها المزوّد' : 'Provider-reported tokens';
+        await waitFor(() => inspect(send, 'document.body?.textContent.includes(' + JSON.stringify(tokenLabel) + ')'), 'private dashboard metrics');
+        await captureLayout(send, 'dashboard', lang, name, width, height);
         const teamUrl = origin + '/workspace/projects/' + project + '/team?lang=' + lang;
         if (lang === 'ar') {
           await send('Page.navigate', { url: teamUrl });

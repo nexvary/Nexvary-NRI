@@ -137,3 +137,8 @@
 
 - Added MFA-gated operator plans, dated entitlements, project and external token ceilings, audit history and a SQLite health endpoint.
 - 55/55 with real report rendering. Chromium saved a plan and captured bilingual layouts. The recovery guide records deployment rehearsal and rollback for the loopback release.
+
+## 2026-11-27 · NRI-01a private dashboard data
+
+- Connected accepted collaborator counts, the user’s self-reported ORCID and metered usage to the signed-in dashboard.
+- 56/56 with real report rendering. Chromium captured Arabic desktop and English mobile.

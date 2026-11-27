@@ -28,6 +28,8 @@ export function networkStore(db, now, transact, revokeShares) {
     ON CONFLICT(account_id) DO UPDATE SET name=excluded.name, interests=excluded.interests,
        orcid=excluded.orcid, discoverable=excluded.discoverable`);
   const unpublish = db.prepare(`DELETE FROM researcher_links WHERE kind <> 'block' AND (sender=? OR recipient=?)`);
+  const collaborations = db.prepare(`SELECT count(DISTINCT CASE WHEN sender=:owner THEN recipient ELSE sender END) AS total
+    FROM researcher_links WHERE kind='request' AND state='accepted' AND (sender=:owner OR recipient=:owner)`);
   const visible = `r.discoverable=1 AND r.account_id <> ? AND NOT EXISTS (
     SELECT 1 FROM researcher_links b WHERE b.kind='block'
       AND ((b.sender=? AND b.recipient=r.account_id) OR (b.sender=r.account_id AND b.recipient=?))
@@ -71,6 +73,7 @@ export function networkStore(db, now, transact, revokeShares) {
 
   return {
     blockParticipant: (owner, peer) => transact(db, () => block(owner, peer)),
+    collaborations: (owner) => collaborations.get({ owner }).total,
     profile: (owner) => profile.get(owner),
     discover: (owner, search) => discover.all(owner, owner, owner, owner, owner, search, search, search),
     incoming: (owner) => incoming.all(owner, owner, owner, owner),

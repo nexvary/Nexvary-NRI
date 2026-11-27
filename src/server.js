@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { createAssistantProvider } from './assistant-provider.js';
 import { createCrossrefClient } from './crossref.js';
 import { createOpenAlexClient } from './openalex.js';
-import { createOrcidClient, createZenodoClient } from './public-identifiers.js';
+import { createOrcidClient, createZenodoClient, normalizeOrcid } from './public-identifiers.js';
 import { createLocalReportRenderer } from './reports.js';
 import { modules } from './content.js';
 import { render } from './render.js';
@@ -93,7 +93,15 @@ export function createApp(store = openWorkspaceStore(), {
     }
     if (pathname === '/' && view === 'dashboard') {
       const session = store.session(readSessionCookie(request.headers.cookie));
-      sendPage(200, view, undefined, { 'Cache-Control': 'no-store' }, session ? store.library.dashboard(session.id) : undefined);
+      let dashboard;
+      if (session) {
+        const owner = session.id;
+        dashboard = store.library.dashboard(owner);
+        dashboard.metrics.collaborations = store.network.collaborations(owner);
+        dashboard.orcid = normalizeOrcid(store.network.profile(owner)?.orcid ?? '');
+        dashboard.usage = store.assistantUsage.today(owner);
+      }
+      sendPage(200, view, undefined, { 'Cache-Control': 'no-store' }, dashboard);
       return;
     }
     if (pathname === '/' && view === 'reports') {
