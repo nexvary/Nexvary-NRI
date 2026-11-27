@@ -89,6 +89,7 @@ test('institutional subscriptions require a seat and preserve ownership and data
   const winner = candidates[results.findIndex(({ status }) => status === 303)];
   const runnerUp = candidates.find((user) => user !== winner);
   assert.equal((await request(winner, paths.get(winner))).status, 200);
+  assert.deepEqual(licensing.effectiveSubscription(winner.id), { plan: 'research', source: 'institution', state: 'trial', modules: [2] });
   assert.equal((await request(winner, paths.get(outsider))).status, 404);
   assert.equal((await request(winner, '/workspace', { title: 'Over quota' })).status, 429);
   assert.equal((await request(runnerUp, paths.get(runnerUp))).status, 403);
@@ -131,8 +132,14 @@ test('institutional subscriptions require a seat and preserve ownership and data
   assert.equal(licensing.transitionInstitution(operator.id, code, 'expired', 'active', null), 303);
   assert.equal((await request(winner, paths.get(winner))).status, 200);
 
-  assert.equal(licensing.save(operator.id, 'personal', 5, 0), 303);
+  assert.equal(licensing.save(operator.id, 'personal', 5, 0, null, null, null, 'individual'), 303);
+  assert.equal(licensing.save(operator.id, 'research-team', 5, 0, null, null, 5, 'team'), 303);
+  assert.equal(licensing.assign(operator.id, winner.email, 'research-team', null), 422);
+  assert.equal(licensing.save(operator.id, 'research', 1, 0, null, null, 1, 'individual'), 409);
+  assert.equal(licensing.save(operator.id, 'personal', 5, 0, null, null, 5), 303);
+  assert.equal(licensing.assignInstitution(operator.id, code, 'personal', null, 'active'), 422);
   assert.equal(licensing.assign(operator.id, winner.email, 'personal', null), 303);
+  assert.deepEqual(licensing.effectiveSubscription(winner.id), { plan: 'personal', source: 'individual', state: 'active', modules: [] });
   assert.equal((await request(winner, paths.get(winner))).status, 403);
   assert.equal(licensing.saveModules(operator.id, 'personal', [2], ''), 303);
   assert.equal((await request(winner, paths.get(winner))).status, 200);

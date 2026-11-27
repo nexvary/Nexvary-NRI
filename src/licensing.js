@@ -16,6 +16,12 @@ const states = {
   past_due: ['Past due', 'متأخرة السداد'], expired: ['Expired', 'منتهية'], suspended: ['Suspended', 'معلّقة'],
   cancelled: ['Cancelled', 'ملغاة'], revoked: ['Revoked', 'مسحوبة'],
 };
+const audiences = {
+  all: ['Individual or institutional', 'فردية أو مؤسسية'], individual: ['Individual', 'فردية'],
+  team: ['Research team', 'فريق بحثي'], enterprise: ['Enterprise', 'شركات'],
+  institutional: ['Institutional', 'مؤسسية'],
+};
+
 export const controlCenterPath = '/control-center';
 export const billingRecordsPath = '/control-center/billing';
 export const legacyLicensingPath = '/workspace/settings/licensing';
@@ -178,7 +184,7 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
           optional('monthly-minor'), optional('annual-minor'));
       } else if (intent === 'save') {
         status = store.licensing.save(account.id, code, whole(form.get('project-limit')), whole(form.get('ai-tokens')),
-          optional('storage-mib'), optional('daily-reports'), optional('institutional-seats'));
+          optional('storage-mib'), optional('daily-reports'), optional('institutional-seats'), form.get('audience') || null);
       } else {
         const email = normalizeAddress(form.get('email') ?? '');
         const expiresAt = endDate(form.get('expires'));
@@ -246,7 +252,8 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
   const institutionSelect = `<label>${t('Organization', 'المؤسسة')}<select name="institution" required>
     ${data.organizations.map(({ code, name }) => `<option value="${escapeHtml(code)}">${escapeHtml(name)} · ${escapeHtml(code)}</option>`).join('')}
     </select></label>`;
-  const institutionPlans = data.plans.filter(({ institutional_seats }) => institutional_seats !== null);
+  const institutionPlans = data.plans.filter(({ institutional_seats, audience }) => institutional_seats !== null && audience !== 'individual');
+  const individualPlans = data.plans.filter(({ audience }) => ['all', 'individual'].includes(audience));
   const organizations = `
     <h2 id="organizations">${t('Organizations and seats', 'المؤسسات والمقاعد')}</h2>
     <form class="workspace-form" method="post" action="${url}">
@@ -311,15 +318,20 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
         <label>${t('PDF storage limit in MiB (optional)', 'حد تخزين PDF بالميبي بايت (اختياري)')}<input name="storage-mib" type="number" min="0" max="1048576"></label>
         <label>${t('Daily report exports (optional)', 'عدد تصديرات التقارير يوميًا (اختياري)')}<input name="daily-reports" type="number" min="0" max="10000"></label>
         <label>${t('Institutional seats (optional)', 'المقاعد المؤسسية (اختياري)')}<input name="institutional-seats" type="number" min="1" max="10000"></label>
+        <label>${t('Plan audience', 'الفئة المستهدفة')}<select name="audience">
+          <option value="">${t('Keep current or use default', 'احتفظ بالإعداد الحالي أو استخدم الافتراضي')}</option>
+          ${Object.entries(audiences).map(([value, labels]) => `<option value="${value}">${t(...labels)}</option>`).join('')}
+        </select></label>
         ${passwordField}<button class="action" name="intent" value="save">${t('Save plan', 'احفظ الخطة')}</button>
       </form>
-      ${data.plans.length ? `<ul class="project-list">${data.plans.map((item) => `<li><bdi>${escapeHtml(item.code)}</bdi> ·
+      ${data.plans.length ? `<ul class="project-list">${data.plans.map((item) => `<li><bdi>${escapeHtml(item.code)}</bdi> · ${t(...audiences[item.audience])} ·
         ${t('PDF storage','تخزين PDF')} <bdi>${item.storage_mib === null ? t('Unlimited','غير محدود') : count.format(item.storage_mib) + ' MiB'}</bdi> ·
         ${t('Daily reports','التقارير اليومية')} <bdi>${item.daily_reports === null ? t('Unlimited','غير محدودة') : count.format(item.daily_reports)}</bdi> ·
-        ${t('Institutional seats','المقاعد المؤسسية')} <bdi>${item.institutional_seats === null ? t('Unset','غير محددة') : count.format(item.institutional_seats)}</bdi></li>`).join('')}</ul><h2>${t('Assign a plan', 'تعيين خطة')}</h2>
+        ${t('Institutional seats','المقاعد المؤسسية')} <bdi>${item.institutional_seats === null ? t('Unset','غير محددة') : count.format(item.institutional_seats)}</bdi></li>`).join('')}</ul>` : ''}
+      ${individualPlans.length ? `<h2>${t('Assign a plan', 'تعيين خطة')}</h2>
       <form class="workspace-form" method="post" action="${url}">
         <label>${t('Account email', 'البريد الإلكتروني للحساب')}<input name="email" type="email" maxlength="254" required dir="ltr"></label>
-        <label>${t('Plan', 'الخطة')}<select name="plan">${data.plans.map((item) => `<option value="${escapeHtml(item.code)}">${escapeHtml(item.code)} · ${count.format(item.project_limit)} / ${count.format(item.daily_ai_tokens)}</option>`).join('')}</select></label>
+        <label>${t('Plan', 'الخطة')}<select name="plan">${individualPlans.map((item) => `<option value="${escapeHtml(item.code)}">${escapeHtml(item.code)} · ${count.format(item.project_limit)} / ${count.format(item.daily_ai_tokens)}</option>`).join('')}</select></label>
         <label>${t('Expiry date (UTC, optional)', 'تاريخ الانتهاء (UTC، اختياري)')}<input name="expires" type="date"></label>
         ${reasonField}${passwordField}<button class="action" name="intent" value="assign">${t('Assign plan', 'عيّن الخطة')}</button>
         <button class="action" name="intent" value="complimentary">${t('Grant complimentary subscription', 'امنح اشتراكًا مجانيًا')}</button>
@@ -330,10 +342,10 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
       ${moduleForms}
       ${organizations}
       ${discountForm}
-      ${data.plans.length ? `<h2>${t('Start a trial', 'ابدأ فترة تجريبية')}</h2>
+      ${individualPlans.length ? `<h2>${t('Start a trial', 'ابدأ فترة تجريبية')}</h2>
       <form class="workspace-form" method="post" action="${url}">
         <label>${t('Account email', 'البريد الإلكتروني للحساب')}<input name="email" type="email" maxlength="254" required dir="ltr"></label>
-        <label>${t('Plan', 'الخطة')}<select name="plan">${data.plans.map((item) => `<option>${escapeHtml(item.code)}</option>`).join('')}</select></label>
+        <label>${t('Plan', 'الخطة')}<select name="plan">${individualPlans.map((item) => `<option>${escapeHtml(item.code)}</option>`).join('')}</select></label>
         <label>${t('Expiry date (UTC)', 'تاريخ الانتهاء (UTC)')}<input name="expires" type="date" required></label>
         ${passwordField}<button class="action" name="intent" value="trial">${t('Start trial', 'ابدأ التجربة')}</button>
       </form>` : ''}

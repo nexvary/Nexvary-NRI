@@ -2,7 +2,7 @@ import { billingAccessSchema, billingDiscountSchema, billingReconciliationSchema
 import { resourceSchema, resourceStore } from './resource-store.js';
 import { citationSchema, citationStore } from './citation-store.js';
 import { organizationSchema, organizationStore } from './library-organization.js';
-import { institutionalSeatSchema, institutionalSubscriptionSchema, licenseSchema, lifecycleScheduleSchema, licensingStore, moduleEntitlementSchema, planPricingSchema, quotaSchema, subscriptionSchema } from './licensing-store.js';
+import { institutionalSeatSchema, institutionalSubscriptionSchema, licenseSchema, lifecycleScheduleSchema, licensingStore, moduleEntitlementSchema, planAudienceSchema, planPricingSchema, quotaSchema, subscriptionSchema } from './licensing-store.js';
 import { manuscriptCatalogSchema, teamSchema, teamStore, teamWorkSchema } from './team-store.js';
 import { privacyStore } from './privacy-store.js';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
@@ -29,7 +29,7 @@ import { referenceSchema, referenceMigrationV4, referenceStore } from './referen
 
 export const sessionLifetime = 8 * 60 * 60;
 export const sessionIdle = 30 * 60_000;
-const schemaVersion = 39;
+const schemaVersion = 40;
 const schema = `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -119,6 +119,7 @@ function initialize(db, path) {
     if (version < 37) db.exec(billingReconciliationSchema);
     if (version < 38) db.exec(lifecycleScheduleSchema);
     if (version < 39) db.exec(billingDiscountSchema);
+    if (version < 40) db.exec(planAudienceSchema);
     return bindDocumentKey(db, path);
   });
 }

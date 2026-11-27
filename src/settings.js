@@ -62,6 +62,7 @@ const labels = {
 
 export function settingsPage(store, lang, account, token) {
   const t = (key) => labels[key][lang === 'ar' ? 1 : 0];
+  const subscription = store.licensing.effectiveSubscription(account.id);
   const renewal = store.licensing.renewalNotice(account.id);
   const recent = store.settings.list(account.id);
   const count = store.otherSessions(account.id, token);
@@ -80,6 +81,13 @@ export function settingsPage(store, lang, account, token) {
         <div><dt>${t('other')}</dt><dd>${current}</dd></div></dl>
       ${count ? `<form method="post" action="/workspace/settings?lang=${lang}">
         <button class="action" name="intent" value="revoke-others">${t('revoke')}</button></form>` : ''}
+      ${subscription ? `<h2>${lang === 'ar' ? 'الاشتراك الفعلي' : 'Effective subscription'}</h2>
+        <p><bdi>${escapeHtml(subscription.plan)}</bdi> · ${subscription.source === 'institution'
+          ? (lang === 'ar' ? 'مقعد مؤسسي' : 'Institutional seat')
+          : (lang === 'ar' ? 'اشتراك فردي' : 'Individual assignment')}</p>
+        <p>${lang === 'ar' ? 'الوحدات المتاحة' : 'Available modules'} · <bdi>${subscription.modules.length
+          ? subscription.modules.map((id) => 'NRI-' + String(id).padStart(2, '0')).join(', ')
+          : '0'}</bdi></p>` : ''}
       ${renewal ? `<p><strong>${renewal.expired
         ? (lang === 'ar' ? 'انتهى اشتراكك' : 'Your subscription expired')
         : (lang === 'ar' ? 'ينتهي اشتراكك قريبًا' : 'Your subscription expires soon')}</strong>

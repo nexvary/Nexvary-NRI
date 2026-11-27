@@ -117,6 +117,16 @@ export const lifecycleScheduleSchema = `
   PRAGMA user_version = 38;
 `;
 
+export const planAudienceSchema = `
+  CREATE TABLE IF NOT EXISTS license_plan_audiences (
+    plan TEXT PRIMARY KEY REFERENCES license_plans(code) ON DELETE CASCADE,
+    audience TEXT NOT NULL CHECK(audience IN ('all','individual','team','enterprise','institutional'))
+  ) STRICT;
+  PRAGMA user_version = 40;
+`;
+
+const planAudiences = new Set(['all','individual','team','enterprise','institutional']);
+
 const subscriptionTransitions = Object.freeze({
   trial: ['active', 'expired', 'suspended', 'cancelled', 'revoked'],
   active: ['grace', 'past_due', 'expired', 'suspended', 'cancelled', 'revoked'],
@@ -142,11 +152,17 @@ export function licensingStore(db, now, transact) {
     WHERE o.account_id = ? AND m.pending_until = 0`);
   const grant = db.prepare('INSERT OR IGNORE INTO license_operators VALUES (?)');
   const revoke = db.prepare('DELETE FROM license_operators WHERE account_id = ?');
-  const plans = db.prepare(`SELECT p.*,q.storage_mib,q.daily_reports,s.institutional_seats,price.currency,price.monthly_minor,price.annual_minor
+  const plans = db.prepare(`SELECT p.*,q.storage_mib,q.daily_reports,s.institutional_seats,COALESCE(a.audience,'all') AS audience,price.currency,price.monthly_minor,price.annual_minor
     FROM license_plans p LEFT JOIN license_plan_quotas q ON q.code=p.code
     LEFT JOIN license_plan_seats s ON s.code=p.code
-    LEFT JOIN license_plan_prices price ON price.plan=p.code ORDER BY p.code`);
+    LEFT JOIN license_plan_prices price ON price.plan=p.code
+    LEFT JOIN license_plan_audiences a ON a.plan=p.code ORDER BY p.code`);
   const plan = db.prepare('SELECT * FROM license_plans WHERE code = ?');
+  const planAudience = db.prepare('SELECT audience FROM license_plan_audiences WHERE plan=?');
+  const saveAudience = db.prepare(`INSERT INTO license_plan_audiences VALUES (?,?)
+    ON CONFLICT(plan) DO UPDATE SET audience=excluded.audience`);
+  const hasIndividualAssignments = db.prepare('SELECT 1 FROM license_assignments WHERE plan=? LIMIT 1');
+  const hasOrganizationAssignments = db.prepare('SELECT 1 FROM license_organization_subscriptions WHERE plan=? LIMIT 1');
   const save = db.prepare(`INSERT INTO license_plans VALUES (?,?,?)
     ON CONFLICT(code) DO UPDATE SET project_limit=excluded.project_limit,daily_ai_tokens=excluded.daily_ai_tokens`);
   const savePrice = db.prepare(`INSERT INTO license_plan_prices VALUES (?,?,?,?)
@@ -156,9 +172,9 @@ export function licensingStore(db, now, transact) {
   const lookup = db.prepare('SELECT id FROM accounts WHERE email = ?');
   const individual = db.prepare('SELECT plan,state,expires_at FROM license_assignments WHERE account_id = ?');
   const effectiveAssignment = `
-    SELECT plan,state,expires_at FROM license_assignments WHERE account_id = :account
+    SELECT plan,state,expires_at,'individual' AS source FROM license_assignments WHERE account_id = :account
     UNION ALL
-    SELECT s.plan,s.state,s.expires_at FROM license_organization_subscriptions s
+    SELECT s.plan,s.state,s.expires_at,'institution' AS source FROM license_organization_subscriptions s
     JOIN license_organization_seats seats ON seats.organization=s.organization
     JOIN license_organization_members m ON m.organization=seats.organization AND m.account_id=seats.account_id
     WHERE seats.account_id=:account AND NOT EXISTS (SELECT 1 FROM license_assignments WHERE account_id=:account)
@@ -221,7 +237,7 @@ export function licensingStore(db, now, transact) {
     WHERE state IN ('trial','active','grace') AND expires_at<=? ORDER BY expires_at,account_id LIMIT 500`);
   const dueInstitutions = db.prepare(`SELECT organization,state,expires_at FROM license_organization_subscriptions
     WHERE state IN ('trial','active','grace') AND expires_at<=? ORDER BY expires_at,organization LIMIT 500`);
-  const accountExpiry = db.prepare(`SELECT state,expires_at FROM (${effectiveAssignment})`);
+  const accountExpiry = db.prepare(`SELECT plan,state,expires_at,source FROM (${effectiveAssignment})`);
 
   function stateAt(current, timestamp) {
     if (usableStates.has(current.state) && current.expires_at !== null && current.expires_at <= timestamp) return 'expired';
@@ -278,17 +294,21 @@ export function licensingStore(db, now, transact) {
         organizations: organizationList.all().map((current) => ({ ...current, state: stateAt(current, timestamp) })),
         institutionalHistory: institutionalHistory.all(), subscriptions: subscriptions.all().map((current) => ({ ...current, state: stateAt(current, timestamp) })) };
     },
-    save(actor, code, projectLimit, aiTokens, storage = null, dailyReports = null, institutionalSeats = null) {
+    save(actor, code, projectLimit, aiTokens, storage = null, dailyReports = null, institutionalSeats = null, audience = null) {
       return transact(db, () => {
         if (!authorized.get(actor)) return 403;
         if (!/^[a-z][a-z0-9-]{1,30}$/.test(code) || !Number.isInteger(projectLimit) || projectLimit < 0 || projectLimit > 10000 ||
             !Number.isInteger(aiTokens) || aiTokens < 0 || aiTokens > 1_000_000_000 ||
             !optionalLimit(storage,1048576) || !optionalLimit(dailyReports,10000) ||
             !optionalLimit(institutionalSeats,10000) || institutionalSeats === 0) return 422;
-        if ((institutionalSeats ?? 0) < maxSeatsInUse.get(code).total) return 409;
+        if (audience !== null && !planAudiences.has(audience)) return 422;
+        if ((audience === 'individual' && hasOrganizationAssignments.get(code)) ||
+            (audience !== null && audience !== 'all' && audience !== 'individual' && hasIndividualAssignments.get(code)) ||
+            (institutionalSeats ?? 0) < maxSeatsInUse.get(code).total) return 409;
         save.run(code, projectLimit, aiTokens);
         saveQuotas.run(code, storage, dailyReports);
         saveSeats.run(code, institutionalSeats);
+        if (audience !== null) saveAudience.run(code, audience);
         record.run(actor, null, code, 'plan-saved', now());
         return 303;
       });
@@ -313,7 +333,8 @@ export function licensingStore(db, now, transact) {
         if (!authorized.get(actor)) return 403;
         if (!validReason(promotionReason)) return 422;
         const account = lookup.get(email);
-        if (!account || !plan.get(code) || (expiresAt !== null && !Number.isSafeInteger(expiresAt))) return 422;
+        const audience = planAudience.get(code)?.audience ?? 'all';
+        if (!account || !plan.get(code) || (audience !== 'all' && audience !== 'individual') || (expiresAt !== null && !Number.isSafeInteger(expiresAt))) return 422;
         const timestamp = now();
         if (promotionReason !== null && (initialState !== 'active' || (expiresAt !== null && expiresAt <= timestamp))) return 422;
         if (initialState !== 'active' && (initialState !== 'trial' || expiresAt === null || expiresAt <= timestamp)) return 422;
@@ -358,7 +379,7 @@ export function licensingStore(db, now, transact) {
         if (!validReason(promotionReason)) return 422;
         const seats = institutionPlan.get(planCode)?.institutional_seats;
         const timestamp = now();
-        if (!organization.get(code) || !seats || (expiresAt !== null && (!Number.isSafeInteger(expiresAt) || expiresAt <= timestamp)) ||
+        if (!organization.get(code) || !seats || planAudience.get(planCode)?.audience === 'individual' || (expiresAt !== null && (!Number.isSafeInteger(expiresAt) || expiresAt <= timestamp)) ||
             (initialState !== 'active' && (initialState !== 'trial' || expiresAt === null))) return 422;
         if (promotionReason !== null && (initialState !== 'active' || (expiresAt !== null && expiresAt <= timestamp))) return 422;
         const current = organizationSubscription.get(code);
@@ -429,6 +450,13 @@ export function licensingStore(db, now, transact) {
         }
         return { accounts: accounts.length, organizations: organizations.length };
       });
+    },
+    effectiveSubscription(account) {
+      const current = accountExpiry.get({ account });
+      if (!current) return undefined;
+      const state = stateAt(current, now());
+      return { plan: current.plan, source: current.source, state,
+        modules: usableStates.has(state) ? planModules.all(current.plan).map(({ module }) => module) : [] };
     },
     renewalNotice(account) {
       const current = accountExpiry.get({ account });
