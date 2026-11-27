@@ -22,6 +22,8 @@ if mode == 'malformed':
 if mode == 'active':
     xml = xml.replace('<w:p>', '<w:p><w:object/>', 1)
 attributes = 'Target="word/document.xml"'
+if mode == 'root-escape':
+    attributes = 'Target="../word/document.xml"'
 if mode == 'scheme-relative':
     attributes = 'Target="//word/document.xml"'
 if mode == 'external':
@@ -32,14 +34,15 @@ with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as archive:
     archive.writestr('_rels/.rels', f'<Relationships xmlns="{rel}"><Relationship Id="rId1" Type="{office}" {attributes}/></Relationships>')
     archive.writestr('word/document.xml', xml)
     extra = {'traversal': ('../data.xml', '<data/>'), 'macro': ('word/vbaProject.bin', 'code'),
-             'bomb': ('word/extra.xml', 'X' * (5 * 1024 * 1024))}
+             'bomb': ('word/extra.xml', 'X' * (5 * 1024 * 1024)),
+             'fake-image': ('word/media/photo.png', b'MZfake executable')}
     if mode in extra:
         archive.writestr(*extra[mode])
 sys.stdout.buffer.write(output.getvalue())
 `, variant]);
 
 test('rejects malformed and unsafe DOCX packages', async () => {
-  for (const variant of ['dtd', 'malformed', 'external', 'scheme-relative', 'traversal', 'macro', 'bomb', 'active']) {
+  for (const variant of ['dtd', 'malformed', 'external', 'scheme-relative', 'root-escape', 'traversal', 'macro', 'bomb', 'active', 'fake-image']) {
     assert.equal((await inspectDocx(fixture(variant))).status, 422, variant);
   }
   assert.equal((await inspectDocx(Buffer.from('not a ZIP archive'))).status, 422);
@@ -84,4 +87,18 @@ test('stores, previews and downloads a DOCX only in its private project', async 
   assert.deepEqual(Buffer.from(await download.arrayBuffer()), bytes);
   assert.equal((await get(history + '/versions/1', accounts[1])).status, 404);
   assert.match(await (await get('/workspace/library?kind=docx&q=study')).text(), /study\.docx/);
+});
+
+
+test('previews a standard DOCX produced by the report runtime', { skip: !process.env.NRI_REPORT_PYTHON }, async () => {
+  const bytes = execFileSync(process.env.NRI_REPORT_PYTHON, ['-c', [
+    'import io, sys',
+    'from docx import Document',
+    'document = Document()',
+    'document.add_paragraph("Ordinary DOCX • مستند عادي")',
+    'output = io.BytesIO()',
+    'document.save(output)',
+    'sys.stdout.buffer.write(output.getvalue())',
+  ].join('\n')]);
+  assert.deepEqual(await inspectDocx(bytes), { text: 'Ordinary DOCX • مستند عادي\n' });
 });

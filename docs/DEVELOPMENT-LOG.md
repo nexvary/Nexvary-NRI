@@ -220,3 +220,7 @@
 ## 2026-11-27 · Recoverable workspace key rotation
 
 - Added offline SQLite snapshot rotation for document bytes, messages, MFA secrets and provider credentials, with version history and recovery-code preservation. [CI passed 71/71](https://github.com/nexvary/Nexvary-NRI/actions/runs/46011042141) on `ca3fde9` with a killed-child interruption test and encrypted backup rollback.
+
+## 2026-11-27 · Independent L-READY decisions
+
+- Added accepted-reviewer-only decisions with an independence declaration, one write per revision and attributable history. Current-revision decisions appear in Report Studio. [Regression and browser evidence](https://github.com/nexvary/Nexvary-NRI/actions/runs/46011593215).

@@ -62,3 +62,6 @@ Private DOCX upload and plain-text preview passed [CI](https://github.com/nexvar
 
 
 Workspace key rotation passed [CI](https://github.com/nexvary/Nexvary-NRI/actions/runs/46011042141) on disposable workspaces. Follow [RECOVERY.md](RECOVERY.md#workspace-encryption-key-rotation) for staging, promotion and rollback.
+
+
+Independent L-READY review is available in Project team. Accepted reviewers record a declaration and a revision-bound decision. See [CI evidence](https://github.com/nexvary/Nexvary-NRI/actions/runs/46011593215). Wider scientific review and researcher network work remain open.

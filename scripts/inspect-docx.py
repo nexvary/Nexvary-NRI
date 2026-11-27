@@ -39,6 +39,33 @@ def valid_path(name):
     )
 
 
+def relationship_target(path, target):
+    require(not target.startswith("//") and re.fullmatch(r"/?[A-Za-z0-9_./\[\]-]+", target))
+    pieces = list(PurePosixPath(path).parent.parent.parts) if not target.startswith("/") else []
+    for part in target.lstrip("/").split("/"):
+        require(part not in {"", "."})
+        if part == "..":
+            require(bool(pieces))
+            pieces.pop()
+        else:
+            pieces.append(part)
+    require(bool(pieces))
+    return "/".join(pieces)
+
+
+def raster_signature(data, extension):
+    prefixes = {
+        ".png": (b"\x89PNG\r\n\x1a\n",),
+        ".jpg": (b"\xff\xd8\xff",),
+        ".jpeg": (b"\xff\xd8\xff",),
+        ".gif": (b"GIF87a", b"GIF89a"),
+        ".bmp": (b"BM",),
+        ".tif": (b"II*\x00", b"MM\x00*"),
+        ".tiff": (b"II*\x00", b"MM\x00*"),
+    }
+    return data.startswith(prefixes[extension])
+
+
 def xml_tree(data):
     source = data.decode("utf-8-sig")
     require(not re.search(r"<!DOCTYPE|<!ENTITY|<\?(?!xml\s)", source))
@@ -80,6 +107,8 @@ def inspect(raw):
                 require(len(data) == part.file_size and not stream.read(1))
             if is_xml:
                 trees[path] = xml_tree(data)
+            else:
+                require(raster_signature(data, extension))
 
         manifest = trees["[Content_Types].xml"]
         require(manifest.tag == CT + "Types")
@@ -102,14 +131,13 @@ def inspect(raw):
                 relationship = item.attrib["Type"]
                 require(item.tag == REL + "Relationship" and identifier not in seen)
                 seen.add(identifier)
-                require(item.get("TargetMode", "Internal") == "Internal" and not target.startswith("//") and valid_path(target.lstrip("/")))
+                require(item.get("TargetMode", "Internal") == "Internal")
                 relation_name = relationship.rsplit("/", 1)[-1].lower()
                 require(relation_name not in {"oleobject", "package", "activex", "vbaproject", "attachedtemplate", "afchunk", "control"})
-                folder = PurePosixPath(path).parent.parent
-                resolved = target.lstrip("/") if target.startswith("/") else str(folder / target)
+                resolved = relationship_target(path, target)
                 require(resolved in members)
                 if path == "_rels/.rels" and relationship in OFFICE:
-                    root_targets.append("/" + target.lstrip("/"))
+                    root_targets.append("/" + resolved)
 
         require(len(main_parts) == 1 and root_targets == main_parts)
         document = trees[main_parts[0].removeprefix("/")]
