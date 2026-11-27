@@ -209,6 +209,12 @@ try {
         url: origin, name: 'nri_session', value: session, httpOnly: true, sameSite: 'Strict',
       });
       assert.equal(success, true);
+      await send('Page.navigate', { url: origin + '/workspace/projects/' + project + '/documents/' +
+        textDocument + '/versions/1/preview?lang=' + lang });
+      await waitFor(() => inspect(send,
+        'document.querySelector(".document-text-preview")?.textContent.includes("ملاحظات البحث <source>")'),
+      'private TXT preview');
+      await captureLayout(send, 'txt-preview', lang, name, width, height);
       await send('Page.navigate', { url: origin + '/workspace/assistant?lang=' + lang });
       await waitFor(() => inspect(send, 'Boolean(document.querySelector("select[name=project]"))'), 'Assistant project selector');
       assert.equal(await inspect(send, `(() => {
@@ -364,12 +370,6 @@ try {
         await waitFor(() => inspect(send, 'Boolean(document.querySelector("select[name=plan] option[value=research]"))'), 'saved workspace plan');
         await captureLayout(send, 'licensing', lang, name, width, height);
       }
-      await send('Page.navigate', { url: origin + '/workspace/projects/' + project + '/documents/' +
-        textDocument + '/versions/1/preview?lang=' + lang });
-      await waitFor(() => inspect(send,
-        'document.querySelector(".document-text-preview")?.textContent.includes("ملاحظات البحث <source>")'),
-      'private TXT preview');
-      await captureLayout(send, 'txt-preview', lang, name, width, height);
       for (const view of ['about', 'developer']) {
         await send('Page.navigate', { url: origin + '/?lang=' + lang + '&view=' + view });
         await waitFor(() => inspect(send, `location.search.includes('view=${view}') &&
