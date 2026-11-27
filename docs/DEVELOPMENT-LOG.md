@@ -294,3 +294,8 @@
 
 - Added MFA- and password-protected discount creation and revocation for licensing operators. Codes support percentage basis points or currency-specific fixed minor units, a UTC expiry, optional plan eligibility, and bounded redemptions.
 - Signed synthetic invoice events may specify a discount code and plan code with their gross line total. The verified event, net invoice and redemption commit together. Exact retries preserve the original result and do not consume a second redemption.
+
+## 2026-11-27 · Promotional grants and administrative overrides
+
+- The bilingual Control Center can apply complimentary account assignments and sponsored organization plans through the existing MFA- and password-protected licensing paths. A reason is required and stored with the actor, target and plan in the existing audits.
+- An explicit, reasoned operator override can reopen a cancelled assignment. Revoked assignments remain terminal. Grants, plan limits and private resource checks still apply.

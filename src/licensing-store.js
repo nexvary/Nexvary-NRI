@@ -130,6 +130,9 @@ const subscriptionTransitions = Object.freeze({
 
 const usableStates = new Set(['trial', 'active', 'grace']);
 
+const validReason = (reason) => reason === null || (typeof reason === 'string' && reason.trim().length > 0 &&
+  reason.trim().length <= 200 && !/[\u0000-\u001f\u007f]/.test(reason));
+
 const dayMs = 86_400_000;
 const optionalLimit = (value, max) => value === null || (Number.isInteger(value) && value >= 0 && value <= max);
 
@@ -225,10 +228,11 @@ export function licensingStore(db, now, transact) {
     return current.state;
   }
 
-  function validateTransition(current, expected, next, expiresAt, timestamp) {
+  function validateTransition(current, expected, next, expiresAt, timestamp, overrideReason) {
     if (!current || !Object.hasOwn(subscriptionTransitions, expected) || !Object.hasOwn(subscriptionTransitions, next)) return 422;
     const previous = stateAt(current, timestamp);
-    if (previous !== expected || !subscriptionTransitions[previous].includes(next)) return 409;
+    const reopening = overrideReason !== null && previous === 'cancelled' && next === 'active';
+    if (previous !== expected || (!subscriptionTransitions[previous].includes(next) && !reopening)) return 409;
     if ((expiresAt !== null && (!Number.isSafeInteger(expiresAt) || expiresAt <= timestamp || !usableStates.has(next))) ||
         (next === 'grace' && expiresAt === null)) return 422;
     return 303;
@@ -304,31 +308,38 @@ export function licensingStore(db, now, transact) {
         return 303;
       });
     },
-    assign(actor, email, code, expiresAt, initialState = 'active') {
+    assign(actor, email, code, expiresAt, initialState = 'active', promotionReason = null) {
       return transact(db, () => {
         if (!authorized.get(actor)) return 403;
+        if (!validReason(promotionReason)) return 422;
         const account = lookup.get(email);
         if (!account || !plan.get(code) || (expiresAt !== null && !Number.isSafeInteger(expiresAt))) return 422;
         const timestamp = now();
+        if (promotionReason !== null && (initialState !== 'active' || (expiresAt !== null && expiresAt <= timestamp))) return 422;
         if (initialState !== 'active' && (initialState !== 'trial' || expiresAt === null || expiresAt <= timestamp)) return 422;
         const current = individual.get(account.id);
         if (current && (stateAt(current, timestamp) !== 'active' || initialState !== 'active')) return 409;
         assign.run(account.id, code, expiresAt);
         if (initialState === 'trial') updateSubscription.run('trial', expiresAt, account.id);
-        record.run(actor, account.id, code, initialState === 'trial' ? 'trial-started' : 'assigned', timestamp);
+        const action = promotionReason !== null ? 'complimentary:' + promotionReason.trim()
+          : initialState === 'trial' ? 'trial-started' : 'assigned';
+        record.run(actor, account.id, code, action, timestamp);
         return 303;
       });
     },
-    transition(actor, email, expected, next, expiresAt) {
+    transition(actor, email, expected, next, expiresAt, overrideReason = null) {
       return transact(db, () => {
         if (!authorized.get(actor)) return 403;
+        if (!validReason(overrideReason)) return 422;
         const account = lookup.get(email);
         const current = account && individual.get(account.id);
         const timestamp = now();
-        const status = validateTransition(current, expected, next, expiresAt, timestamp);
+        const status = validateTransition(current, expected, next, expiresAt, timestamp, overrideReason);
         if (status !== 303) return status;
         updateSubscription.run(next, expiresAt, account.id);
-        record.run(actor, account.id, current.plan, `subscription:${expected}:${next}`, timestamp);
+        const action = overrideReason === null ? `subscription:${expected}:${next}`
+          : `override:${expected}:${next}:${overrideReason.trim()}`;
+        record.run(actor, account.id, current.plan, action, timestamp);
         return 303;
       });
     },
@@ -341,30 +352,37 @@ export function licensingStore(db, now, transact) {
         return 303;
       });
     },
-    assignInstitution(actor, code, planCode, expiresAt, initialState) {
+    assignInstitution(actor, code, planCode, expiresAt, initialState, promotionReason = null) {
       return transact(db, () => {
         if (!authorized.get(actor)) return 403;
+        if (!validReason(promotionReason)) return 422;
         const seats = institutionPlan.get(planCode)?.institutional_seats;
         const timestamp = now();
         if (!organization.get(code) || !seats || (expiresAt !== null && (!Number.isSafeInteger(expiresAt) || expiresAt <= timestamp)) ||
             (initialState !== 'active' && (initialState !== 'trial' || expiresAt === null))) return 422;
+        if (promotionReason !== null && (initialState !== 'active' || (expiresAt !== null && expiresAt <= timestamp))) return 422;
         const current = organizationSubscription.get(code);
         if ((current && (stateAt(current, timestamp) !== 'active' || initialState !== 'active')) ||
             seatCount.get(code).total > seats) return 409;
         insertInstitutionalSubscription.run(code, planCode, expiresAt, initialState);
-        institutionalAudit.run(actor, code, null, 'subscription:' + initialState + ':' + planCode, timestamp);
+        const action = promotionReason === null ? 'subscription:' + initialState + ':' + planCode
+          : 'sponsorship:' + planCode + ':' + promotionReason.trim();
+        institutionalAudit.run(actor, code, null, action, timestamp);
         return 303;
       });
     },
-    transitionInstitution(actor, code, expected, next, expiresAt) {
+    transitionInstitution(actor, code, expected, next, expiresAt, overrideReason = null) {
       return transact(db, () => {
         if (!authorized.get(actor)) return 403;
+        if (!validReason(overrideReason)) return 422;
         const current = organizationSubscription.get(code);
         const timestamp = now();
-        const status = validateTransition(current, expected, next, expiresAt, timestamp);
+        const status = validateTransition(current, expected, next, expiresAt, timestamp, overrideReason);
         if (status !== 303) return status;
         setInstitutionalState.run(next, expiresAt, code);
-        institutionalAudit.run(actor, code, null, 'subscription:' + expected + ':' + next, timestamp);
+        const action = overrideReason === null ? `subscription:${expected}:${next}`
+          : `override:${expected}:${next}:${overrideReason.trim()}`;
+        institutionalAudit.run(actor, code, null, action, timestamp);
         return 303;
       });
     },

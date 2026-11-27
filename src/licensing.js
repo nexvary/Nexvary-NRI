@@ -136,8 +136,8 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
   if (form) {
     const code = (form.get('plan') ?? '').trim();
     const intent = form.get('intent');
-    if (!['save', 'assign', 'transition', 'trial', 'modules', 'pricing', 'discount-create', 'discount-revoke', 'institution-create',
-      'institution-assign', 'institution-trial', 'institution-transition'].includes(intent) &&
+    if (!['save', 'assign', 'transition', 'complimentary', 'override', 'trial', 'modules', 'pricing', 'discount-create', 'discount-revoke', 'institution-create',
+      'institution-assign', 'institution-trial', 'institution-transition', 'institution-sponsor', 'institution-override'].includes(intent) &&
       !Object.hasOwn(institutionalActions, intent)) return reply(422);
     const retryAfter = throttle.begin(request.socket.remoteAddress ?? '', account.email);
     if (retryAfter) return reply(429, null, { 'Retry-After': String(retryAfter) });
@@ -148,6 +148,7 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
           store.session(token)?.id !== account.id) return reply(403);
       const optional = (field) => form.get(field) ? whole(form.get(field)) : null;
       const institution = (form.get('institution') ?? '').trim();
+      const reason = (form.get('reason') ?? '').trim();
       const promo = (form.get('discount-code') ?? '').trim().toUpperCase();
       if (intent === 'discount-create') {
         status = store.billing.createDiscount(account.id, {
@@ -159,12 +160,12 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
         status = store.billing.revokeDiscount(account.id, promo);
       } else if (intent === 'institution-create') {
         status = store.licensing.createOrganization(account.id, institution, (form.get('institution-name') ?? '').trim());
-      } else if (intent === 'institution-assign' || intent === 'institution-trial') {
+      } else if (['institution-assign', 'institution-trial', 'institution-sponsor'].includes(intent)) {
         status = store.licensing.assignInstitution(account.id, institution, code, endDate(form.get('expires')),
-          intent === 'institution-trial' ? 'trial' : 'active');
-      } else if (intent === 'institution-transition') {
+          intent === 'institution-trial' ? 'trial' : 'active', intent === 'institution-sponsor' ? reason : null);
+      } else if (intent === 'institution-transition' || intent === 'institution-override') {
         status = store.licensing.transitionInstitution(account.id, institution, form.get('current-state'),
-          form.get('next-state'), endDate(form.get('expires')));
+          form.get('next-state'), endDate(form.get('expires')), intent === 'institution-override' ? reason : null);
       } else if (Object.hasOwn(institutionalActions, intent)) {
         const email = normalizeAddress(form.get('email') ?? '');
         status = intent.startsWith('institution-member')
@@ -181,9 +182,11 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
       } else {
         const email = normalizeAddress(form.get('email') ?? '');
         const expiresAt = endDate(form.get('expires'));
-        status = intent === 'transition'
-          ? store.licensing.transition(account.id, email, form.get('current-state'), form.get('next-state'), expiresAt)
-          : store.licensing.assign(account.id, email, code, expiresAt, intent === 'trial' ? 'trial' : 'active');
+        status = intent === 'transition' || intent === 'override'
+          ? store.licensing.transition(account.id, email, form.get('current-state'), form.get('next-state'), expiresAt,
+            intent === 'override' ? reason : null)
+          : store.licensing.assign(account.id, email, code, expiresAt, intent === 'trial' ? 'trial' : 'active',
+            intent === 'complimentary' ? reason : null);
       }
     } finally {
       throttle.finish();
@@ -195,6 +198,8 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
   const date = new Intl.DateTimeFormat(lang, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' });
   const stateOptions = Object.entries(states).map(([value, labels]) => `<option value="${value}">${t(...labels)}</option>`).join('');
   const passwordField = `<label>${t('Current password', 'كلمة المرور الحالية')}<input name="password" type="password" required maxlength="128" autocomplete="current-password"></label>`;
+  const reasonField = `<label>${t('Reason for promotional grants or overrides', 'سبب المنح الترويجية أو التجاوزات')}
+    <input name="reason" maxlength="200"></label>`;
   const moduleForms = data.plans.map(({ code, modules }) => `
     <form class="workspace-form" method="post" action="${url}">
       <input name="plan" type="hidden" value="${escapeHtml(code)}">
@@ -260,8 +265,9 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
         <label>${t('Institutional plan', 'الخطة المؤسسية')}<select name="plan" required>
           ${institutionPlans.map(({ code }) => `<option>${escapeHtml(code)}</option>`).join('')}</select></label>
         <label>${t('Expiry date (UTC, required for trials)', 'تاريخ الانتهاء (UTC، مطلوب للتجربة)')}<input name="expires" type="date"></label>
-        ${passwordField}
+        ${reasonField}${passwordField}
         <button class="action" name="intent" value="institution-assign">${t('Assign institutional plan', 'عيّن خطة مؤسسية')}</button>
+        <button class="action" name="intent" value="institution-sponsor">${t('Grant sponsorship', 'امنح رعاية مؤسسية')}</button>
         <button class="action" name="intent" value="institution-trial">${t('Start institutional trial', 'ابدأ تجربة مؤسسية')}</button>
       </form>` : ''}
       <form class="workspace-form" method="post" action="${url}">
@@ -275,7 +281,8 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
         <label>${t('Current state', 'الحالة الحالية')}<select name="current-state">${stateOptions}</select></label>
         <label>${t('New state', 'الحالة الجديدة')}<select name="next-state">${stateOptions}</select></label>
         <label>${t('New expiry (UTC, required for grace)', 'تاريخ الانتهاء الجديد (UTC، مطلوب لفترة السماح)')}<input name="expires" type="date"></label>
-        ${passwordField}<button class="action" name="intent" value="institution-transition">${t('Change institutional subscription status', 'غيّر حالة الاشتراك المؤسسي')}</button>
+        ${reasonField}${passwordField}<button class="action" name="intent" value="institution-transition">${t('Change institutional subscription status', 'غيّر حالة الاشتراك المؤسسي')}</button>
+        <button class="action" name="intent" value="institution-override">${t('Apply institutional override', 'طبّق تجاوزًا مؤسسيًا')}</button>
       </form>` : ''}
     ` : ''}
     ${data.institutionalHistory.length ? `<h3>${t('Organization audit history', 'سجل تدقيق المؤسسات')}</h3>
@@ -314,7 +321,8 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
         <label>${t('Account email', 'البريد الإلكتروني للحساب')}<input name="email" type="email" maxlength="254" required dir="ltr"></label>
         <label>${t('Plan', 'الخطة')}<select name="plan">${data.plans.map((item) => `<option value="${escapeHtml(item.code)}">${escapeHtml(item.code)} · ${count.format(item.project_limit)} / ${count.format(item.daily_ai_tokens)}</option>`).join('')}</select></label>
         <label>${t('Expiry date (UTC, optional)', 'تاريخ الانتهاء (UTC، اختياري)')}<input name="expires" type="date"></label>
-        ${passwordField}<button class="action" name="intent" value="assign">${t('Assign plan', 'عيّن الخطة')}</button>
+        ${reasonField}${passwordField}<button class="action" name="intent" value="assign">${t('Assign plan', 'عيّن الخطة')}</button>
+        <button class="action" name="intent" value="complimentary">${t('Grant complimentary subscription', 'امنح اشتراكًا مجانيًا')}</button>
       </form>` : ''}
       ${data.plans.length ? `<h2 id="plan-pricing">${t('Plan pricing', 'أسعار الخطط')}</h2>
         <p>${t('Leave all pricing fields empty to clear pricing for a plan.', 'اترك حقول الأسعار فارغة لإلغاء تسعير الخطة.')}</p>
@@ -336,7 +344,8 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
         <label>${t('Current state', 'الحالة الحالية')}<select name="current-state">${stateOptions}</select></label>
         <label>${t('New state', 'الحالة الجديدة')}<select name="next-state">${stateOptions}</select></label>
         <label>${t('New expiry (UTC, required for grace)', 'تاريخ الانتهاء الجديد (UTC، مطلوب لفترة السماح)')}<input name="expires" type="date"></label>
-        ${passwordField}<button class="action" name="intent" value="transition">${t('Change subscription status', 'غيّر حالة الاشتراك')}</button>
+        ${reasonField}${passwordField}<button class="action" name="intent" value="transition">${t('Change subscription status', 'غيّر حالة الاشتراك')}</button>
+        <button class="action" name="intent" value="override">${t('Apply subscription override', 'طبّق تجاوز الاشتراك')}</button>
       </form>` : ''}
       ${data.recent.length ? `<h2>${t('Recent changes', 'آخر التغييرات')}</h2><ol class="activity">${data.recent.map((item) => `<li>
         ${item.action === 'assigned' ? t('Assigned', 'تم التعيين') : item.action === 'plan-saved' ? t('Plan saved', 'حُفظت الخطة') : escapeHtml(item.action)} · <bdi>${escapeHtml(item.plan)}</bdi>
