@@ -76,6 +76,10 @@ function connect(url) {
   const socket = new WebSocket(url);
   const pending = new Map();
   let sequence = 0;
+  socket.addEventListener('close', () => {
+    for (const { reject } of pending.values()) reject(new Error('Chrome DevTools disconnected.'));
+    pending.clear();
+  });
   socket.addEventListener('message', ({ data }) => {
     const message = JSON.parse(data);
     const request = pending.get(message.id);
@@ -94,8 +98,14 @@ function connect(url) {
       const id = ++sequence;
       const request = Promise.withResolvers();
       pending.set(id, request);
-      socket.send(JSON.stringify({ id, method, params }));
-      return request.promise;
+      const deadline = setTimeout(() => request.reject(new Error('DevTools command timed out: ' + method)), 15_000);
+      try {
+        socket.send(JSON.stringify({ id, method, params }));
+        return await request.promise;
+      } finally {
+        clearTimeout(deadline);
+        pending.delete(id);
+      }
     },
   };
 }
@@ -170,14 +180,21 @@ try {
       return '';
     });
     const port = activePort.split('\n', 1)[0];
-    if (/^\d+$/.test(port)) return '127.0.0.1:' + port;
-    return browserOutput.match(/DevTools listening on ws:\/\/(127\.0\.0\.1:\d+)/)?.[1];
-  }, 'DevTools startup', 150);
+    const address = /^\d+$/.test(port) ? '127.0.0.1:' + port
+      : browserOutput.match(/DevTools listening on ws:\/\/(127\.0\.0\.1:\d+)/)?.[1];
+    if (!address) return;
+    try {
+      const response = await fetch('http://' + address + '/json/version', { signal: AbortSignal.timeout(1000) });
+      if (response.ok && (await response.json()).webSocketDebuggerUrl) return address;
+    } catch {
+      // Chrome can announce DevTools before it accepts requests.
+    }
+  }, 'DevTools startup', 250);
   for (const lang of ['ar', 'en']) {
     for (const [name, width, height] of [['desktop', 1440, 920], ['mobile', 390, 844]]) {
-      const tabResponse = await fetch('http://' + devtools + '/json/new?about:blank', { method: 'PUT' });
+      const tabResponse = await fetch('http://' + devtools + '/json/new?about:blank', { method: 'PUT', signal: AbortSignal.timeout(5000) });
       assert.equal(tabResponse.ok, true);
-      const { webSocketDebuggerUrl } = await tabResponse.json();
+      const { id: tabId, webSocketDebuggerUrl } = await tabResponse.json();
       const client = connect(webSocketDebuggerUrl);
       clients.push(client);
       await client.ready;
@@ -344,9 +361,22 @@ try {
         await waitFor(() => inspect(send, 'Boolean(document.querySelector("select[name=plan] option[value=research]"))'), 'saved workspace plan');
         await captureLayout(send, 'licensing', lang, name, width, height);
       }
+      for (const view of ['about', 'developer']) {
+        await send('Page.navigate', { url: origin + '/?lang=' + lang + '&view=' + view });
+        await waitFor(() => inspect(send, `location.search.includes('view=${view}') &&
+          Boolean(document.querySelector('.tabs [aria-current="page"]'))`), view + ' navigation');
+        await captureLayout(send, view, lang, name, width, height);
+      }
       client.socket.close();
+      const closed = await fetch('http://' + devtools + '/json/close/' + tabId,
+        { signal: AbortSignal.timeout(3000) });
+      assert.equal(closed.ok, true);
+      await closed.text();
     }
   }
+} catch (error) {
+  if (browserOutput.trim()) console.error(browserOutput.trim().slice(-12000));
+  throw error;
 } finally {
   for (const { socket } of clients) socket.close();
   chrome.kill();

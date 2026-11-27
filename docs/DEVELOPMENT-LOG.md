@@ -202,3 +202,8 @@
 ## 2026-11-27 · Local concurrent workspace load
 
 - Ran 24- and 48-client mixed read/write/isolation workloads against disposable on-disk SQLite stores. The runs completed 1,440 and 2,880 requests respectively with no unexpected outcomes. Recorded throughput, latency and resource measurements in [DEPLOYMENT.md](DEPLOYMENT.md#sqlite-workload-measurements).
+
+## 2026-11-27 · Hosted browser regression reliability
+
+- Wait for a responsive DevTools endpoint, bound browser commands, close completed tabs and print the Chrome diagnostic tail when a run fails. Existing visual assertions remain active.
+- Added bilingual System and Developer captures in both viewport sizes to the existing Chromium suite.

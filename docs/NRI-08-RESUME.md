@@ -51,3 +51,5 @@ Operator recovery increment: `npm run account:reset -- researcher@example.org` r
 Encrypted backup increment: use `workspace:export` and `workspace:import` with a separate private 32-byte key file. The restore integration test covers authentication and PDF recovery. See [RECOVERY.md](RECOVERY.md) and the optional timer in [DEPLOYMENT.md](DEPLOYMENT.md). Key rotation must account for existing MFA recovery digests as well as encrypted records.
 
 The bounded SQLite load harness covers project-list reads, project creation and cross-account direct routes. The [deployment guide](DEPLOYMENT.md#sqlite-workload-measurements) records both measurements and remaining target-host checks.
+
+The Chromium CI harness now verifies DevTools readiness and bounds command waits. It captures 38 views including the System and Developer pages. Remaining visual acceptance includes tablet coverage, keyboard and screen-reader tests, and screens outside the harness.

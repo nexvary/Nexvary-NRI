@@ -1,5 +1,9 @@
 # Development status
 
+## Browser regression · 2026-11-27 (Cairo)
+
+Chromium produced 38 captures from the running app, including System and Developer pages in Arabic and English at desktop and mobile viewport sizes. DevTools readiness, per-command deadlines and failure diagnostics improve CI observability. Full screen-by-screen accessibility and tablet acceptance remain open.
+
 ## SQLite mixed-workload baseline · 2026-11-27 (Cairo)
 
 Verified 1,440 requests with 24 clients and 2,880 with 48 clients across bilingual workspace reads, project writes and cross-account access denials. See [measurements and scope](DEPLOYMENT.md#sqlite-workload-measurements).
