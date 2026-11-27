@@ -207,3 +207,8 @@
 
 - Wait for a responsive DevTools endpoint, bound browser commands, close completed tabs and print the Chrome diagnostic tail when a run fails. Existing visual assertions remain active.
 - Added bilingual System and Developer captures in both viewport sizes to the existing Chromium suite.
+
+
+## 2026-11-27 · Private TXT documents
+
+- Added versioned UTF-8 TXT uploads and escaped previews, with private downloads, filtering and shared storage quotas. [CI passed](https://github.com/nexvary/Nexvary-NRI/actions/runs/46009913116) at `1d4d604`.

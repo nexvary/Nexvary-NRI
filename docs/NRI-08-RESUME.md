@@ -53,3 +53,6 @@ Encrypted backup increment: use `workspace:export` and `workspace:import` with a
 The bounded SQLite load harness covers project-list reads, project creation and cross-account direct routes. The [deployment guide](DEPLOYMENT.md#sqlite-workload-measurements) records both measurements and remaining target-host checks.
 
 The Chromium CI harness now verifies DevTools readiness and bounds command waits. It captures 38 views including the System and Developer pages. Remaining visual acceptance includes tablet coverage, keyboard and screen-reader tests, and screens outside the harness.
+
+
+Private TXT upload, preview, versioning and quota enforcement passed [CI](https://github.com/nexvary/Nexvary-NRI/actions/runs/46009913116). Both document types use the existing encrypted storage and project access rules.

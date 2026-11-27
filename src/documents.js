@@ -1,3 +1,4 @@
+import { inspectDocx } from './docx.js';
 import { readBoundedBody } from './request-body.js';
 import { documentsPath, escapeHtml, workspacePage } from './workspace-view.js';
 
@@ -6,10 +7,15 @@ const maxTextSize = 256 * 1024;
 const utf8 = new TextDecoder('utf-8', { fatal: true });
 
 export function documentFormat(name) {
-  return /\.txt$/iu.test(name) ? 'txt' : 'pdf';
+  if (/\.txt$/iu.test(name)) return 'txt';
+  return /\.docx$/iu.test(name) ? 'docx' : 'pdf';
 }
 
-const contentTypes = { pdf: 'application/pdf', txt: 'text/plain; charset=utf-8' };
+const contentTypes = {
+  pdf: 'application/pdf',
+  txt: 'text/plain; charset=utf-8',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+};
 
 const maxUploadBody = maxFileSize + 64 * 1024;
 
@@ -40,7 +46,7 @@ async function readDocument(request) {
   if (candidates.length !== 1 || !(file instanceof File)) return { status: 422, error: 'invalidPdf' };
   if (file.size > maxFileSize) return { status: 413, error: 'largePdf' };
   const name = file.name.normalize('NFC').trim();
-  if (name.length > 180 || !/\.(?:pdf|txt)$/iu.test(name) || /[\/\\\p{Cc}\u202a-\u202e\u2066-\u2069]/u.test(name)) {
+  if (name.length > 180 || !/\.(?:pdf|txt|docx)$/iu.test(name) || /[\/\\\p{Cc}\u202a-\u202e\u2066-\u2069]/u.test(name)) {
     return { status: 422, error: 'invalidPdf' };
   }
   if (legacyPdf && documentFormat(name) !== 'pdf') return { status: 422, error: 'invalidPdf' };
@@ -54,6 +60,10 @@ async function readDocument(request) {
       return { status: 422, error: 'invalidText' };
     }
     return { file: { name, bytes } };
+  }
+  if (documentFormat(name) === 'docx') {
+    const inspected = await inspectDocx(bytes);
+    return inspected.status ? inspected : { file: { name, bytes } };
   }
   const header = bytes.subarray(0, 10).toString('latin1');
   const ending = bytes.subarray(-1024).toString('latin1');
@@ -95,7 +105,14 @@ export function createDocumentHandler(store) {
         return;
       }
       if (kind === 'preview-document') {
-        if (documentFormat(file.name) !== 'txt') return missing();
+        const format = documentFormat(file.name);
+        if (format === 'pdf') return missing();
+        const preview = format === 'docx' ? await inspectDocx(file.bytes) : { text: utf8.decode(file.bytes) };
+        if (!stillSignedIn()) return redirect('/login?lang=' + lang);
+        if (format === 'docx' && !store.documents.get(account.id, id, documentId)) return missing();
+        if (preview.status) return reply(preview.status, workspacePage(lang, 'document', {
+          id, project, document, documentId, versions: store.documents.versions(account.id, id, documentId), error: preview.error,
+        }));
         const title = lang === 'ar' ? 'معاينة المستند' : 'Document preview';
         const path = documentsPath(lang, id, documentId).split('?')[0] + '/versions/' + number + '/preview';
         reply(200, {
@@ -103,7 +120,7 @@ export function createDocumentHandler(store) {
           html: `<section class="surface panel detail workspace-page">
             <a href="${documentsPath(lang, id, documentId)}">${lang === 'ar' ? 'سجل الإصدارات' : 'Version history'}</a>
             <h1>${title}</h1><p dir="auto">${escapeHtml(file.name)}</p>
-            <pre class="document-text-preview" dir="auto">\n${escapeHtml(utf8.decode(file.bytes))}</pre>
+            <pre class="document-text-preview" dir="auto">\n${escapeHtml(preview.text)}</pre>
           </section>`,
         });
         return;

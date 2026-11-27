@@ -19,14 +19,14 @@ const labels = {
   missing: ['Project unavailable', 'المشروع غير متاح'],
   empty: ['Your projects will appear here after you create one.', 'ستظهر مشاريعك هنا بعد إنشاء أول مشروع.'],
   confirmProject: ['Confirm deletion of this project and its files', 'أؤكد حذف المشروع وكل ملفاته'],
-  documents: ['Private PDFs and text files', 'ملفات PDF والنصوص الخاصة'],
+  documents: ['Private PDFs, DOCX and text files', 'ملفات PDF وDOCX والنصوص الخاصة'],
   sharing: ['Project invitations', 'دعوات المشروع'],
   reports: ['Report studio', 'استوديو التقارير'],
   economics: ['Economic feasibility', 'الجدوى الاقتصادية'],
   readiness: ['L-READY assessment', 'تقييم L-READY'],
   evidence: ['Evidence intelligence', 'تحليل الأدلة'],
   references: ['Reference validator', 'التحقق من المراجع'],
-  emptyDocuments: ['This project has no PDFs or text files yet.', 'لم تُضف ملفات PDF أو ملفات نصية إلى هذا المشروع بعد.'],
+  emptyDocuments: ['This project has no PDF, DOCX or text files yet.', 'لم تُضف ملفات PDF أو DOCX أو ملفات نصية إلى هذا المشروع بعد.'],
   backToProject: ['Back to the project', 'العودة إلى المشروع'],
   backToDocuments: ['Back to project files', 'العودة إلى ملفات المشروع'],
   pdfFile: ['Document file', 'ملف المستند'],
@@ -36,8 +36,10 @@ const labels = {
   version: ['Version', 'الإصدار'],
   download: ['Download file', 'تنزيل الملف'],
   bytes: ['bytes', 'بايت'],
-  fileLimit: ['PDF up to 8 MiB. UTF-8 TXT up to 256 KiB.', 'الحد الأقصى 8 ميبيبايت لملف PDF و256 كيبيبايت لملف TXT بترميز UTF-8.'],
+  fileLimit: ['PDF and DOCX up to 8 MiB. UTF-8 TXT up to 256 KiB.', 'الحد الأقصى 8 ميبيبايت لملفات PDF وDOCX و256 كيبيبايت لملف TXT بترميز UTF-8.'],
   preview: ['Preview text', 'معاينة النص'],
+  invalidDocx: ['This DOCX is malformed or uses unsupported content.', 'ملف DOCX تالف أو يتضمن محتوى غير مدعوم.'],
+  docxUnavailable: ['DOCX processing is temporarily unavailable.', 'معالجة ملفات DOCX غير متاحة مؤقتًا.'],
   invalidText: ['Choose a valid UTF-8 text file.', 'اختر ملفًا نصيًا صالحًا بترميز UTF-8.'],
   largeText: ['The TXT file exceeds 256 KiB.', 'يتجاوز الملف النصي 256 كيبيبايت.'],
   versionFormat: ['Versions must use the original file format.', 'يجب أن تطابق الإصدارات صيغة الملف الأصلي.'],
@@ -106,8 +108,8 @@ export function workspacePage(lang, kind, options = {}) {
     const { project, document, documents, versions, documentId } = options;
     const route = documentsPath(lang, id, documentId);
     const path = route.split('?')[0];
-    const textDocument = Boolean(document && /\.txt$/iu.test(document.title));
-    const accept = document ? (textDocument ? ".txt,text/plain" : ".pdf,application/pdf") : ".pdf,.txt";
+    const textDocument = Boolean(document && /\.(?:txt|docx)$/iu.test(document.title));
+    const accept = document ? (textDocument ? document.title.slice(document.title.lastIndexOf(".")).toLowerCase() : ".pdf") : ".pdf,.txt,.docx";
     const upload = `
       ${feedback}
       <form method="post" action="${route}" enctype="multipart/form-data" class="workspace-form">
