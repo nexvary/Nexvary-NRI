@@ -56,6 +56,14 @@ export const moduleEntitlementSchema = `
   PRAGMA user_version = 32;
 `;
 
+export const institutionalSeatSchema = `
+  CREATE TABLE IF NOT EXISTS license_plan_seats (
+    code TEXT PRIMARY KEY REFERENCES license_plans(code) ON DELETE CASCADE,
+    institutional_seats INTEGER CHECK(institutional_seats BETWEEN 1 AND 10000)
+  ) STRICT;
+  PRAGMA user_version = 33;
+`;
+
 const subscriptionTransitions = Object.freeze({
   trial: ['active', 'expired', 'suspended', 'cancelled', 'revoked'],
   active: ['grace', 'past_due', 'expired', 'suspended', 'cancelled', 'revoked'],
@@ -78,7 +86,9 @@ export function licensingStore(db, now, transact) {
     WHERE o.account_id = ? AND m.pending_until = 0`);
   const grant = db.prepare('INSERT OR IGNORE INTO license_operators VALUES (?)');
   const revoke = db.prepare('DELETE FROM license_operators WHERE account_id = ?');
-  const plans = db.prepare('SELECT p.*,q.storage_mib,q.daily_reports FROM license_plans p LEFT JOIN license_plan_quotas q ON q.code=p.code ORDER BY p.code');
+  const plans = db.prepare(`SELECT p.*,q.storage_mib,q.daily_reports,s.institutional_seats
+    FROM license_plans p LEFT JOIN license_plan_quotas q ON q.code=p.code
+    LEFT JOIN license_plan_seats s ON s.code=p.code ORDER BY p.code`);
   const plan = db.prepare('SELECT * FROM license_plans WHERE code = ?');
   const save = db.prepare(`INSERT INTO license_plans VALUES (?,?,?)
     ON CONFLICT(code) DO UPDATE SET project_limit=excluded.project_limit,daily_ai_tokens=excluded.daily_ai_tokens`);
@@ -95,6 +105,8 @@ export function licensingStore(db, now, transact) {
   const ownedProjects = db.prepare('SELECT count(*) AS total FROM projects WHERE owner_id = ?');
   const saveQuotas = db.prepare(`INSERT INTO license_plan_quotas VALUES (?,?,?)
     ON CONFLICT(code) DO UPDATE SET storage_mib=excluded.storage_mib,daily_reports=excluded.daily_reports`);
+  const saveSeats = db.prepare(`INSERT INTO license_plan_seats VALUES (?,?)
+    ON CONFLICT(code) DO UPDATE SET institutional_seats=excluded.institutional_seats`);
   const bytes = db.prepare(`SELECT COALESCE(SUM(v.size),0) AS total FROM document_versions v
     JOIN documents d ON d.id=v.document_id JOIN projects p ON p.id=d.project_id WHERE p.owner_id=?`);
   const reports = db.prepare('SELECT count(*) AS total FROM report_reservations WHERE account_id=? AND day=?');
@@ -153,14 +165,16 @@ export function licensingStore(db, now, transact) {
       return { plans: plans.all().map((plan) => ({ ...plan, modules: planModules.all(plan.code).map(({ module }) => module) })), metrics: metrics.get(timestamp), recent: events.all(),
         subscriptions: subscriptions.all().map((current) => ({ ...current, state: stateAt(current, timestamp) })) };
     },
-    save(actor, code, projectLimit, aiTokens, storage = null, dailyReports = null) {
+    save(actor, code, projectLimit, aiTokens, storage = null, dailyReports = null, institutionalSeats = null) {
       return transact(db, () => {
         if (!authorized.get(actor)) return 403;
         if (!/^[a-z][a-z0-9-]{1,30}$/.test(code) || !Number.isInteger(projectLimit) || projectLimit < 0 || projectLimit > 10000 ||
             !Number.isInteger(aiTokens) || aiTokens < 0 || aiTokens > 1_000_000_000 ||
-            !optionalLimit(storage,1048576) || !optionalLimit(dailyReports,10000)) return 422;
+            !optionalLimit(storage,1048576) || !optionalLimit(dailyReports,10000) ||
+            !optionalLimit(institutionalSeats,10000) || institutionalSeats === 0) return 422;
         save.run(code, projectLimit, aiTokens);
-        saveQuotas.run(code,storage,dailyReports);
+        saveQuotas.run(code, storage, dailyReports);
+        saveSeats.run(code, institutionalSeats);
         record.run(actor, null, code, 'plan-saved', now());
         return 303;
       });

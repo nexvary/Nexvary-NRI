@@ -48,7 +48,7 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
       } else if (intent === 'save') {
         const optional = (field) => form.get(field) ? whole(form.get(field)) : null;
         status = store.licensing.save(account.id, code, whole(form.get('project-limit')), whole(form.get('ai-tokens')),
-          optional('storage-mib'), optional('daily-reports'));
+          optional('storage-mib'), optional('daily-reports'), optional('institutional-seats'));
       } else {
         const email = normalizeAddress(form.get('email') ?? '');
         const expiresAt = endDate(form.get('expires'));
@@ -95,11 +95,13 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
         <label>${t('Daily external AI tokens', 'الحد اليومي لرموز الذكاء الاصطناعي الخارجي')}<input name="ai-tokens" type="number" required min="0" max="1000000000"></label>
         <label>${t('PDF storage limit in MiB (optional)', 'حد تخزين PDF بالميبي بايت (اختياري)')}<input name="storage-mib" type="number" min="0" max="1048576"></label>
         <label>${t('Daily report exports (optional)', 'عدد تصديرات التقارير يوميًا (اختياري)')}<input name="daily-reports" type="number" min="0" max="10000"></label>
+        <label>${t('Institutional seats (optional)', 'المقاعد المؤسسية (اختياري)')}<input name="institutional-seats" type="number" min="1" max="10000"></label>
         ${passwordField}<button class="action" name="intent" value="save">${t('Save plan', 'احفظ الخطة')}</button>
       </form>
       ${data.plans.length ? `<ul class="project-list">${data.plans.map((item) => `<li><bdi>${escapeHtml(item.code)}</bdi> ·
         ${t('PDF storage','تخزين PDF')} <bdi>${item.storage_mib === null ? t('Unlimited','غير محدود') : count.format(item.storage_mib) + ' MiB'}</bdi> ·
-        ${t('Daily reports','التقارير اليومية')} <bdi>${item.daily_reports === null ? t('Unlimited','غير محدودة') : count.format(item.daily_reports)}</bdi></li>`).join('')}</ul><h2>${t('Assign a plan', 'تعيين خطة')}</h2>
+        ${t('Daily reports','التقارير اليومية')} <bdi>${item.daily_reports === null ? t('Unlimited','غير محدودة') : count.format(item.daily_reports)}</bdi> ·
+        ${t('Institutional seats','المقاعد المؤسسية')} <bdi>${item.institutional_seats === null ? t('Unset','غير محددة') : count.format(item.institutional_seats)}</bdi></li>`).join('')}</ul><h2>${t('Assign a plan', 'تعيين خطة')}</h2>
       <form class="workspace-form" method="post" action="${url}">
         <label>${t('Account email', 'البريد الإلكتروني للحساب')}<input name="email" type="email" maxlength="254" required dir="ltr"></label>
         <label>${t('Plan', 'الخطة')}<select name="plan">${data.plans.map((item) => `<option value="${escapeHtml(item.code)}">${escapeHtml(item.code)} · ${count.format(item.project_limit)} / ${count.format(item.daily_ai_tokens)}</option>`).join('')}</select></label>

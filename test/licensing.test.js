@@ -32,7 +32,7 @@ test('MFA-protected operator plans govern project capacity and external token re
     redirect: 'manual', headers: { cookie: user?.cookie ?? '', ...(fields ? { origin: source } : {}) },
     ...(fields ? { method: 'POST', body: new URLSearchParams(fields) } : {}),
   });
-  const setup = { password, intent: 'save', plan: 'research', 'project-limit': 1, 'ai-tokens': 1000, 'storage-mib': 1, 'daily-reports': 1 };
+  const setup = { password, intent: 'save', plan: 'research', 'project-limit': 1, 'ai-tokens': 1000, 'storage-mib': 1, 'daily-reports': 1, 'institutional-seats': 25 };
   const assign = { password, intent: 'assign', email: researcher.email, plan: 'research', expires: '2027-12-01' };
   assert.equal((await request(null, path)).headers.get('location'), '/login?lang=en');
   assert.equal((await request(operator, path, setup)).status, 403);
@@ -45,7 +45,9 @@ test('MFA-protected operator plans govern project capacity and external token re
   store.mfa.confirm(operator.id, totp(secret, now / 30_000), operator.token);
   assert.equal((await request(operator, path, setup, 'https://foreign.test')).status, 403);
   assert.equal((await request(operator, path, { ...setup, 'ai-tokens': '-1' })).status, 422);
+  assert.equal(store.licensing.save(operator.id, 'research', 1, 1000, 1, 1, 0), 422);
   assert.equal((await request(operator, path, setup)).status, 303);
+  assert.equal(store.licensing.dashboard(operator.id).plans[0].institutional_seats, 25);
   assert.equal((await request(operator, path, { ...assign, expires: '2027-02-31' })).status, 422);
   assert.equal((await request(operator, path, assign)).status, 303);
   assert.equal((await request(researcher, path, assign)).status, 403);
@@ -53,6 +55,7 @@ test('MFA-protected operator plans govern project capacity and external token re
   assert.equal(dashboard.headers.get('cache-control'), 'no-store');
   const content = await dashboard.text();
   assert.match(content, /Active assignments/);
+  assert.match(content, /Institutional seats <bdi>25<\/bdi>/);
   assert.match(content, /NRI CONTROL CENTER — NEXVARY INC/);
   assert.doesNotMatch(content, /class="surface sidebar"/);
   assert.equal((await request(operator, '/workspace/settings/licensing?lang=en', { ...setup, password: 'incorrect' })).status, 403);
