@@ -92,3 +92,23 @@ test('serves the stylesheet and HEAD while handling unsupported requests', async
   assert.equal(unknown.status, 404);
   assert.match(await unknown.text(), /Return to the dashboard/);
 });
+
+test('publishes bilingual release and legal review information separately from official company contacts', async () => {
+  for (const [lang, privacy, terms, review] of [
+    ['en', 'Privacy policy draft', 'Terms of use draft', 'Legal information for owner review'],
+    ['ar', 'مسودة سياسة الخصوصية', 'مسودة شروط الاستخدام', 'معلومات قانونية بانتظار مراجعة المالك'],
+  ]) {
+    const system = await fetch(`${base}/?lang=${lang}&view=about`).then((response) => response.text());
+    const developer = await fetch(`${base}/?lang=${lang}&view=developer`).then((response) => response.text());
+    for (const heading of [privacy, terms, review]) {
+      assert.ok(system.includes(heading));
+      assert.ok(!developer.includes(heading));
+    }
+    assert.match(system, /github\.com\/nexvary\/Nexvary-NRI\/commits\//);
+    assert.match(system, /https:\/\/nexvary\.com\/contact/);
+    assert.doesNotMatch(system, /mailto:info@nexvary\.com/);
+    assert.match(developer, /href="mailto:info@nexvary\.com"/);
+    assert.match(developer, /href="https:\/\/www\.youtube\.com\/@NexvaryInc"/);
+    assert.match(developer, /href="https:\/\/x\.com\/Nexvary"/);
+  }
+});

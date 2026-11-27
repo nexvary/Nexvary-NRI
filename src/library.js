@@ -15,7 +15,7 @@ export function libraryStore(db) {
       SELECT 'source', p.id, p.title, r.doi, COALESCE(NULLIF(json_extract(r.metadata, '$.title'), ''), r.doi),
         r.provider, r.checked_at
       FROM projects p JOIN project_references r ON r.project_id = p.id
-      WHERE p.owner_id = ? AND r.state = 'found' AND r.provider <> 'orcid'
+      WHERE p.owner_id = ? AND r.state = 'found' AND r.provider NOT IN ('orcid', 'agency')
     )
     SELECT * FROM entries WHERE (? = 'all' OR kind = ?)
       AND (instr(lower(title), lower(?)) > 0 OR instr(lower(project), lower(?)) > 0
@@ -26,7 +26,7 @@ export function libraryStore(db) {
     SELECT (SELECT count(*) FROM projects WHERE owner_id = ?) AS projects,
       (SELECT count(*) FROM documents d JOIN projects p ON p.id = d.project_id WHERE p.owner_id = ?) AS pdfs,
       (SELECT count(*) FROM project_references r JOIN projects p ON p.id = r.project_id
-        WHERE p.owner_id = ? AND r.state = 'found' AND r.provider <> 'orcid') AS sources,
+        WHERE p.owner_id = ? AND r.state = 'found' AND r.provider NOT IN ('orcid', 'agency')) AS sources,
       (SELECT count(*) FROM evidence_items e JOIN claims c ON c.id = e.claim_id
         JOIN projects p ON p.id = c.project_id WHERE p.owner_id = ?) AS evidence
   `);

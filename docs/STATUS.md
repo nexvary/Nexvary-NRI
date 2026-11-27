@@ -1,5 +1,13 @@
 # Development status
 
+## Release acceptance increment · 2026-11-27 (Cairo)
+
+- Verified the draft branch baseline at `596c855`. The full local suite passes 64/64 with actual Arabic and English PDF and DOCX exports.
+- The reference validator saves a dated DOI registration agency lookup from Crossref. It distinguishes a missing agency record from provider unavailability. Agency lookups are excluded from bibliographic, evidence and research metrics. Automated verification uses a synthetic Crossref response.
+- The bilingual System and Developer pages provide release and support links, methodology, draft legal text and official Nexvary channels. The release owner still needs to approve distribution terms, the privacy policy and the terms of use.
+- Chromium captures from the running application: System [Arabic desktop](qa/nri-about/about-ar-desktop.webp), [Arabic mobile](qa/nri-about/about-ar-mobile.webp), [English desktop](qa/nri-about/about-en-desktop.webp), [English mobile](qa/nri-about/about-en-mobile.webp). Developer [Arabic desktop](qa/nri-about/developer-ar-desktop.webp), [Arabic mobile](qa/nri-about/developer-ar-mobile.webp), [English desktop](qa/nri-about/developer-en-desktop.webp), [English mobile](qa/nri-about/developer-en-mobile.webp).
+- Installation and staging instructions: [README](../README.md), [HTTPS staging](DEPLOYMENT.md) and [recovery](RECOVERY.md).
+
 ## NRI-19c · PDF storage and report quotas
 
 Plans can limit stored PDF bytes across all versions and daily PDF/DOCX exports across owned and shared reports. Upload checks run in the same transaction as the version write. Report exports reserve an allowance before rendering and release it when rendering or the final access check fails. Existing assignments without these values keep their previous limits.
@@ -293,14 +301,14 @@ The audit started at `0136a7f` on `main`. The tree contained only AGENTS.md, the
 
 ## Functional acceptance
 
-Compared all 19 requirements with the application routes, persistence, renderer and test suite on the P2b branch. Modules with only shell navigation are **Not started**. The current dashboard reads account-scoped data from the library and project store. The workspace, file and reference handlers have functional tests, and About and L-READY shell behavior is covered in `test/shell.test.js`.
+The matrix records accumulated module evidence and the current increment. The application remains in staging readiness while partial requirements are open.
 
 | ID | Status | Implemented evidence and remaining acceptance |
 |---|---|---|
 | NRI-01 | Partial | Verified real private project, PDF, reference and evidence counts, recent activity, sign-in/empty states and account isolation. Accepted collaborator counts, self-reported ORCID and metered cost are verified. Verified ORCID ownership remains. |
 | NRI-02 | Partial | Personal project CRUD, project PDF versions, project DOI records and access denial are verified. The team workspace adds versioned manuscripts and author attribution. Catalog search, authors, tags, DOI and publication revisions are verified, alongside team notes and tasks. Wider document integration remains. |
 | NRI-03 | Partial | Project-bound PDF upload, metadata, encrypted persistence, version downloads and deletion are verified. Cross-project search and type filtering for PDFs and saved sources are verified. Private PDF collections, version-specific bookmarks and annotations are verified. BibTeX/RIS exchange, DOI/provider grouping and controlled merging are verified. Embedded PDF reading is verified. Other document formats remain. |
-| NRI-04 | Partial | Crossref and OpenAlex DOI lookups, dated per-provider source links, correction/retraction metadata, per-provider local cache, rate limits and unknown/failure outcomes are verified. Side-by-side provider comparison view implemented. Agency resolution, additional providers, claim-to-source mapping and evidence review remain. |
+| NRI-04 | Partial | Crossref and OpenAlex DOI lookups, dated per-provider source links, correction/retraction metadata, per-provider local cache, rate limits and unknown/failure outcomes are verified. Side-by-side provider comparison view implemented. Crossref agency resolution is verified with simulated upstream results. ORCID and Zenodo public record snapshots are implemented. Wider provider coverage and fuller reference-to-evidence integration remain. |
 | NRI-05 | Partial | Claims, dated source snapshots, study type, limitations, conflicting evidence, owner review and JSON export are verified. Team reviewers can file attributable reviews alongside immutable review history. |
 | NRI-06 | Partial | Six ordered dimensions, four qualitative categories, project evidence links, revision history, reviewer and safety/authorization blockers are verified. Independent team reviewer roles remain. |
 | NRI-07 | Verified | One-year operating model with explicit assumptions, currency, units, capacity, sensitivity, scenario comparison and reproducible JSON export. |
@@ -312,8 +320,8 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | NRI-13 | Verified | Bounded UTF-8 CSV import, numeric validation, descriptive metrics, histogram, IQR outlier flags, units and reproducible JSON export. |
 | NRI-14 | Verified | Bilingual starter lessons, quizzes, model-backed illustrative simulation and private progress. |
 | NRI-15 | Verified | Versioned Arabic/English PDF and DOCX downloads with citations, evidence, L-READY findings and limitations. Requires the documented local renderer. |
-| NRI-16 | Partial | System About view shows the purpose, framework wording, build version and documentation links. Changelog, licensing, privacy, terms and support content remain. |
-| NRI-17 | Partial | Separate developer view identifies Nexvary Inc. and links to the official company site. Dedicated confirmed contact information remains. |
+| NRI-16 | Partial | Bilingual purpose, version, changelog, licensing status, privacy and terms drafts, support and framework limitations are verified in HTTP tests and Chromium. Final legal text and distribution license require owner approval. |
+| NRI-17 | Verified | Bilingual developer page names Nexvary Inc. and provides the official website, contact form, email, GitHub, YouTube and X. HTTP tests verify its separation from the System page. Chromium captures both locales. |
 | NRI-18 | Partial | Local authentication, session revocation, account audit, authorization, encrypted PDF bytes, RTL/LTR and verified recovery are implemented. NRI-18a adds optional MFA and one-use recovery codes. NRI-18b adds the operator-managed message moderator role and scoped report review. Project team RBAC is verified for manuscripts and evidence review. Password/account recovery, accessibility audit and broader administration remain. |
 | NRI-19 | Partial | Local restore and regression workflow configuration are implemented. Local plans, entitlement limits, an MFA-protected operator console, migration/restore drills and schema health checks are verified. Direct HTTPS staging, session hardening, structured logs, a service configuration and upgrade/rollback rehearsal are verified. Hosted alerting, capacity validation, key rotation and optional billing remain. |
 

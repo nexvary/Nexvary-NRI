@@ -182,3 +182,9 @@
 
 - Added configurable PDF storage and UTC daily report limits with transactional checks, refunds on failed rendering or access revocation, and bilingual operator controls.
 - 62/62 with real report rendering. Chromium verified saving a quota-enabled plan.
+
+## 2026-11-27 · Release acceptance increment
+
+- Added Crossref DOI agency lookups with dated private snapshots and explicit unavailable and missing outcomes.
+- Completed the bilingual developer page and expanded About System with methodology, release history, support and legal drafts for owner review.
+- 64/64 tests passed with the real bilingual renderer. Chromium captured both About views at both viewport sizes in both locales.

@@ -3,7 +3,7 @@ import { normalizeOrcid, normalizeZenodoDoi } from './public-identifiers.js';
 import { referencePage } from './reference-view.js';
 import { loginPath, projectReferencesPath, workspacePage } from './workspace-view.js';
 
-const normalize = { crossref: normalizeDoi, openalex: normalizeDoi, orcid: normalizeOrcid, zenodo: normalizeZenodoDoi };
+const normalize = { crossref: normalizeDoi, agency: normalizeDoi, openalex: normalizeDoi, orcid: normalizeOrcid, zenodo: normalizeZenodoDoi };
 
 export function resolveReferenceRoute(pathname) {
   if (pathname === '/workspace/reference-projects') return { kind: 'reference-projects' };
@@ -27,7 +27,7 @@ export function createReferenceHandler(store, adapters) {
       return;
     }
     const show = (status, error, input, provider, headers) => reply(status, referencePage(lang, {
-      id, project, error, input, provider, records: store.references.list(owner, id),
+      id, project, error, input, provider, records: store.references.list(owner, id, { includeAgency: true }),
     }), headers);
 
     if (request.method !== 'POST') {
@@ -42,7 +42,7 @@ export function createReferenceHandler(store, adapters) {
     }
     const doi = normalize[provider](input);
     if (!doi) {
-      const error = provider === 'crossref' || provider === 'openalex' ? 'invalid' : 'invalid-' + provider;
+      const error = normalize[provider] === normalizeDoi ? 'invalid' : 'invalid-' + provider;
       show(422, error, input, provider);
       return;
     }

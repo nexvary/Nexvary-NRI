@@ -43,3 +43,5 @@ NRI-19b adds opt-in HTTPS, host-prefixed cookies, session idle expiry, bounded l
 NRI-19c adds transactional PDF storage and report-export limits, covering owned and shared reports. Full regression: 62/62 with the report renderer. The operator interface was exercised in Chromium.
 
 Next: close the remaining [functional acceptance items](STATUS.md#functional-acceptance), including verified ORCID ownership, catalog workflows and production key rotation. Public deployment and billing remain subject to owner approval.
+
+Release acceptance increment from `596c855`: DOI registration agency lookups through Crossref, bilingual System and Developer pages, and 64/64 tests with real bilingual exports. See the [acceptance matrix and Chromium captures](STATUS.md#functional-acceptance). Continue with owner-authenticated ORCID, document and manuscript integration, secure recovery and key rotation. Final NRI legal documents remain pending owner review.

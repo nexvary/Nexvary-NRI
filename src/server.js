@@ -4,6 +4,7 @@ import { performance } from 'node:perf_hooks';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { createAssistantProvider } from './assistant-provider.js';
+import { createDoiAgencyClient } from './doi-agency.js';
 import { createCrossrefClient } from './crossref.js';
 import { createOpenAlexClient } from './openalex.js';
 import { createOrcidClient, createZenodoClient, normalizeOrcid } from './public-identifiers.js';
@@ -34,6 +35,7 @@ const baseSecurityHeaders = {
 
 export function createApp(store = openWorkspaceStore(), {
   crossref = createCrossrefClient(),
+  agency = createDoiAgencyClient(),
   openalex = createOpenAlexClient(),
   orcid = createOrcidClient(),
   zenodo = createZenodoClient(),
@@ -48,7 +50,7 @@ export function createApp(store = openWorkspaceStore(), {
   }
   const securityHeaders = origin ? { ...baseSecurityHeaders, 'Strict-Transport-Security': 'max-age=31536000' } : baseSecurityHeaders;
   const logEvent = (event, fields = {}) => log?.({ time: new Date().toISOString(), event, ...fields });
-  const workspace = createWorkspaceHandler(store, { crossref, openalex, orcid, zenodo }, version, reportRenderer, assistantProvider, origin?.origin);
+  const workspace = createWorkspaceHandler(store, { crossref, openalex, orcid, zenodo, agency }, version, reportRenderer, assistantProvider, origin?.origin);
 
   async function handle(request, response) {
     if (origin && request.headers.host?.toLowerCase() !== origin.host) {

@@ -46,7 +46,7 @@ export function evidenceStore(db, now, transact) {
     FROM claims JOIN projects ON projects.id = claims.project_id
     JOIN project_references AS ref ON ref.project_id = projects.id
     WHERE projects.owner_id = ? AND projects.id = ? AND claims.id = ?
-      AND ref.doi = ? AND ref.provider = ? AND ref.provider <> 'orcid' AND ref.state = 'found'
+      AND ref.doi = ? AND ref.provider = ? AND ref.provider NOT IN ('orcid', 'agency') AND ref.state = 'found'
       AND NOT EXISTS (
         SELECT 1 FROM evidence_items
         WHERE claim_id = claims.id AND json_extract(source_snapshot, '$.identifier') = ref.doi

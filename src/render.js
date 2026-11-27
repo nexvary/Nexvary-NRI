@@ -1,3 +1,4 @@
+import { developerInformation, systemInformation } from './about.js';
 import { copy, modules, dimensions, metrics, providers } from './content.js';
 
 import { icon } from './icons.js';
@@ -88,9 +89,8 @@ export function render({ lang, view, version, page, workspace, unread = 0, invit
       </nav>
       <h1>${t(view === 'about' ? 'aboutSystem' : 'aboutDeveloper')}</h1>
       ${view === 'about'
-        ? `<p>${t('motto')}</p><p>${t('framework')}</p><p>${t('version')} <bdi>${version}</bdi> · ${t('build')}</p>
-           <ul class="about-links"><li><a href="${repo}/blob/main/docs/PROJECT.md">${t('docs')}</a></li><li><a href="${repo}/blob/main/docs/STATUS.md">${t('status')}</a></li></ul>`
-        : `<p>${t('developer')}</p><a href="https://nexvary.com/">${t('website')}</a>`}
+        ? `<p>${t('version')} <bdi>${version}</bdi> · ${t('build')}</p>${systemInformation(tr)}`
+        : developerInformation(tr)}
     </section>`;
   const detail = () => `
     <section class="surface panel detail">
