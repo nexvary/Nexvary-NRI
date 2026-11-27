@@ -11,6 +11,20 @@ export const settingsSchema = `
   PRAGMA user_version = 10;
 `;
 
+export const passwordRecoverySchema = `
+  ALTER TABLE security_events RENAME TO old_security_events;
+  CREATE TABLE security_events (
+    id INTEGER PRIMARY KEY,
+    account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    action TEXT NOT NULL CHECK(action IN ('sign-in', 'sign-out', 'revoke-others', 'password-reset')),
+    recorded_at INTEGER NOT NULL
+  ) STRICT;
+  INSERT INTO security_events SELECT * FROM old_security_events;
+  DROP TABLE old_security_events;
+  CREATE INDEX security_events_account ON security_events(account_id, id DESC);
+  PRAGMA user_version = 27;
+`;
+
 export function settingsStore(db, now) {
   const insert = db.prepare('INSERT INTO security_events(account_id, action, recorded_at) VALUES (?, ?, ?)');
   const trim = db.prepare(`
@@ -39,6 +53,7 @@ const labels = {
   revoke: ['Sign out other sessions', 'سجّل الخروج من الجلسات الأخرى'],
   events: ['Recent security activity', 'نشاط الأمان الأخير'],
   empty: ['No security events recorded yet.', 'لا توجد أحداث أمان مسجّلة بعد.'],
+  'password-reset': ['Password reset by workspace operator', 'أعاد مشغّل مساحة العمل تعيين كلمة المرور'],
   'sign-in': ['Signed in', 'تسجيل الدخول'],
   'sign-out': ['Signed out', 'تسجيل الخروج'],
   'revoke-others': ['Other sessions revoked', 'أُلغيت الجلسات الأخرى'],

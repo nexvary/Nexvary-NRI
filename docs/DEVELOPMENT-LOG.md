@@ -188,3 +188,8 @@
 - Added Crossref DOI agency lookups with dated private snapshots and explicit unavailable and missing outcomes.
 - Completed the bilingual developer page and expanded About System with methodology, release history, support and legal drafts for owner review.
 - 64/64 tests passed with the real bilingual renderer. Chromium captured both About views at both viewport sizes in both locales.
+
+## 2026-11-27 · Local account recovery
+
+- Added private-terminal operator password reset with per-account session revocation, stale-credential rejection and a user-visible security event.
+- Verified v26 migration, existing audit history and cross-account isolation. Full local suite with the real bilingual renderer passes 65/65.

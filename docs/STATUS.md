@@ -1,5 +1,9 @@
 # Development status
 
+## Operator-assisted recovery · 2026-11-27 (Cairo)
+
+An operator with local database access can reset an existing account password from a private terminal. The reset records an audit event and revokes that account’s sessions in one transaction. MFA remains active. The regression test migrates v26 security history, verifies the replacement credential and rejects stale sign-in attempts while preserving another account’s session. Full local suite: 65/65 with real bilingual report rendering.
+
 ## Release acceptance increment · 2026-11-27 (Cairo)
 
 - Verified the draft branch baseline at `596c855`. The full local suite passes 64/64 with actual Arabic and English PDF and DOCX exports.
@@ -322,7 +326,7 @@ The matrix records accumulated module evidence and the current increment. The ap
 | NRI-15 | Verified | Versioned Arabic/English PDF and DOCX downloads with citations, evidence, L-READY findings and limitations. Requires the documented local renderer. |
 | NRI-16 | Partial | Bilingual purpose, version, changelog, licensing status, privacy and terms drafts, support and framework limitations are verified in HTTP tests and Chromium. Final legal text and distribution license require owner approval. |
 | NRI-17 | Verified | Bilingual developer page names Nexvary Inc. and provides the official website, contact form, email, GitHub, YouTube and X. HTTP tests verify its separation from the System page. Chromium captures both locales. |
-| NRI-18 | Partial | Local authentication, session revocation, account audit, authorization, encrypted PDF bytes, RTL/LTR and verified recovery are implemented. NRI-18a adds optional MFA and one-use recovery codes. NRI-18b adds the operator-managed message moderator role and scoped report review. Project team RBAC is verified for manuscripts and evidence review. Password/account recovery, accessibility audit and broader administration remain. |
+| NRI-18 | Partial | Local authentication, session revocation, account audit, authorization, encrypted PDF bytes, RTL/LTR and verified recovery are implemented. NRI-18a adds optional MFA and one-use recovery codes. NRI-18b adds the operator-managed message moderator role and scoped report review. Project team RBAC is verified for manuscripts and evidence review. Audited local operator password reset is verified. Self-service recovery, key rotation, the accessibility audit and broader administration remain. |
 | NRI-19 | Partial | Local restore and regression workflow configuration are implemented. Local plans, entitlement limits, an MFA-protected operator console, migration/restore drills and schema health checks are verified. Direct HTTPS staging, session hardening, structured logs, a service configuration and upgrade/rollback rehearsal are verified. Hosted alerting, capacity validation, key rotation and optional billing remain. |
 
 Next milestone: remaining functional acceptance items and final release review.

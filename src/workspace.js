@@ -165,7 +165,11 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
           show(401, 'login', { error: 'credentials' });
           return;
         }
-        const session = store.signIn(credentials.id, token);
+        const session = store.signIn(credentials, token);
+        if (!session) {
+          show(401, 'login', { error: 'credentials' });
+          return;
+        }
         redirect(workspacePath(lang), { 'Set-Cookie': sessionCookie(session, sessionLifetime, Boolean(origin)) });
       } finally {
         throttle.finish();

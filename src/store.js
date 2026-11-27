@@ -16,7 +16,7 @@ import { bindDocumentKey } from './document-crypto.js';
 import { documentSchema, documentStore } from './document-store.js';
 import { educationSchema, educationStore } from './education.js';
 import { sharingSchema, sharingStore } from './sharing-store.js';
-import { settingsSchema, settingsStore } from './settings.js';
+import { passwordRecoverySchema, settingsSchema, settingsStore } from './settings.js';
 import { observatorySchema, observatoryStore } from './observatory-store.js';
 import { networkSchema, networkStore } from './network-store.js';
 import { libraryStore } from './library.js';
@@ -27,7 +27,7 @@ import { referenceSchema, referenceMigrationV4, referenceStore } from './referen
 
 export const sessionLifetime = 8 * 60 * 60;
 export const sessionIdle = 30 * 60_000;
-const schemaVersion = 26;
+const schemaVersion = 27;
 const schema = `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -104,6 +104,7 @@ function initialize(db, path) {
       PRAGMA user_version = 25;
     `);
     if (version < 26) db.exec(quotaSchema);
+    if (version < 27) db.exec(passwordRecoverySchema);
     return bindDocumentKey(db, path);
   });
 }
@@ -148,6 +149,9 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
 
   const insertAccount = db.prepare('INSERT INTO accounts VALUES (?, ?, ?, ?)');
   const findAccount = db.prepare('SELECT id, salt, hash FROM accounts WHERE email = ?');
+  const replacePassword = db.prepare('UPDATE accounts SET salt = ?, hash = ? WHERE email = ? RETURNING id');
+  const currentCredentials = db.prepare('SELECT 1 FROM accounts WHERE id = ? AND salt = ? AND hash = ?');
+  const revokeAccountSessions = db.prepare('DELETE FROM sessions WHERE account_id = ?');
   const insertSession = db.prepare('INSERT INTO sessions VALUES (?, ?, ?)');
   const initializeActivity = db.prepare('INSERT INTO session_activity VALUES (?,?)');
   const clearExpired = db.prepare(`DELETE FROM sessions WHERE expires_at<=? OR
@@ -235,8 +239,18 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
       return findAccount.get(email);
     },
     newSession: (account) => transact(db, () => issueSession(account)),
-    signIn(accountId, previousToken) {
+    resetPassword(email, { salt, hash }) {
       return transact(db, () => {
+        const account = replacePassword.get(salt, hash, email);
+        if (!account) return false;
+        revokeAccountSessions.run(account.id);
+        settings.record(account.id, 'password-reset');
+        return true;
+      });
+    },
+    signIn({ id: accountId, salt, hash }, previousToken) {
+      return transact(db, () => {
+        if (!currentCredentials.get(accountId, salt, hash)) return undefined;
         const session = issueSession(accountId);
         if (previousToken) removeSession.run(tokenHash(previousToken));
         settings.record(accountId, 'sign-in');
