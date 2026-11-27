@@ -113,6 +113,9 @@ export function createDocumentHandler(store) {
         : store.documents.create(account.id, id, file);
       if (uploaded) redirect(documentsPath(lang, id, uploaded));
       else missing();
+    } catch (error) {
+      if (error.code !== 'NRI_STORAGE_LIMIT') throw error;
+      show(429, 'storageLimit');
     } finally {
       uploads--;
     }

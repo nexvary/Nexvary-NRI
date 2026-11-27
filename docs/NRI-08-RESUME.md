@@ -40,4 +40,6 @@ NRI-10c adds explicit version/snapshot sharing for documents, references, readin
 
 NRI-19b adds opt-in HTTPS, host-prefixed cookies, session idle expiry, bounded login throttling, operational logs and a [staging guide](DEPLOYMENT.md). See `test/transport.test.js`. Full regression: 62/62. A v22-to-v25 migration and rollback from a paired backup were rehearsed. The report and installer dependencies were updated after auditing.
 
-Next: enforce configurable PDF storage and daily report quotas, including shared-report exports. Resume outstanding functional requirements from the [functional matrix](STATUS.md#functional-acceptance). Public infrastructure, alert destinations and any paid service remain subject to approval.
+NRI-19c adds transactional PDF storage and report-export limits, covering owned and shared reports. Full regression: 62/62 with the report renderer. The operator interface was exercised in Chromium.
+
+Next: close the remaining [functional acceptance items](STATUS.md#functional-acceptance), including verified ORCID ownership, catalog workflows and production key rotation. Public deployment and billing remain subject to owner approval.

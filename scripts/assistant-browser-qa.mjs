@@ -336,6 +336,8 @@ try {
             button.form.elements.plan.value = 'research';
             button.form.elements['project-limit'].value = 10;
             button.form.elements['ai-tokens'].value = 5000;
+            button.form.elements['storage-mib'].value = 250;
+            button.form.elements['daily-reports'].value = 3;
             setTimeout(() => button.form.requestSubmit(button), 0);
           })()`);
         }

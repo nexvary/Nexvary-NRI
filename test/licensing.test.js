@@ -15,7 +15,11 @@ test('MFA-protected operator plans govern project capacity and external token re
     const token = store.newSession(id);
     return { id, email, token, cookie: 'nri_session=' + token };
   });
-  const app = createApp(store);
+  let renders = 0;
+  const app = createApp(store,{reportRenderer:async () => {
+    if (++renders === 1) throw new Error('Fixture failure');
+    return Buffer.from('fixture report');
+  }});
   app.listen(0, '127.0.0.1');
   await once(app, 'listening');
   t.after(() => new Promise((resolve) => app.close(resolve)));
@@ -25,7 +29,7 @@ test('MFA-protected operator plans govern project capacity and external token re
     redirect: 'manual', headers: { cookie: user?.cookie ?? '', ...(fields ? { origin: source } : {}) },
     ...(fields ? { method: 'POST', body: new URLSearchParams(fields) } : {}),
   });
-  const setup = { intent: 'save', plan: 'research', 'project-limit': 1, 'ai-tokens': 1000 };
+  const setup = { intent: 'save', plan: 'research', 'project-limit': 1, 'ai-tokens': 1000, 'storage-mib': 1, 'daily-reports': 1 };
   const assign = { intent: 'assign', email: researcher.email, plan: 'research', expires: '2027-12-01' };
   assert.equal((await request(null, path)).headers.get('location'), '/login?lang=en');
   assert.equal((await request(operator, path, setup)).status, 403);
@@ -51,6 +55,32 @@ test('MFA-protected operator plans govern project capacity and external token re
   assert.equal(denied.status, 429);
   assert.match(await denied.text(), /project limit/);
   assert.equal((await request(researcher, project.headers.get('location'))).status, 200);
+  const projectPath = project.headers.get('location').split('?')[0];
+  const projectId = projectPath.split('/').at(-1);
+  const pdf = store.documents.create(researcher.id,projectId,{name:'First.pdf',bytes:Buffer.alloc(1024 * 1024)});
+  assert.throws(() => store.documents.append(researcher.id,projectId,pdf,{name:'Second.pdf',bytes:Buffer.from('pdf')}),
+    {code:'NRI_STORAGE_LIMIT'});
+  assert.equal(store.documents.versions(researcher.id,projectId,pdf).length,1);
+  const upload = new FormData();
+  upload.set('pdf',new File(['%PDF-1.4\nfixture\n%%EOF\n'],'Second.pdf'));
+  const deniedUpload = await fetch(origin + projectPath + '/documents/' + pdf + '?lang=en', {
+    method:'POST',headers:{cookie:researcher.cookie,origin},body:upload,redirect:'manual',
+  });
+  assert.equal(deniedUpload.status,429);
+  assert.match(await deniedUpload.text(),/PDF storage limit/);
+  assert.ok(store.documents.delete(researcher.id,projectId,pdf));
+  assert.ok(store.documents.create(researcher.id,projectId,{name:'Reclaimed.pdf',bytes:Buffer.from('pdf')}));
+  const reportPath = projectPath + '/reports?lang=en';
+  assert.equal((await request(researcher,reportPath,{format:'pdf'})).status,503);
+  assert.equal((await request(researcher,reportPath,{format:'pdf'})).status,200);
+  assert.equal((await request(researcher,reportPath,{format:'docx'})).status,429);
+  assert.equal(renders,2);
+  now += 86_400_000;
+  const nextDay = store.licensing.reserveReport(researcher.id);
+  assert.ok(nextDay);
+  assert.equal(store.licensing.reserveReport(researcher.id),undefined);
+  store.licensing.releaseReport(researcher.id,nextDay);
+  now -= 86_400_000;
   const caps = { tokens: 5000, cost: 5000 };
   assert.ok(store.assistantUsage.reserve(researcher.id, 'test', { tokens: 900, cost: 100 }, caps));
   assert.equal(store.assistantUsage.reserve(researcher.id, 'test', { tokens: 101, cost: 1 }, caps), undefined);

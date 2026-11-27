@@ -1,3 +1,4 @@
+import { renderLicensedReport } from './licensing-store.js';
 import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dimensions } from './content.js';
@@ -17,6 +18,7 @@ const copy = {
   pdf: ['Download PDF', 'نزّل PDF'],
   docx: ['Download DOCX', 'نزّل DOCX'],
   unavailable: ['The local report renderer is unavailable.', 'أداة إنشاء التقارير المحلية غير متاحة.'],
+  quota: ['The daily report export limit has been reached.', 'بلغت الحد اليومي لتصدير التقارير.'],
   busy: ['A report is being generated. Try again shortly.', 'يجري إنشاء تقرير. حاول مرة أخرى بعد قليل.'],
   references: ['Dated references', 'المراجع المؤرخة'],
   evidence: ['Claim-source evidence', 'أدلة الادعاءات ومصادرها'],
@@ -160,24 +162,20 @@ export function createReportHandler(store, release, renderReport) {
       return;
     }
     active = true;
-    let file;
+    let result;
     try {
       const report = buildReport(store, owner, project, lang, release);
-      if (Buffer.byteLength(JSON.stringify(report)) > 512 * 1024) {
-        reply(413);
-        return;
-      }
-      file = await renderReport(report, format);
+      if (Buffer.byteLength(JSON.stringify(report)) > 512 * 1024) return reply(413);
+      result = await renderLicensedReport(store.licensing,owner,() => renderReport(report,format),
+        () => stillSignedIn() && Boolean(store.getProject(owner,id)));
     } catch {
-      show(503, 'unavailable');
-      return;
+      return show(503,'unavailable');
     } finally {
       active = false;
     }
-    if (!stillSignedIn() || !store.getProject(owner, id)) {
-      reply(404);
-      return;
-    }
+    if (result.status === 429) return show(429,'quota');
+    if (result.status !== 200) return result.status === 503 ? show(503,'unavailable') : reply(result.status);
+    const { file } = result;
     reply(200, null, { 'Content-Type': formats[format], 'Content-Length': file.length,
       'Content-Disposition': `attachment; filename="nri-research-report.${format}"` }, file);
   };

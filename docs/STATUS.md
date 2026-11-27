@@ -1,5 +1,12 @@
 # Development status
 
+## NRI-19c · PDF storage and report quotas
+
+Plans can limit stored PDF bytes across all versions and daily PDF/DOCX exports across owned and shared reports. Upload checks run in the same transaction as the version write. Report exports reserve an allowance before rendering and release it when rendering or the final access check fails. Existing assignments without these values keep their previous limits.
+
+- 62/62 with real PDF/DOCX rendering. Tests exercise denied uploads, reclaimed space, failed-render refunds and daily reset.
+- [Arabic desktop](qa/nri-19/quotas-ar-desktop.webp) and [English mobile](qa/nri-19/quotas-en-mobile.webp) were captured in Chromium.
+
 ## NRI-19b · HTTPS staging and operations · 2026-11-27 (Cairo)
 
 Direct HTTPS staging supports an exact configured authority, secure host-scoped session cookies, idle expiry and absolute lifetimes, login limits by source address and account, and structured operational logs. A hardened systemd template and [staging guide](DEPLOYMENT.md) are included.
@@ -310,4 +317,4 @@ Compared all 19 requirements with the application routes, persistence, renderer 
 | NRI-18 | Partial | Local authentication, session revocation, account audit, authorization, encrypted PDF bytes, RTL/LTR and verified recovery are implemented. NRI-18a adds optional MFA and one-use recovery codes. NRI-18b adds the operator-managed message moderator role and scoped report review. Project team RBAC is verified for manuscripts and evidence review. Password/account recovery, accessibility audit and broader administration remain. |
 | NRI-19 | Partial | Local restore and regression workflow configuration are implemented. Local plans, entitlement limits, an MFA-protected operator console, migration/restore drills and schema health checks are verified. Direct HTTPS staging, session hardening, structured logs, a service configuration and upgrade/rollback rehearsal are verified. Hosted alerting, capacity validation, key rotation and optional billing remain. |
 
-Next milestone: report and PDF storage entitlements, then the remaining functional acceptance items.
+Next milestone: remaining functional acceptance items and final release review.

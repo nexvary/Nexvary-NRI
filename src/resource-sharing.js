@@ -1,3 +1,4 @@
+import { renderLicensedReport } from './licensing-store.js';
 import { buildReport } from './reports.js';
 import { escapeHtml } from './workspace-view.js';
 
@@ -46,7 +47,7 @@ export function createResourceHandler(store,release,renderReport) {
     const params = new URL(request.url,'http://localhost').searchParams;
     const section = t('Shared research resources','الموارد البحثية المشتركة');
     const when = new Intl.DateTimeFormat(lang,{ dateStyle:'medium',timeStyle:'short',timeZone:'UTC' });
-    const page = (body) => reply(200,{
+    const page = (body, status = 200) => reply(status,{
       title:section,path:grant ? path + '/' + grant : path,
       html:`<section class="surface panel detail workspace-page"><h1>${section}</h1>${body}</section>`,
     });
@@ -65,11 +66,14 @@ export function createResourceHandler(store,release,renderReport) {
         if (row.kind !== 'report' || !Object.hasOwn(formats,format)) return reply(422);
         if (!renderReport || active) return reply(503);
         active = true;
-        let file;
-        try { file = await renderReport(data[lang],format); }
-        catch { return reply(503); }
-        finally { active = false; }
-        if (!stillSignedIn() || !store.resources.get(actor,id,grant)) return reply(404);
+        let result;
+        try {
+          result = await renderLicensedReport(store.licensing,actor,() => renderReport(data[lang],format),
+            () => stillSignedIn() && Boolean(store.resources.get(actor,id,grant)));
+        } finally { active = false; }
+        if (result.status === 429) return page(`<p role="alert">${t('The daily report export limit has been reached.','بلغت الحد اليومي لتصدير التقارير.')}</p><a href="${link(grant)}">${t('Return to the report','العودة إلى التقرير')}</a>`,429);
+        if (result.status !== 200) return reply(result.status);
+        const { file } = result;
         return reply(200,null,{ 'Content-Type':formats[format], 'Content-Length':file.length,
           'Content-Disposition':`attachment; filename="shared-report.${format}"` },file);
       }

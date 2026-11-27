@@ -37,6 +37,7 @@ export function privacyStore(db, workspaceKey, now) {
     messagePreferences: 'SELECT notifications FROM message_preferences WHERE account_id = ?',
     reports: 'SELECT message, category, created_at FROM message_reports WHERE reporter = ?',
     securityActivity: 'SELECT action, recorded_at FROM security_events WHERE account_id = ?',
+    reportUsage: 'SELECT day,COUNT(*) AS exports FROM report_reservations WHERE account_id=? GROUP BY day ORDER BY day',
     license: 'SELECT plan, expires_at FROM license_assignments WHERE account_id = ?',
     resourceGrants: `SELECT r.* FROM resource_grants r JOIN projects p ON p.id=r.project_id WHERE p.owner_id = ?`,
     teamMemberships: 'SELECT project_id, role, state FROM project_members WHERE account_id = ?',

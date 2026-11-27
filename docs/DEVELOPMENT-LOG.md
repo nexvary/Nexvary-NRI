@@ -177,3 +177,8 @@
 
 - Added direct TLS staging, secure cookies, idle session expiry, independent login limits, JSON request logs and a hardened service template.
 - 62/62 with real report rendering, 48 concurrent TLS reads, verified migration and rollback, and Chromium regression. Updated WeasyPrint and pip following the Python dependency audit.
+
+## 2026-11-27 · NRI-19c quotas
+
+- Added configurable PDF storage and UTC daily report limits with transactional checks, refunds on failed rendering or access revocation, and bilingual operator controls.
+- 62/62 with real report rendering. Chromium verified saving a quota-enabled plan.

@@ -96,3 +96,5 @@ Run `npm ci --omit=optional --ignore-scripts` before starting NRI to install the
 ### HTTPS staging
 
 NRI supports direct TLS, host-scoped secure session cookies, a schema health endpoint and structured operational logs. See [the staging deployment guide](docs/DEPLOYMENT.md) for installation, the service unit and local verification.
+
+Plans can also limit stored PDF versions and daily report downloads. Leave either quota blank for unlimited usage. The report counter resets at midnight UTC and applies to owned and shared report exports.

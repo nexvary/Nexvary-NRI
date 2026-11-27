@@ -23,19 +23,38 @@ export const licenseSchema = `
   PRAGMA user_version = 19;
 `;
 
+export const quotaSchema = `
+  CREATE TABLE IF NOT EXISTS license_plan_quotas (
+    code TEXT PRIMARY KEY REFERENCES license_plans(code) ON DELETE CASCADE,
+    storage_mib INTEGER CHECK(storage_mib BETWEEN 0 AND 1048576),
+    daily_reports INTEGER CHECK(daily_reports BETWEEN 0 AND 10000)
+  ) STRICT;
+  CREATE TABLE IF NOT EXISTS report_reservations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    day INTEGER NOT NULL
+  ) STRICT;
+  CREATE INDEX IF NOT EXISTS report_reservations_account ON report_reservations(account_id,day);
+  CREATE INDEX IF NOT EXISTS report_reservations_day ON report_reservations(day);
+  PRAGMA user_version = 26;
+`;
+
+const dayMs = 86_400_000;
+const optionalLimit = (value, max) => value === null || (Number.isInteger(value) && value >= 0 && value <= max);
+
 export function licensingStore(db, now, transact) {
   const isOperator = db.prepare('SELECT 1 FROM license_operators WHERE account_id = ?');
   const authorized = db.prepare(`SELECT 1 FROM license_operators o JOIN account_mfa m ON m.account_id=o.account_id
     WHERE o.account_id = ? AND m.pending_until = 0`);
   const grant = db.prepare('INSERT OR IGNORE INTO license_operators VALUES (?)');
   const revoke = db.prepare('DELETE FROM license_operators WHERE account_id = ?');
-  const plans = db.prepare('SELECT * FROM license_plans ORDER BY code');
+  const plans = db.prepare('SELECT p.*,q.storage_mib,q.daily_reports FROM license_plans p LEFT JOIN license_plan_quotas q ON q.code=p.code ORDER BY p.code');
   const plan = db.prepare('SELECT * FROM license_plans WHERE code = ?');
   const save = db.prepare(`INSERT INTO license_plans VALUES (?,?,?)
     ON CONFLICT(code) DO UPDATE SET project_limit=excluded.project_limit,daily_ai_tokens=excluded.daily_ai_tokens`);
   const lookup = db.prepare('SELECT id FROM accounts WHERE email = ?');
-  const entitlement = db.prepare(`SELECT p.code,p.project_limit,p.daily_ai_tokens,a.expires_at
-    FROM license_assignments a JOIN license_plans p ON p.code=a.plan WHERE a.account_id = ?`);
+  const entitlement = db.prepare(`SELECT p.code,p.project_limit,p.daily_ai_tokens,a.expires_at,q.storage_mib,q.daily_reports
+    FROM license_assignments a JOIN license_plans p ON p.code=a.plan LEFT JOIN license_plan_quotas q ON q.code=p.code WHERE a.account_id = ?`);
   const assign = db.prepare(`INSERT INTO license_assignments VALUES (?,?,?)
     ON CONFLICT(account_id) DO UPDATE SET plan=excluded.plan,expires_at=excluded.expires_at`);
   const events = db.prepare('SELECT actor,subject,plan,action,recorded_at FROM license_events ORDER BY id DESC LIMIT 50');
@@ -44,11 +63,20 @@ export function licensingStore(db, now, transact) {
     (SELECT count(*) FROM projects) AS projects,
     (SELECT count(*) FROM license_assignments WHERE expires_at IS NULL OR expires_at > ?) AS active`);
   const ownedProjects = db.prepare('SELECT count(*) AS total FROM projects WHERE owner_id = ?');
+  const saveQuotas = db.prepare(`INSERT INTO license_plan_quotas VALUES (?,?,?)
+    ON CONFLICT(code) DO UPDATE SET storage_mib=excluded.storage_mib,daily_reports=excluded.daily_reports`);
+  const bytes = db.prepare(`SELECT COALESCE(SUM(v.size),0) AS total FROM document_versions v
+    JOIN documents d ON d.id=v.document_id JOIN projects p ON p.id=d.project_id WHERE p.owner_id=?`);
+  const reports = db.prepare('SELECT count(*) AS total FROM report_reservations WHERE account_id=? AND day=?');
+  const reserve = db.prepare('INSERT INTO report_reservations(account_id,day) VALUES (?,?)');
+  const release = db.prepare('DELETE FROM report_reservations WHERE id=? AND account_id=?');
+  const prune = db.prepare('DELETE FROM report_reservations WHERE day<?');
   function limits(account) {
     const current = entitlement.get(account);
-    if (!current) return { projectLimit: Infinity, aiTokens: Infinity };
-    if (current.expires_at !== null && current.expires_at <= now()) return { projectLimit: 0, aiTokens: 0 };
-    return { projectLimit: current.project_limit, aiTokens: current.daily_ai_tokens };
+    if (!current) return { projectLimit: Infinity, aiTokens: Infinity, storage: Infinity, reports: Infinity };
+    if (current.expires_at !== null && current.expires_at <= now()) return { projectLimit: 0, aiTokens: 0, storage: 0, reports: 0 };
+    return { projectLimit: current.project_limit, aiTokens: current.daily_ai_tokens,
+      storage: (current.storage_mib ?? Infinity) * 1024 * 1024, reports: current.daily_reports ?? Infinity };
   }
 
   return {
@@ -60,12 +88,14 @@ export function licensingStore(db, now, transact) {
       if (!authorized.get(actor)) return undefined;
       return { plans: plans.all(), metrics: metrics.get(now()), recent: events.all() };
     },
-    save(actor, code, projectLimit, aiTokens) {
+    save(actor, code, projectLimit, aiTokens, storage = null, dailyReports = null) {
       return transact(db, () => {
         if (!authorized.get(actor)) return 403;
         if (!/^[a-z][a-z0-9-]{1,30}$/.test(code) || !Number.isInteger(projectLimit) || projectLimit < 0 || projectLimit > 10000 ||
-            !Number.isInteger(aiTokens) || aiTokens < 0 || aiTokens > 1_000_000_000) return 422;
+            !Number.isInteger(aiTokens) || aiTokens < 0 || aiTokens > 1_000_000_000 ||
+            !optionalLimit(storage,1048576) || !optionalLimit(dailyReports,10000)) return 422;
         save.run(code, projectLimit, aiTokens);
+        saveQuotas.run(code,storage,dailyReports);
         record.run(actor, null, code, 'plan-saved', now());
         return 303;
       });
@@ -83,8 +113,39 @@ export function licensingStore(db, now, transact) {
     canCreateProject(owner) {
       return ownedProjects.get(owner).total < limits(owner).projectLimit;
     },
+    canStore(owner, amount) {
+      const maximum = limits(owner).storage;
+      return maximum === Infinity || bytes.get(owner).total + amount <= maximum;
+    },
+    reserveReport(owner) {
+      return transact(db, () => {
+        const day = Math.floor(now() / dayMs);
+        if (reports.get(owner,day).total >= limits(owner).reports) return undefined;
+        prune.run(day - 89);
+        return reserve.run(owner,day).lastInsertRowid;
+      });
+    },
+    releaseReport(owner, id) {
+      release.run(id,owner);
+    },
     aiTokens(owner) {
       return limits(owner).aiTokens;
     },
   };
+}
+
+export async function renderLicensedReport(licensing, actor, render, authorized) {
+  const reservation = licensing.reserveReport(actor);
+  if (reservation === undefined) return { status:429 };
+  let delivered = false;
+  try {
+    const file = await render();
+    if (!authorized()) return { status:404 };
+    delivered = true;
+    return { status:200,file };
+  } catch {
+    return { status:503 };
+  } finally {
+    if (!delivered) licensing.releaseReport(actor,reservation);
+  }
 }

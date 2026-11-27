@@ -39,6 +39,7 @@ const labels = {
   fileLimit: ['Up to 8 MiB per PDF.', 'الحد الأقصى 8 ميبيبايت لكل ملف PDF.'],
   invalidPdf: ['Choose one PDF file with a valid PDF signature.', 'اختر ملف PDF واحدًا بتوقيع صالح.'],
   largePdf: ['The PDF exceeds the 8 MiB limit.', 'يتجاوز الملف الحد الأقصى البالغ 8 ميبيبايت.'],
+  storageLimit: ['The plan PDF storage limit has been reached.', 'بلغت الحد الأقصى لتخزين PDF في خطتك.'],
   uploadBusy: ['Other uploads are in progress. Try again shortly.', 'هناك ملفات أخرى قيد الرفع. جرّب مرة أخرى بعد قليل.'],
   deleteDocument: ['Delete PDF and all versions', 'حذف ملف PDF وكل إصداراته'],
   confirmDocument: ['Confirm file deletion', 'أؤكد حذف الملف'],
