@@ -249,3 +249,9 @@
 - Added a provider-independent verifier contract with a synthetic HMAC adapter. The adapter authenticates the original bytes, checks a five-minute timestamp window, and rejects malformed or oversized envelopes.
 - Schema v31 records normalized invoice, payment, refund, renewal and cancellation events with a unique provider and event ID. Identical retries are idempotent and conflicting retries preserve the first event.
 - This increment exposes an internal interface only. Invoice projections, subscription reconciliation and administration are pending. Local regression: 74 passed, zero failed, zero skipped.
+
+## 2026-11-27 · Production entitlement gate
+
+- Added schema v32 for explicit module grants, a default-deny HTTP route inventory and strict HTTPS defaults. Existing plan assignments need explicit grants before serving external traffic.
+- Added audited plan grant management to the existing MFA and password-confirmed Control Center. Plan permissions remain independent of account and resource authorization.
+- Local regression with the actual bilingual renderer: 75 passed, zero failed, zero skipped. Verifies TLS default-deny, isolated project access, plan edit conflicts, and in-flight report revocation. Hosted CI and browser evidence await an approved private destination.

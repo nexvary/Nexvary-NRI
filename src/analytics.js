@@ -156,6 +156,7 @@ export async function handleAnalytics({ request, reply, lang, stillSignedIn }) {
         return;
       }
       input = hasFile ? new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer()) : typeof pasted === 'string' ? pasted : '';
+      if (!stillSignedIn()) return reply(403);
       if (Buffer.byteLength(input) > csvLimit) {
         reply(413);
         return;

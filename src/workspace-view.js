@@ -97,6 +97,15 @@ export function workspacePage(lang, kind, options = {}) {
         </form>
       </section>`);
   }
+  if (kind === 'entitlement') {
+    const title = lang === 'ar' ? 'الميزة غير متاحة في اشتراكك' : 'Feature unavailable with your subscription';
+    const settings = lang === 'ar' ? 'أمان الحساب وتصدير البيانات' : 'Account security and data export';
+    return panel(title, '/workspace/settings', `
+      <section class="surface panel detail workspace-page">
+        <h1>${title}</h1>
+        <a class="action" href="/workspace/settings?lang=${lang}">${settings}</a>
+      </section>`);
+  }
   if (kind === 'missing') {
     return panel(t('missing'), '/workspace', `
       <section class="surface panel detail workspace-page">

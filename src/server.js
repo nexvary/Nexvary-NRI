@@ -1,3 +1,4 @@
+import { dashboardModules } from './entitlements.js';
 import { createServer } from 'node:http';
 import { createServer as createTlsServer } from 'node:https';
 import { performance } from 'node:perf_hooks';
@@ -13,7 +14,7 @@ import { modules } from './content.js';
 import { render } from './render.js';
 import { openWorkspaceStore, workspaceDatabasePath } from './store.js';
 import { createWorkspaceHandler, readSessionCookie, resolveWorkspaceRoute } from './workspace.js';
-import { referenceProjectsPath, workspacePath } from './workspace-view.js';
+import { referenceProjectsPath, workspacePage, workspacePath } from './workspace-view.js';
 
 const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 const stylesheet = readFileSync(new URL('../public/styles.css', import.meta.url));
@@ -43,6 +44,7 @@ export function createApp(store = openWorkspaceStore(), {
   assistantProvider = createAssistantProvider(),
   tls = undefined,
   log = undefined,
+  enforceEntitlements = Boolean(tls),
 } = {}) {
   const origin = tls ? new URL(tls.origin) : undefined;
   if (origin && (origin.protocol !== 'https:' || origin.origin !== tls.origin)) {
@@ -50,7 +52,7 @@ export function createApp(store = openWorkspaceStore(), {
   }
   const securityHeaders = origin ? { ...baseSecurityHeaders, 'Strict-Transport-Security': 'max-age=31536000' } : baseSecurityHeaders;
   const logEvent = (event, fields = {}) => log?.({ time: new Date().toISOString(), event, ...fields });
-  const workspace = createWorkspaceHandler(store, { crossref, openalex, orcid, zenodo, agency }, version, reportRenderer, assistantProvider, origin?.origin);
+  const workspace = createWorkspaceHandler(store, { crossref, openalex, orcid, zenodo, agency }, version, reportRenderer, assistantProvider, origin?.origin, enforceEntitlements);
 
   async function handle(request, response) {
     if (origin && request.headers.host?.toLowerCase() !== origin.host) {
@@ -107,8 +109,9 @@ export function createApp(store = openWorkspaceStore(), {
 
     const sendPage = (status, view, page, headers, dashboard) => {
       const session = store.session(token);
-      const unread = session && store.messages.notifications(session.id) ? store.messages.unread(session.id) : 0;
-      const answer = request.method === 'HEAD' ? undefined : render({ lang, view, version, page, workspace: dashboard, unread, invitations: session ? store.teams.pending(session.id) : 0 });
+      const mayRead = (module) => session && (!enforceEntitlements || store.licensing.allowsModules(session.id, [module]));
+      const unread = mayRead(11) && store.messages.notifications(session.id) ? store.messages.unread(session.id) : 0;
+      const answer = request.method === 'HEAD' ? undefined : render({ lang, view, version, page, workspace: dashboard, unread, invitations: mayRead(10) ? store.teams.pending(session.id) : 0 });
       response.writeHead(status, {
         ...securityHeaders, 'Content-Type': 'text/html; charset=utf-8', 'Content-Language': lang, ...headers,
         ...(session ? { 'Cache-Control': 'no-store' } : {}),
@@ -144,14 +147,16 @@ export function createApp(store = openWorkspaceStore(), {
     if (pathname === '/' && view === 'dashboard') {
       const session = store.session(token);
       let dashboard;
-      if (session) {
+      if (session && (!enforceEntitlements || store.licensing.allowsModules(session.id, dashboardModules))) {
         const owner = session.id;
         dashboard = store.library.dashboard(owner);
         dashboard.metrics.collaborations = store.network.collaborations(owner);
         dashboard.orcid = normalizeOrcid(store.network.profile(owner)?.orcid ?? '');
         dashboard.usage = store.assistantUsage.today(owner);
       }
-      sendPage(200, view, undefined, { 'Cache-Control': 'no-store' }, dashboard);
+      const denied = session && !dashboard;
+      sendPage(denied ? 403 : 200, view, denied ? workspacePage(lang, 'entitlement') : undefined,
+        { 'Cache-Control': 'no-store' }, dashboard);
       return;
     }
     if (pathname === '/' && view === 'reports') {
@@ -231,11 +236,16 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const tls = origin ? { origin, cert:readFileSync(certPath), key:readFileSync(keyPath) } : undefined;
   const port = Number(process.env.PORT ?? (tls ? 8443 : 3000));
   const host = process.env.HOST ?? '127.0.0.1';
-  if (!tls && !['127.0.0.1', '::1', 'localhost'].includes(host)) {
+  const loopback = ['127.0.0.1', '::1', 'localhost'].includes(host);
+  const mode = process.env.NRI_ENTITLEMENT_MODE ?? (tls ? 'enforced' : 'staging');
+  if (!['enforced', 'staging'].includes(mode) || (mode === 'staging' && !loopback)) {
+    throw new Error('Staging entitlements require a loopback bind.');
+  }
+  if (!tls && !loopback) {
     throw new Error('An HTTPS configuration is required for a non-loopback host.');
   }
   const log = (event) => console.log(JSON.stringify(event));
-  const app = createApp(openWorkspaceStore(databasePath), { tls,log }).listen(port, host, () => {
+  const app = createApp(openWorkspaceStore(databasePath), { tls,log,enforceEntitlements: mode === 'enforced' }).listen(port, host, () => {
     log({ time:new Date().toISOString(), event:'service.listening', transport:tls ? 'https' : 'http',
       port:app.address().port });
   });

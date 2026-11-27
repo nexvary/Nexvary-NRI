@@ -1,3 +1,5 @@
+import { configurableModules } from './entitlements.js';
+
 export const licenseSchema = `
   CREATE TABLE IF NOT EXISTS license_operators (
     account_id TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE
@@ -43,6 +45,15 @@ export const subscriptionSchema = `
   ALTER TABLE license_assignments ADD COLUMN state TEXT NOT NULL DEFAULT 'active'
     CHECK(state IN ('trial','active','grace','past_due','expired','suspended','cancelled','revoked'));
   PRAGMA user_version = 30;
+`;
+
+export const moduleEntitlementSchema = `
+  CREATE TABLE IF NOT EXISTS license_plan_modules (
+    plan TEXT NOT NULL REFERENCES license_plans(code) ON DELETE CASCADE,
+    module INTEGER NOT NULL CHECK(module BETWEEN 1 AND 15),
+    PRIMARY KEY(plan,module)
+  ) STRICT;
+  PRAGMA user_version = 32;
 `;
 
 const subscriptionTransitions = Object.freeze({
@@ -92,6 +103,11 @@ export function licensingStore(db, now, transact) {
   const prune = db.prepare('DELETE FROM report_reservations WHERE day<?');
   const subscriptions = db.prepare(`SELECT a.email,s.plan,s.state,s.expires_at FROM license_assignments s
     JOIN accounts a ON a.id=s.account_id ORDER BY a.email LIMIT 50`);
+  const accountModules = db.prepare(`SELECT a.state,a.expires_at,m.module FROM license_assignments a
+    LEFT JOIN license_plan_modules m ON m.plan=a.plan WHERE a.account_id=?`);
+  const planModules = db.prepare('SELECT module FROM license_plan_modules WHERE plan=? ORDER BY module');
+  const clearModules = db.prepare('DELETE FROM license_plan_modules WHERE plan=?');
+  const addModule = db.prepare('INSERT INTO license_plan_modules VALUES (?,?)');
   const updateSubscription = db.prepare('UPDATE license_assignments SET state=?,expires_at=? WHERE account_id=?');
   function stateAt(current, timestamp) {
     if (usableStates.has(current.state) && current.expires_at !== null && current.expires_at <= timestamp) return 'expired';
@@ -107,6 +123,26 @@ export function licensingStore(db, now, transact) {
   }
 
   return {
+    allowsModules(account, required) {
+      if (required.length === 0) return true;
+      const rows = accountModules.all(account);
+      if (!rows.length || !usableStates.has(stateAt(rows[0], now()))) return false;
+      const granted = new Set(rows.map(({ module }) => module));
+      return required.every((module) => granted.has(module));
+    },
+    saveModules(actor, code, modules, previous) {
+      return transact(db, () => {
+        if (!authorized.get(actor)) return 403;
+        if (!plan.get(code) || modules.length > configurableModules.length ||
+            modules.some((module) => !configurableModules.includes(module)) ||
+            new Set(modules).size !== modules.length) return 422;
+        if (planModules.all(code).map(({ module }) => module).join(',') !== previous) return 409;
+        clearModules.run(code);
+        for (const module of modules) addModule.run(code, module);
+        record.run(actor, null, code, 'modules:' + [...modules].sort((a, b) => a - b).join(','), now());
+        return 303;
+      });
+    },
     isOperator: (owner) => Boolean(isOperator.get(owner)),
     setOperator(owner, enabled) {
       return enabled ? grant.run(owner) : revoke.run(owner);
@@ -114,7 +150,7 @@ export function licensingStore(db, now, transact) {
     dashboard(actor) {
       if (!authorized.get(actor)) return undefined;
       const timestamp = now();
-      return { plans: plans.all(), metrics: metrics.get(timestamp), recent: events.all(),
+      return { plans: plans.all().map((plan) => ({ ...plan, modules: planModules.all(plan.code).map(({ module }) => module) })), metrics: metrics.get(timestamp), recent: events.all(),
         subscriptions: subscriptions.all().map((current) => ({ ...current, state: stateAt(current, timestamp) })) };
     },
     save(actor, code, projectLimit, aiTokens, storage = null, dailyReports = null) {

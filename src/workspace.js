@@ -1,3 +1,4 @@
+import { allowsRoute } from './entitlements.js';
 import { createLoginThrottle } from './login-throttle.js';
 import { createResourceHandler, resolveResourceRoute } from './resource-sharing.js';
 import { handleCitations, resolveCitationRoute } from './citations.js';
@@ -93,7 +94,7 @@ function projectFields(form) {
   };
 }
 
-export function createWorkspaceHandler(store, providers, version, reportRenderer, assistantProvider, origin) {
+export function createWorkspaceHandler(store, providers, version, reportRenderer, assistantProvider, origin, enforceEntitlements) {
   const handlePrivacy = createPrivacyHandler(store);
   const handleMfaSettings = createMfaSettingsHandler(store);
   const handleAssistantAnswer = createAssistantAnswerHandler(store, assistantProvider);
@@ -131,6 +132,11 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
         reply(403);
         return;
       }
+      if (enforceEntitlements && kind !== 'login') {
+        const preliminary = store.session(token);
+        if (!preliminary) return redirect(loginPath(lang));
+        if (!allowsRoute(store.licensing, preliminary.id, kind)) return reply(403, workspacePage(lang, 'entitlement'));
+      }
       if (!['logout', 'documents', 'document', 'analytics'].includes(kind)) {
         const { status, fields } = await readForm(request, kind === 'citations' ? 1024 * 1024 : kind === 'team-project' ? 160 * 1024 : formLimit);
         if (status) {
@@ -141,6 +147,7 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
       }
     }
     const account = store.session(token);
+    const entitled = () => !enforceEntitlements || allowsRoute(store.licensing, account.id, kind);
 
     if (kind === 'login') {
       if (method !== 'POST') {
@@ -181,6 +188,11 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
       redirect(loginPath(lang));
       return;
     }
+    if (!entitled()) {
+      reply(403, workspacePage(lang, 'entitlement'));
+      return;
+    }
+    const stillSignedIn = () => store.session(token)?.id === account.id && entitled();
     if (kind === 'logout') {
       store.signOut(account.id, token);
       redirect(loginPath(lang), { 'Set-Cookie': sessionCookie('', 0, Boolean(origin)) });
@@ -192,7 +204,7 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
       return;
     }
     if (kind === 'assistant-answer') {
-      await handleAssistantAnswer({ request, reply, lang, form, account, stillSignedIn: () => store.session(token)?.id === account.id });
+      await handleAssistantAnswer({ request, reply, lang, form, account, stillSignedIn });
       return;
     }
     if (kind === 'assistant-settings') {
@@ -208,7 +220,7 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
       return;
     }
     if (kind === 'shared-resources') {
-      await handleResources({ request,reply,redirect,route,lang,account,form,stillSignedIn: () => store.session(token)?.id === account.id });
+      await handleResources({ request,reply,redirect,route,lang,account,form,stillSignedIn });
       return;
     }
     if (kind === 'team-work') {
@@ -254,7 +266,7 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
     }
 
     if (kind.startsWith('report')) {
-      await handleReports({ request, reply, route, lang, account, form, stillSignedIn: () => store.session(token)?.id === account.id });
+      await handleReports({ request, reply, route, lang, account, form, stillSignedIn });
       return;
     }
     if (kind.startsWith('observatory')) {
@@ -262,7 +274,7 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
       return;
     }
     if (kind === 'analytics') {
-      await handleAnalytics({ request, reply, lang, stillSignedIn: () => store.session(token)?.id === account.id });
+      await handleAnalytics({ request, reply, lang, stillSignedIn });
       return;
     }
     if (kind === 'network' || kind === 'collaboration') {
@@ -296,7 +308,6 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
       return;
     }
 
-    const stillSignedIn = () => store.session(token)?.id === account.id;
     if (['references', 'reference-projects'].includes(kind)) {
       await handleReferences({ request, reply, redirect, route, lang, account, form, stillSignedIn });
       return;

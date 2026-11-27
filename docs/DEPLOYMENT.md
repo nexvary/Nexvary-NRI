@@ -20,6 +20,12 @@ The example systemd unit expects `/etc/nri/nri.env`, loads the TLS key as a cred
 
 Run one application process per SQLite database. Use direct TLS in this configuration. The application uses the socket address for login rate limits and ignores untrusted forwarding headers. Before placing a proxy in front of the service, separately verify its TLS and client-address trust configuration.
 
+### Provisioning module access
+
+HTTPS now starts in enforced entitlement mode by default. Before exposing the service, provision plan grants and assignments in the MFA-protected Control Center. Existing plans start with no module grants. The deployment test must confirm an unassigned account is blocked, an explicitly entitled account can access its own project, and another account's project remains inaccessible. See the [route inventory and rollout rules](ENTITLEMENTS.md).
+
+An isolated loopback preview may use `NRI_ENTITLEMENT_MODE=staging` for compatible fixture behavior. Staging is rejected on non-loopback binds. Keep it isolated from public proxies.
+
 ## Verification and operations
 
 - Check `GET /healthz` over verified HTTPS. Saturation and unhealthy responses can be monitored through request status, duration and health events in the service logs.

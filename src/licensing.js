@@ -1,3 +1,4 @@
+import { configurableModules } from './entitlements.js';
 import { createLoginThrottle } from './login-throttle.js';
 import { normalizeAddress, verifyPassword } from './password.js';
 import { escapeHtml } from './workspace-view.js';
@@ -34,7 +35,7 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
   if (form) {
     const code = (form.get('plan') ?? '').trim();
     const intent = form.get('intent');
-    if (!['save', 'assign', 'transition', 'trial'].includes(intent)) return reply(422);
+    if (!['save', 'assign', 'transition', 'trial', 'modules'].includes(intent)) return reply(422);
     const retryAfter = throttle.begin(request.socket.remoteAddress ?? '', account.email);
     if (retryAfter) return reply(429, null, { 'Retry-After': String(retryAfter) });
     try {
@@ -42,7 +43,9 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
       const credentials = store.credentials(account.email);
       if (password.length > 128 || !await verifyPassword(password, credentials) ||
           store.session(token)?.id !== account.id) return reply(403);
-      if (intent === 'save') {
+      if (intent === 'modules') {
+        status = store.licensing.saveModules(account.id, code, form.getAll('module').map(whole), form.get('previous'));
+      } else if (intent === 'save') {
         const optional = (field) => form.get(field) ? whole(form.get(field)) : null;
         status = store.licensing.save(account.id, code, whole(form.get('project-limit')), whole(form.get('ai-tokens')),
           optional('storage-mib'), optional('daily-reports'));
@@ -63,13 +66,23 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
   const date = new Intl.DateTimeFormat(lang, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' });
   const stateOptions = Object.entries(states).map(([value, labels]) => `<option value="${value}">${t(...labels)}</option>`).join('');
   const passwordField = `<label>${t('Current password', 'كلمة المرور الحالية')}<input name="password" type="password" required maxlength="128" autocomplete="current-password"></label>`;
+  const moduleForms = data.plans.map(({ code, modules }) => `
+    <form class="workspace-form" method="post" action="${url}">
+      <input name="plan" type="hidden" value="${escapeHtml(code)}">
+      <input name="previous" type="hidden" value="${modules.join(',')}">
+      <fieldset><legend>${t('Module access', 'الوصول إلى الوحدات')} · <bdi>${escapeHtml(code)}</bdi></legend>
+        <div class="module-permission-options">${configurableModules.map((module) =>
+          `<label><input name="module" type="checkbox" value="${module}"${modules.includes(module) ? ' checked' : ''}> <bdi>NRI-${String(module).padStart(2, '0')}</bdi></label>`).join('')}</div>
+      </fieldset>
+      ${passwordField}<button class="action" name="intent" value="modules">${t('Save module access', 'احفظ الوصول إلى الوحدات')}</button>
+    </form>`).join('');
   reply(status, {
     title, path, controlCenter: true,
     html: `<section class="surface panel detail workspace-page">
       <h1>${title}</h1>
       <p>${t('Assign plans and limits for this workspace.', 'عيّن الخطط والحدود لمساحة العمل هذه.')}</p>
       ${status === 422 ? `<p role="alert">${t('Check the plan, limits, and account information.', 'تحقق من الخطة والحدود وبيانات الحساب.')}</p>` : ''}
-      ${status === 409 ? `<p role="alert">${t('The subscription state changed or does not allow this action.', 'تغيّرت حالة الاشتراك أو لا تسمح بهذا الإجراء.')}</p>` : ''}
+      ${status === 409 ? `<p role="alert">${t('The subscription or plan changed, or this action is unavailable.', 'تغيّر الاشتراك أو الخطة، أو أن الإجراء غير متاح.')}</p>` : ''}
       <dl class="reference-meta" id="overview">
         <div><dt>${t('Accounts', 'الحسابات')}</dt><dd>${count.format(data.metrics.accounts)}</dd></div>
         <div><dt>${t('Projects', 'المشاريع')}</dt><dd>${count.format(data.metrics.projects)}</dd></div>
@@ -93,6 +106,7 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
         <label>${t('Expiry date (UTC, optional)', 'تاريخ الانتهاء (UTC، اختياري)')}<input name="expires" type="date"></label>
         ${passwordField}<button class="action" name="intent" value="assign">${t('Assign plan', 'عيّن الخطة')}</button>
       </form>` : ''}
+      ${moduleForms}
       ${data.plans.length ? `<h2>${t('Start a trial', 'ابدأ فترة تجريبية')}</h2>
       <form class="workspace-form" method="post" action="${url}">
         <label>${t('Account email', 'البريد الإلكتروني للحساب')}<input name="email" type="email" maxlength="254" required dir="ltr"></label>
