@@ -2,7 +2,10 @@ import { createLoginThrottle } from './login-throttle.js';
 import { createHash } from 'node:crypto';
 import { constants } from 'node:fs';
 import { lstat, open, readdir } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { readBackupKey, restoreEncryptedBackup } from './encrypted-backup.js';
 import { normalizeAddress, verifyPassword } from './password.js';
 import { escapeHtml } from './workspace-view.js';
 
@@ -51,10 +54,22 @@ export const operationsSessionSchema = `
   PRAGMA user_version = 44;
 `;
 
+export const operationsBackupSchema = `
+  CREATE TABLE IF NOT EXISTS control_center_backup_checks (
+    id INTEGER PRIMARY KEY,
+    actor TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+    archive_name TEXT NOT NULL,
+    result TEXT NOT NULL CHECK(result IN ('verified','failed','unavailable')),
+    checked_at INTEGER NOT NULL
+  ) STRICT;
+  CREATE INDEX IF NOT EXISTS control_center_backup_checks_latest ON control_center_backup_checks(archive_name,id DESC);
+  PRAGMA user_version = 47;
+`;
+
 const roleAdminThrottle = createLoginThrottle();
 const securityActionThrottle = createLoginThrottle();
 
-export function operationsStore(db, now, sessionIdle, backupDirectory = process.env.NRI_BACKUP_DIRECTORY || '/var/backups/nri') {
+export function operationsStore(db, now, sessionIdle, backupDirectory = process.env.NRI_BACKUP_DIRECTORY || '/var/backups/nri', backupKeyFile = process.env.NRI_BACKUP_KEY_FILE) {
   const authorized = db.prepare(`SELECT 1 FROM account_mfa m WHERE m.account_id=:account AND m.pending_until=0
     AND (EXISTS(SELECT 1 FROM license_operators WHERE account_id=:account)
       OR EXISTS(SELECT 1 FROM control_center_roles WHERE account_id=:account AND role=:role))`);
@@ -82,6 +97,14 @@ export function operationsStore(db, now, sessionIdle, backupDirectory = process.
   const deleteSession = db.prepare('DELETE FROM sessions WHERE account_id=? AND token_hash=?');
   const insertSecurityEvent = db.prepare(`INSERT INTO control_center_security_events(actor,subject,session_hash,action,recorded_at)
     VALUES (?,?,?,'session-revoked',?)`);
+  const insertBackupCheck = db.prepare('INSERT INTO control_center_backup_checks(actor,archive_name,result,checked_at) VALUES (?,?,?,?)');
+  const latestBackupCheck = db.prepare(`SELECT result,checked_at AS checkedAt FROM control_center_backup_checks
+    WHERE archive_name=? ORDER BY id DESC LIMIT 1`);
+  const insertBackupCheckTransaction = (actor,name,result) => {
+    db.exec('BEGIN IMMEDIATE');
+    try { insertBackupCheck.run(actor,name,result,now()); db.exec('COMMIT'); }
+    catch(error) { db.exec('ROLLBACK'); throw error; }
+  };
   async function backupHistory(actor) {
     if(!canReview(actor,'security'))return undefined;
     const directory=resolve(backupDirectory);
@@ -98,12 +121,32 @@ export function operationsStore(db, now, sessionIdle, backupDirectory = process.
         const file=await open(path,constants.O_RDONLY|constants.O_NOFOLLOW|constants.O_NONBLOCK);
         try{
           const header=Buffer.alloc(8), {bytesRead}=await file.read(header,0,8,0), current=await file.stat();
-          files.push({name,size:current.size,modifiedAt:current.mtimeMs,containerRecognized:bytesRead===8&&header.toString('ascii')==='NRIBAK01'});
+          files.push({name,size:current.size,modifiedAt:current.mtimeMs,containerRecognized:bytesRead===8&&header.toString('ascii')==='NRIBAK01',
+            verification:latestBackupCheck.get(name)});
         }finally{await file.close();}
       }catch(error){if(!['ENOENT','EACCES','ELOOP'].includes(error.code))throw error;}
     }
     files.sort((a,b)=>b.modifiedAt-a.modifiedAt||a.name.localeCompare(b.name));
     return {available:true,files:files.slice(0,50)};
+  }
+  async function verifyBackup(actor,name) {
+    if(!canReview(actor,'security'))return {status:'forbidden'};
+    if(typeof name!=='string'||!/^workspace-[A-Za-z0-9T_-]+\.nribak$/.test(name))return {status:'failed'};
+    let result='failed';
+    try {
+      if(!backupKeyFile)throw new Error('Backup verification key is not configured.');
+      const directory=resolve(backupDirectory),path=resolve(directory,name),info=await lstat(path);
+      if(dirname(path)!==directory||!info.isFile()||info.isSymbolicLink())throw new Error('Invalid backup file.');
+      const key=await readBackupKey(backupKeyFile);
+      const temp=await mkdtemp(join(tmpdir(),'nri-backup-verify-'));
+      try { await restoreEncryptedBackup(path,join(temp,'restored'),key); result='verified'; }
+      finally { key.fill(0); await rm(temp,{recursive:true,force:true}); }
+    } catch(error) {
+      if(!backupKeyFile||['ENOENT','EACCES','ELOOP'].includes(error.code))result='unavailable';
+    }
+    if(!canReview(actor,'security'))return {status:'forbidden'};
+    insertBackupCheckTransaction(actor,name,result);
+    return {status:result,checkedAt:now()};
   }
   const canManage = db.prepare(`SELECT 1 FROM license_operators o JOIN account_mfa m ON m.account_id=o.account_id
     WHERE o.account_id=? AND m.pending_until=0`);
@@ -117,6 +160,7 @@ export function operationsStore(db, now, sessionIdle, backupDirectory = process.
   return {
     canReview,
     backupHistory,
+    verifyBackup,
     canManageRoles: (actor) => Boolean(canManage.get(actor)),
     adminLookup(actor, email) {
       if (!canManage.get(actor)) return { status: 403 };
@@ -252,6 +296,7 @@ export async function handleOperations({ request, reply, redirect, lang, account
   const email = input === null ? '' : normalizeAddress(input);
   if (input !== null && !email) return reply(422);
   let status=200;
+  let backupNotice='';
   if(form){
     if(role!=='security')return reply(405);
     const retry=securityActionThrottle.begin(request.socket.remoteAddress ?? '',account.email);
@@ -259,6 +304,11 @@ export async function handleOperations({ request, reply, redirect, lang, account
     try{
       const credentials=store.credentials(account.email);
       if((form.get('password') ?? '').length>128 || !await verifyPassword(form.get('password') ?? '',credentials) || store.session(token)?.id!==account.id)return reply(403);
+      if(form.get('intent')==='verify-backup'){
+        const checked=await store.operations.verifyBackup(account.id,form.get('backup-name') ?? '');
+        if(checked.status==='forbidden')return reply(403);
+        return redirect(path+'?lang='+lang+'&verification='+checked.status+'&archive='+encodeURIComponent(form.get('backup-name') ?? ''));
+      }
       status=store.operations.revokeSession(account.id,email,form.get('session-ref') ?? '',token);
     }finally{securityActionThrottle.finish();}
     if(status===303)return redirect(path+'?email='+encodeURIComponent(email)+'&lang='+lang);
@@ -266,6 +316,14 @@ export async function handleOperations({ request, reply, redirect, lang, account
   const result = email ? store.operations.lookup(account.id, role, email) : undefined;
   if (result?.status === 403) return reply(403);
   const backups=role==='security' ? await store.operations.backupHistory(account.id) : undefined;
+  const verification=url.searchParams.get('verification');
+  const verificationArchive=url.searchParams.get('archive') ?? '';
+  if(['verified','failed','unavailable'].includes(verification)&&/^workspace-[A-Za-z0-9T_-]+\.nribak$/.test(verificationArchive)){
+    const label={verified:t('Archive authenticated and restored into a disposable workspace.','تم التحقق من الأرشيف واستعادته في مساحة مؤقتة.'),
+      failed:t('Archive authentication or workspace validation failed.','فشل التحقق من الأرشيف أو فحص مساحة العمل.'),
+      unavailable:t('Verification could not run. Check the archive key and host permissions.','تعذر إجراء التحقق. افحص مفتاح الأرشيف وأذونات الخادم.')};
+    backupNotice=`<p role="status"><bdi>${escapeHtml(verificationArchive)}</bdi> · ${label[verification]}</p>`;
+  }
   const date = new Intl.DateTimeFormat(lang, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' });
   const summary = (row) => row?.plan ? `<bdi>${escapeHtml(row.plan)}</bdi> · ${t(...states[row.state])}
     ${row.expires_at === null ? '' : ` · <time>${date.format(row.expires_at)} UTC</time>`}` : t('No assignment', 'لا يوجد تعيين');
@@ -285,7 +343,11 @@ export async function handleOperations({ request, reply, redirect, lang, account
       : t('Backup directory is unavailable or not configured for this process.', 'مجلد النسخ الاحتياطية غير متاح أو غير مضبوط لهذه العملية.')}</p>
     ${backups?.files.length ? `<ol class="activity">${backups.files.map((file)=>`<li><bdi>${escapeHtml(file.name)}</bdi> ·
       ${file.containerRecognized?t('NRIBAK container header recognized','تم التعرف على ترويسة حاوية NRIBAK'):t('Unrecognized archive header','ترويسة أرشيف غير معروفة')} ·
-      ${new Intl.NumberFormat(lang).format(file.size)} ${t('bytes','بايت')} · <time>${date.format(file.modifiedAt)} UTC</time></li>`).join('')}</ol>`
+      ${new Intl.NumberFormat(lang).format(file.size)} ${t('bytes','بايت')} · <time>${date.format(file.modifiedAt)} UTC</time>
+      ${file.verification ? `<p>${t('Last verification','آخر تحقق')} · ${file.verification.result==='verified'?t('Authenticated restore passed','نجح التحقق والاستعادة'):file.verification.result==='failed'?t('Verification failed','فشل التحقق'):t('Verification unavailable','التحقق غير متاح')} · <time>${date.format(file.verification.checkedAt)} UTC</time></p>`:''}
+      <form class="workspace-form" method="post" action="${path}"><input type="hidden" name="intent" value="verify-backup"><input type="hidden" name="backup-name" value="${escapeHtml(file.name)}">
+        <label>${t('Current password','كلمة المرور الحالية')}<input name="password" type="password" required maxlength="128" autocomplete="current-password"></label>
+        <button class="action">${t('Authenticate and restore-check archive','تحقق تشفيريًا واختبر استعادة الأرشيف')}</button></form></li>`).join('')}</ol>`
       : `<p>${t('No backup archives found.','لم يُعثر على أرشيفات نسخ احتياطية.')}</p>`}` : '';
   const details = !result ? '' : result.status === 404 ? `<p>${t('Account unavailable', 'الحساب غير متاح')}</p>`
     : role === 'support' ? `<p>${summary(result.subscription)}</p><h2>${t('Organizations', 'المؤسسات')}</h2>
@@ -300,6 +362,7 @@ export async function handleOperations({ request, reply, redirect, lang, account
     html: `<section class="surface panel detail workspace-page"><h1>${title}</h1>
       ${role === 'security' ? `<p>${t('Workspace schema', 'مخطط مساحة العمل')} · ${store.healthy() ? t('Ready', 'جاهز') : t('Unavailable', 'غير متاح')}</p>` : ''}
       ${backupSection}
+      ${backupNotice}
       ${status===409 ? `<p role="status">${t('Session unavailable, stale or cannot be revoked from this session.','الجلسة غير متاحة أو قديمة أو لا يمكن إلغاؤها من جلستك الحالية.')}</p>`:''}
       <form class="workspace-form" method="get" action="${path}"><input type="hidden" name="lang" value="${lang}">
         <label>${t('Exact account email', 'البريد الإلكتروني المطابق')}<input type="email" name="email" maxlength="254" required dir="ltr"></label>

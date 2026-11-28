@@ -1,4 +1,4 @@
-import { operationsAdminSchema, operationsSchema, operationsSessionSchema, operationsStore } from './admin-operations.js';
+import { operationsAdminSchema, operationsBackupSchema, operationsSchema, operationsSessionSchema, operationsStore } from './admin-operations.js';
 import { billingAccessSchema, billingDiscountSchema, billingReconciliationSchema, billingSchema, billingStore } from './billing-store.js';
 import { resourceSchema, resourceStore } from './resource-store.js';
 import { citationSchema, citationStore } from './citation-store.js';
@@ -30,7 +30,7 @@ import { referenceSchema, referenceMigrationV4, referenceStore } from './referen
 
 export const sessionLifetime = 8 * 60 * 60;
 export const sessionIdle = 30 * 60_000;
-const schemaVersion = 46;
+const schemaVersion = 47;
 const schema = `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -127,6 +127,7 @@ function initialize(db, path) {
     if (version < 44) db.exec(operationsSessionSchema);
     if (version < 45) db.exec(profilePreferencesSchema);
     if (version < 46) db.exec(networkModerationSchema);
+    if (version < 47) db.exec(operationsBackupSchema);
     return bindDocumentKey(db, path);
   });
 }
@@ -235,7 +236,7 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now, options = 
     },
     healthy: () => db.prepare('PRAGMA user_version').get().user_version === schemaVersion,
     licensing,
-    operations: operationsStore(db, now, sessionIdle, options.backupDirectory),
+    operations: operationsStore(db, now, sessionIdle, options.backupDirectory, options.backupKeyFile),
     billing: billingStore(db, now, transact),
     teams,
     resources: resourceStore(db, now, transact, teams),
