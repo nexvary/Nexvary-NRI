@@ -16,10 +16,11 @@ export function render({ lang, view, version, page, workspace, unread = 0, invit
   const t = (key) => tr(copy[key]);
   const href = (target, language = lang) => `/?lang=${language}&amp;view=${target}`;
   const label = (id) => tr(modules[id][2]);
-  const link = (id) => `<a href="${href(id)}"${view === id ? ' aria-current="page"' : ''}>${icon(modules[id][0])}<span>${label(id)}</span></a>`;
+  const dashboardLink = view === 'dashboard' ? ' data-dashboard-nav' : '';
+  const link = (id) => `<a href="${href(id)}"${dashboardLink}${view === id ? ' aria-current="page"' : ''}>${icon(modules[id][0])}<span>${label(id)}</span></a>`;
   const tile = (id) => {
     const [glyph, color, name, description] = modules[id];
-    return `<a class="tile surface ${color}" href="${href(id)}">${icon(glyph)}<strong>${tr(name)}</strong><small>${tr(description)}</small></a>`;
+    return `<a class="tile surface ${color}" href="${href(id)}"${dashboardLink}>${icon(glyph)}<strong>${tr(name)}</strong><small>${tr(description)}</small></a>`;
   };
   const dimensionList = `<ul class="dimensions">${dimensions.map(([letter, glyph, color, name]) =>
     `<li class="${color}">${icon(glyph)}<bdi>${letter}</bdi><small>${tr(name)}</small></li>`).join('')}</ul>`;
@@ -27,6 +28,7 @@ export function render({ lang, view, version, page, workspace, unread = 0, invit
   const title = page?.title ?? (isModule ? label(view) : t(view === 'developer' ? 'aboutDeveloper' : 'unknown'));
   const direction = lang === 'ar' ? 'rtl' : 'ltr';
   const dashboard = () => `
+    <p id="dashboard-navigation-status" role="status" aria-live="polite" hidden>${t('dashboardLoading')}</p>
     <section class="hero surface" aria-labelledby="hero-title">
       <div class="hero-copy">
         <h1 id="hero-title" class="wordmark"><bdi>NEXVARY <em>NRI</em></bdi></h1>
@@ -166,6 +168,7 @@ export function render({ lang, view, version, page, workspace, unread = 0, invit
   <footer class="surface footer"><nav aria-label="${t('docs')}">
     <ul>${additional.map((id) => `<li>${link(id)}</li>`).join('')}<li><a href="${repo}/blob/main/docs/PROJECT.md">${icon('📘')}${t('docs')}</a></li></ul>
   </nav></footer>
+  ${view === 'dashboard' && !page ? '<script src="/dashboard-navigation.js" defer></script>' : ''}
 </body>
 </html>`;
 }

@@ -6,7 +6,7 @@ Scope: [owner functional requirements](REQUIREMENTS.md), the [charter](PROJECT.m
 
 | ID | Verified criteria (V) | Implemented, evidence incomplete (U) | Missing or incomplete (M) | External blocker (B) | Verification evidence |
 |---|---|---|---|---|---|
-| NRI-01 Dashboard | Private project count; library count; collaborator count; evidence count; metered cost; recent activity; quick actions and module navigation; displayed ORCID profile field; empty state; isolation | Server request error response needs dashboard-specific verification | Loading feedback for pending dashboard navigation | None | `library.test.js`, `shell.test.js`, `qa/nri-01/`. Verify loading and error behavior on the actual dashboard. |
+| NRI-01 Dashboard | Private project count; library count; collaborator count; evidence count; metered cost; recent activity; quick actions and module navigation; displayed ORCID profile field; empty state; isolation; accessible pending-navigation announcement; bilingual error response with retry and no diagnostic leakage | None | None | None | `shell.test.js` verifies navigation status, `aria-busy`, bilingual 503 error handling and no internal error leakage; `library.test.js` verifies metrics and isolation. |
 | NRI-02 Workspace | Project CRUD; manuscript create and update; version history; authors; tags; search; shared notes; tasks; collaborators; permissions and access denial; publication status; DOI; scoped manuscript deletion with dependent-data cleanup | None | None | None | `workspace.test.js`, `teams.test.js`, `readiness.test.js`, `qa/nri-02/`. Direct HTTP tests cover confirmation, stale revisions, isolation and attributable deletion. Document-format expansion is outside this module's closure. |
 | NRI-03 Library | PDF and document upload; stored metadata; named collections; distinct owner-scoped folders and folder assignments; search; filters; embedded PDF reading; annotations; bookmarks; stored citations; BibTeX and RIS import; BibTeX and RIS export; controlled deduplication; bilingual copyright guidance in the upload flow; authorized reads and downloads | None | None | None | `documents.test.js` verifies rendered Arabic/English upload guidance. `library.test.js` verifies distinct collection/folder persistence and account isolation; existing library, citation and sharing tests cover the remaining criteria. |
 | NRI-04 References | Crossref; OpenAlex; ORCID public records; Zenodo public records; DOI resolution and agency identification; bibliographic comparison; supported correction and retraction indicators; dated provenance; unknown and unavailable states; request throttling; caching; integrity checks against mismatched records | None | None | None | `references.test.js`, recorded provider QA in STATUS. Public record lookup satisfies the reference criterion. ORCID account ownership belongs to identity verification where required. |
@@ -31,7 +31,7 @@ Scope: [owner functional requirements](REQUIREMENTS.md), the [charter](PROJECT.m
 
 | Module | Total | Verified | Remaining | Verified % | U | M | B |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| NRI-01 | 12 | 10 | 2 | 83.3% | 1 | 1 | 0 |
+| NRI-01 | 12 | 12 | 0 | 100.0% | 0 | 0 | 0 |
 | NRI-02 | 13 | 13 | 0 | 100.0% | 0 | 0 | 0 |
 | NRI-03 | 15 | 15 | 0 | 100.0% | 0 | 0 | 0 |
 | NRI-04 | 12 | 12 | 0 | 100.0% | 0 | 0 | 0 |
@@ -51,7 +51,7 @@ Scope: [owner functional requirements](REQUIREMENTS.md), the [charter](PROJECT.m
 | NRI-18 | 19 | 14 | 5 | 73.7% | 1 | 4 | 0 |
 | NRI-19 | 9 | 6 | 3 | 66.7% | 1 | 1 | 1 |
 | NRI-20 | 29 | 21 | 8 | 72.4% | 2 | 4 | 2 |
-| Overall | 219 | 190 | 29 | 86.8% | 7 | 16 | 6 |
+| Overall | 219 | 192 | 27 | 87.7% | 7 | 14 | 6 |
 
 ## Scope freeze
 
@@ -67,7 +67,8 @@ Scope: [owner functional requirements](REQUIREMENTS.md), the [charter](PROJECT.m
 3. NRI-04 and NRI-05 met the documented original scope during targeted source and test review. Required provider paths passed with fixture coverage and historical provider evidence. Claim-source mapping, review and export passed. Optional provider adapters and wider review functionality remain frozen. Status: 12/12 and 8/8 locally verified.
 4. NRI-06 (8/10 at baseline) now has direct evidence for all four categories and reviewed source links. The HTTP test rejects selection before review, checks the persisted categories, and verifies the rendered DOI link. Status: 10/10 locally verified.
 5. NRI-03 closed at 15/15. Folder organization now has a separate owner-scoped schema and workflow alongside collections. Upload forms show bilingual rights guidance. Focused library and document tests passed 10/10.
+6. NRI-01 closed at 12/12. Dashboard navigation now announces pending navigation and marks the main region busy. Database failures return a bilingual accessible retry state and log no sensitive details. Focused dashboard tests passed.
 
-**Local result: 190/219 verified (86.8%).** The local module matrix is 14 Verified and 6 Partial. Of the 29 remaining criteria, 7 need evidence for implemented functionality, 16 are missing or incomplete, and 6 are externally blocked. NRI-03 targeted tests passed 10/10. The prior recorded full suite passed 78/78 with real bilingual PDF/DOCX rendering; the previous fresh run in this workspace passed 76 tests and skipped 2 renderer-dependent tests because the report runtime is not installed here. Hosted CI is the source of truth for this checkpoint's real-render regression. Full device and accessibility acceptance remains unverified.
+**Local result: 192/219 verified (87.7%).** The local module matrix is 15 Verified and 5 Partial. Of the 27 remaining criteria, 7 need evidence for implemented functionality, 14 are missing or incomplete, and 6 are externally blocked. NRI-03 and NRI-01 targeted regressions passed. The prior recorded full suite passed 78/78 with real bilingual PDF/DOCX rendering; the previous fresh run in this workspace passed 76 tests and skipped 2 renderer-dependent tests because the report runtime is not installed here. Hosted CI is the source of truth for this checkpoint's real-render regression. Full device and accessibility acceptance remains unverified.
 
 Owner authorization to publish to the existing public repository is recorded. The verified source and matrix are being published to the existing feature branch; PR #19 remains draft and unmerged. Production and live billing remain out of scope.

@@ -325,3 +325,8 @@
 - Added separate, owner-scoped library folders and document assignment; folders remain distinct from named collections and are covered by account-isolation tests.
 - Added bilingual copyright and authorization guidance to document upload.
 - Focused regression: `node --test test/library.test.js test/documents.test.js` — 10/10 passed. NRI-03 is now 15/15; acceptance is 190/219 (86.8%), 14 Verified / 6 Partial. Full regression remains for the next milestone.
+
+# 2026-11-28 · NRI-01 closure
+
+- Dashboard navigation announces pending movement with a live region and `aria-busy`; database failures use a bilingual accessible retry state and never expose internal diagnostics.
+- Focused dashboard regressions passed. NRI-01 is now 12/12; acceptance is 192/219 (87.7%), 15 Verified / 5 Partial. Full regression remains for the next milestone.

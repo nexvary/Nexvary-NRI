@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { runInNewContext } from 'node:vm';
 import { after, before, test } from 'node:test';
 import { createApp } from '../src/server.js';
 import { modules } from '../src/content.js';
+import { openWorkspaceStore } from '../src/store.js';
 
 const app = createApp();
 let base;
@@ -38,6 +40,51 @@ test('serves a bilingual dashboard without fabricated dashboard metrics', async 
   assert.match(english, /Live API spend/);
   assert.match(english, /Inactive/);
   assert.match(english, /aria-current="page"/);
+  assert.match(english, /dashboard-navigation\.js/);
+  assert.match(english, /id="dashboard-navigation-status" role="status" aria-live="polite" hidden/);
+  assert.match(en.headers.get('content-security-policy'), /script-src 'self'/);
+});
+
+test('dashboard navigation announces pending movement and marks the main region busy', async () => {
+  let listener;
+  const status = { hidden: true };
+  const attributes = {};
+  const link = { target: '', closest: (selector) => selector === 'a[data-dashboard-nav]' ? {} : null };
+  const document = {
+    addEventListener: (type, callback) => { if (type === 'click') listener = callback; },
+    getElementById: (id) => id === 'dashboard-navigation-status' ? status
+      : id === 'main' ? { setAttribute: (key, value) => { attributes[key] = value; } } : null,
+  };
+  const source = await readFile(new URL('../public/dashboard-navigation.js', import.meta.url), 'utf8');
+  runInNewContext(source, { document });
+  listener({ target: { closest: () => link }, defaultPrevented: false, button: 0 });
+  assert.equal(status.hidden, false);
+  assert.equal(attributes['aria-busy'], 'true');
+});
+
+test('dashboard database errors return an accessible bilingual retry page without leaking internals', async (t) => {
+  const store = openWorkspaceStore();
+  store.addAccount('dashboard-error@example.test', { salt: Buffer.alloc(16), hash: Buffer.alloc(32) });
+  const account = store.credentials('dashboard-error@example.test').id;
+  const token = store.newSession(account);
+  store.library.dashboard = () => { throw new Error('private database diagnostic'); };
+  const app = createApp(store);
+  await new Promise((resolve) => app.listen(0, '127.0.0.1', resolve));
+  const origin = 'http://127.0.0.1:' + app.address().port;
+  try {
+    for (const [lang, phrase] of [['en', 'Dashboard data could not be loaded'], ['ar', 'تعذّر تحميل بيانات لوحة التحكم']]) {
+      const response = await fetch(origin + '/?lang=' + lang, { headers: { cookie: 'nri_session=' + token } });
+      assert.equal(response.status, 503);
+      assert.equal(response.headers.get('cache-control'), 'no-store');
+      const html = await response.text();
+      assert.match(html, /role="alert"/);
+      assert.ok(html.includes(phrase));
+      assert.doesNotMatch(html, /private database diagnostic/);
+    }
+  } finally {
+    app.closeAllConnections();
+    await new Promise((resolve) => app.close(resolve));
+  }
 });
 
 test('navigates to every module and preserves its view across language changes', async () => {

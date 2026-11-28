@@ -18,6 +18,7 @@ import { referenceProjectsPath, workspacePage, workspacePath } from './workspace
 
 const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 const stylesheet = readFileSync(new URL('../public/styles.css', import.meta.url));
+const dashboardNavigation = readFileSync(new URL('../public/dashboard-navigation.js', import.meta.url));
 const pdfAssets = new URL('../node_modules/pdfjs-dist/', import.meta.url);
 function readerAssets(path) {
   if (path === '/pdf-reader.mjs') return new URL('../public/pdf-reader.mjs', import.meta.url);
@@ -114,6 +115,7 @@ export function createApp(store = openWorkspaceStore(), {
       const answer = request.method === 'HEAD' ? undefined : render({ lang, view, version, page, workspace: dashboard, unread, invitations: mayRead(10) ? store.teams.pending(session.id) : 0 });
       response.writeHead(status, {
         ...securityHeaders, 'Content-Type': 'text/html; charset=utf-8', 'Content-Language': lang, ...headers,
+        ...(view === 'dashboard' && !page ? { 'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'" } : {}),
         ...(session ? { 'Cache-Control': 'no-store' } : {}),
       }).end(answer);
     };
@@ -138,6 +140,11 @@ export function createApp(store = openWorkspaceStore(), {
       response.end(request.method === 'HEAD' ? undefined : stylesheet);
       return;
     }
+    if (pathname === '/dashboard-navigation.js') {
+      response.writeHead(200, { ...securityHeaders, 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'public, max-age=3600' });
+      response.end(request.method === 'HEAD' ? undefined : dashboardNavigation);
+      return;
+    }
 
     const view = searchParams.get('view') ?? 'dashboard';
     if (pathname === '/' && view === 'research') {
@@ -149,10 +156,18 @@ export function createApp(store = openWorkspaceStore(), {
       let dashboard;
       if (session && (!enforceEntitlements || store.licensing.allowsModules(session.id, dashboardModules))) {
         const owner = session.id;
-        dashboard = store.library.dashboard(owner);
-        dashboard.metrics.collaborations = store.network.collaborations(owner);
-        dashboard.orcid = normalizeOrcid(store.network.profile(owner)?.orcid ?? '');
-        dashboard.usage = store.assistantUsage.today(owner);
+        try {
+          dashboard = store.library.dashboard(owner);
+          dashboard.metrics.collaborations = store.network.collaborations(owner);
+          dashboard.orcid = normalizeOrcid(store.network.profile(owner)?.orcid ?? '');
+          dashboard.usage = store.assistantUsage.today(owner);
+        } catch {
+          logEvent('dashboard.load.error');
+          const title = lang === 'ar' ? 'لوحة التحكم غير متاحة' : 'Dashboard unavailable';
+          const detail = lang === 'ar' ? 'تعذّر تحميل بيانات لوحة التحكم. حاول مرة أخرى بعد قليل.' : 'Dashboard data could not be loaded. Retry in a moment.';
+          sendPage(503, view, { title, path: '/', html: `<section class="surface panel detail" role="alert"><h1>${title}</h1><p>${detail}</p><a class="action" href="/?lang=${lang}">${lang === 'ar' ? 'إعادة المحاولة' : 'Retry'}</a></section>` }, { 'Cache-Control': 'no-store' });
+          return;
+        }
       }
       const denied = session && !dashboard;
       sendPage(denied ? 403 : 200, view, denied ? workspacePage(lang, 'entitlement') : undefined,
