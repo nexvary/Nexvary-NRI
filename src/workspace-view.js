@@ -95,6 +95,7 @@ export function workspacePage(lang, kind, options = {}) {
           <label>${t('mfaCode')}<input name="mfa-code" dir="ltr" autocomplete="one-time-code" maxlength="19"></label>
           <button class="action" type="submit">${t('signIn')}</button>
         </form>
+        <p><a href="/recover?lang=${lang}">${lang === 'ar' ? 'هل نسيت كلمة المرور؟ استعد الوصول' : 'Forgot your password? Recover access'}</a></p>
       </section>`);
   }
   if (kind === 'entitlement') {

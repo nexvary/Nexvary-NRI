@@ -1,6 +1,7 @@
 import { handleOperations, handleOperationsAdmin, operationsPaths } from './admin-operations.js';
 import { allowsRoute } from './entitlements.js';
 import { createLoginThrottle } from './login-throttle.js';
+import { createPasswordRecoveryHandler } from './password-recovery.js';
 import { createResourceHandler, resolveResourceRoute } from './resource-sharing.js';
 import { handleCitations, resolveCitationRoute } from './citations.js';
 import { handleOrganization, resolveOrganizationRoute } from './library-organization.js';
@@ -37,6 +38,7 @@ const formLimit = 24 * 1024;
 
 export function resolveWorkspaceRoute(pathname) {
   if (pathname === '/login') return { kind: 'login' };
+  if (pathname === '/recover') return { kind: 'recover' };
   if (pathname === '/logout') return { kind: 'logout' };
   if (pathname === '/workspace/assistant/answer') return { kind: 'assistant-answer' };
   if (pathname === '/workspace/assistant/settings') return { kind: 'assistant-settings' };
@@ -103,6 +105,7 @@ function projectFields(form) {
 
 export function createWorkspaceHandler(store, providers, version, reportRenderer, assistantProvider, origin, enforceEntitlements) {
   const handlePrivacy = createPrivacyHandler(store);
+  const handlePasswordRecovery = createPasswordRecoveryHandler(store);
   const handleMfaSettings = createMfaSettingsHandler(store);
   const handleAssistantAnswer = createAssistantAnswerHandler(store, assistantProvider);
   const handleDocuments = createDocumentHandler(store);
@@ -140,7 +143,7 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
         reply(403);
         return;
       }
-      if (enforceEntitlements && kind !== 'login') {
+      if (enforceEntitlements && !['login', 'recover'].includes(kind)) {
         const preliminary = store.session(token);
         if (!preliminary) return redirect(loginPath(lang));
         if (!allowsRoute(store.licensing, preliminary.id, kind)) return reply(403, workspacePage(lang, 'entitlement'));
@@ -156,6 +159,11 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
     }
     const account = store.session(token);
     const entitled = () => !enforceEntitlements || allowsRoute(store.licensing, account.id, kind);
+
+    if (kind === 'recover') {
+      await handlePasswordRecovery({ request, reply, lang, form });
+      return;
+    }
 
     if (kind === 'login') {
       if (method !== 'POST') {

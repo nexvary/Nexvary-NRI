@@ -278,6 +278,17 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now, options = 
         return true;
       });
     },
+    recoverPassword(email, code, { salt, hash }) {
+      return transact(db, () => {
+        const credentials = findAccount.get(email);
+        if (!credentials || !mfa.enabled(credentials.id) || !mfa.verifyInTransaction(credentials.id, code)) return false;
+        const account = replacePassword.get(salt, hash, email);
+        if (!account) return false;
+        revokeAccountSessions.run(account.id);
+        settings.record(account.id, 'password-reset');
+        return true;
+      });
+    },
     signIn({ id: accountId, salt, hash }, previousToken, userAgent) {
       return transact(db, () => {
         if (!currentCredentials.get(accountId, salt, hash)) return undefined;

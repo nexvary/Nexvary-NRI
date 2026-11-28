@@ -111,6 +111,9 @@ export function mfaStore(db, workspaceKey, now, transact, revokeOthers) {
     verify(account, code) {
       return transact(db, () => verify(account, get.get(account), code));
     },
+    verifyInTransaction(account, code) {
+      return verify(account, get.get(account), code);
+    },
     disable(account, code, token) {
       return transact(db, () => {
         if (!verify(account, get.get(account), code)) return false;
