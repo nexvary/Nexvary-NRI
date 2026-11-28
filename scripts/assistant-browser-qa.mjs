@@ -150,9 +150,14 @@ async function auditAccessibility(send, kind) {
   const result = await inspect(send, `(() => {
     const visible = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden'; };
     const controls = [...document.querySelectorAll('a[href],button,input:not([type=hidden]),select,textarea,[role=button]')].filter(visible);
-    const name = (el) => el.getAttribute('aria-label') || el.getAttribute('title') ||
-      (el.getAttribute('aria-labelledby') || '').split(/\\s+/).map(id => document.getElementById(id)?.innerText || '').join(' ').trim() ||
-      (el.labels?.length ? [...el.labels].map(label => label.innerText).join(' ').trim() : el.innerText || el.value || '').trim();
+    const name = (el) => {
+      const labelledBy = (el.getAttribute('aria-labelledby') || '').split(/\\s+/).map(id => document.getElementById(id)?.innerText || '').join(' ').trim();
+      const labels = [...(el.labels || [])].map(label => label.innerText || label.textContent || '').join(' ').trim();
+      const ancestorLabel = el.closest('label')?.innerText || el.closest('label')?.textContent || '';
+      const explicitLabel = el.id ? [...document.querySelectorAll('label[for]')].find(label => label.htmlFor === el.id)?.innerText || '' : '';
+      return el.getAttribute('aria-label') || el.getAttribute('title') || labelledBy || labels || ancestorLabel.trim() || explicitLabel.trim() ||
+        (el.innerText || el.value || '').trim();
+    };
     const unlabeled = controls.filter(el => !name(el)).map(el => el.outerHTML.slice(0, 120));
     const parse = (value) => {
       if (!value) return null;
