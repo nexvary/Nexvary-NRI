@@ -10,7 +10,7 @@ const shortcuts = ['research', 'evidence', 'l-ready', 'economics', 'assistant', 
 const additional = ['references', 'messages', 'observatory', 'analytics', 'education'];
 const repo = 'https://github.com/nexvary/Nexvary-NRI';
 
-export function render({ lang, view, version, page, workspace, unread = 0, invitations = 0 }) {
+export function render({ lang, view, version, page, workspace, unread = 0, invitations = 0, theme = 'dark' }) {
   const formatCost = new Intl.NumberFormat(lang, { style: 'currency', currency: 'USD', maximumFractionDigits: 6 });
   const tr = (pair) => pair[lang === 'ar' ? 1 : 0];
   const t = (key) => tr(copy[key]);
@@ -112,10 +112,11 @@ export function render({ lang, view, version, page, workspace, unread = 0, invit
   const validView = isModule || view === 'developer' ? view : 'dashboard';
   const languageLink = page ? `${page.path}?lang=${otherLanguage}` : href(validView, otherLanguage);
   if (page?.controlCenter) return `<!doctype html>
-<html lang="${lang}" dir="${direction}">
+<html lang="${lang}" dir="${direction}" data-theme="${theme}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="${theme}">
   <title>${title} | NRI CONTROL CENTER</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
@@ -138,11 +139,11 @@ export function render({ lang, view, version, page, workspace, unread = 0, invit
 </body>
 </html>`;
   return `<!doctype html>
-<html lang="${lang}" dir="${direction}">
+<html lang="${lang}" dir="${direction}" data-theme="${theme}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="dark">
+  <meta name="color-scheme" content="${theme}">
   <title>${title} | NEXVARY NRI</title>
   <link rel="stylesheet" href="/styles.css">
 </head>

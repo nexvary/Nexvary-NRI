@@ -112,7 +112,7 @@ export function createApp(store = openWorkspaceStore(), {
       const session = store.session(token);
       const mayRead = (module) => session && (!enforceEntitlements || store.licensing.allowsModules(session.id, [module]));
       const unread = mayRead(11) && store.messages.notifications(session.id) ? store.messages.unread(session.id) : 0;
-      const answer = request.method === 'HEAD' ? undefined : render({ lang, view, version, page, workspace: dashboard, unread, invitations: mayRead(10) ? store.teams.pending(session.id) : 0 });
+      const answer = request.method === 'HEAD' ? undefined : render({ lang, view, version, page, workspace: dashboard, unread, invitations: mayRead(10) ? store.teams.pending(session.id) : 0, theme: session ? store.settings.profile(session.id).theme : 'dark' });
       response.writeHead(status, {
         ...securityHeaders, 'Content-Type': 'text/html; charset=utf-8', 'Content-Language': lang, ...headers,
         ...(view === 'dashboard' && !page ? { 'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'" } : {}),

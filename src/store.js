@@ -19,7 +19,7 @@ import { bindDocumentKey } from './document-crypto.js';
 import { documentSchema, documentStore } from './document-store.js';
 import { educationSchema, educationStore } from './education.js';
 import { sharingSchema, sharingStore } from './sharing-store.js';
-import { passwordRecoverySchema, settingsSchema, settingsStore } from './settings.js';
+import { passwordRecoverySchema, profilePreferencesSchema, settingsSchema, settingsStore } from './settings.js';
 import { observatorySchema, observatoryStore } from './observatory-store.js';
 import { networkSchema, networkStore } from './network-store.js';
 import { libraryStore } from './library.js';
@@ -30,7 +30,7 @@ import { referenceSchema, referenceMigrationV4, referenceStore } from './referen
 
 export const sessionLifetime = 8 * 60 * 60;
 export const sessionIdle = 30 * 60_000;
-const schemaVersion = 44;
+const schemaVersion = 45;
 const schema = `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -125,6 +125,7 @@ function initialize(db, path) {
     if (version < 42) db.exec(folderSchema);
     if (version < 43) db.exec(operationsAdminSchema);
     if (version < 44) db.exec(operationsSessionSchema);
+    if (version < 45) db.exec(profilePreferencesSchema);
     return bindDocumentKey(db, path);
   });
 }
@@ -186,7 +187,7 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now, options = 
   const countOthers = db.prepare(`SELECT count(*) AS count FROM sessions s JOIN session_activity a ON a.token_hash=s.token_hash
     WHERE s.account_id=? AND s.token_hash<>? AND s.expires_at>? AND a.seen_at>?`);
   const removeOthers = db.prepare('DELETE FROM sessions WHERE account_id = ? AND token_hash <> ? AND expires_at > ?');
-  const settings = settingsStore(db, now);
+  const settings = settingsStore(db, now, transact);
   const sharing = sharingStore(db, now, transact);
   const removeSession = db.prepare('DELETE FROM sessions WHERE token_hash = ?');
   const insertProject = db.prepare('INSERT INTO projects VALUES (?, ?, ?, ?, ?)');

@@ -276,6 +276,31 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
     }
     if (kind === 'settings') {
       if (method === 'POST') {
+        if (form.get('intent') === 'update-profile') {
+          const retryAfter = throttle.begin(request.socket.remoteAddress ?? '', account.email);
+          if (retryAfter) {
+            reply(429, settingsPage(store, lang, account, token), { 'Retry-After': String(retryAfter) });
+            return;
+          }
+          try {
+            const password = form.get('password') ?? '';
+            const credentials = store.credentials(account.email);
+            const valid = password.length <= 128 && await verifyPassword(password, credentials);
+            if (!valid || store.session(token)?.id !== account.id) {
+              reply(403);
+              return;
+            }
+            const status = store.settings.updateProfile(account.id, form.get('display-name'), form.get('theme'));
+            if (status !== 303) {
+              reply(status);
+              return;
+            }
+            redirect(`/workspace/settings?lang=${lang}`);
+            return;
+          } finally {
+            throttle.finish();
+          }
+        }
         if (form.get('intent') !== 'revoke-others') {
           reply(422);
           return;

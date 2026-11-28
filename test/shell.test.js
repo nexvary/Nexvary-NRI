@@ -25,7 +25,7 @@ test('serves a bilingual dashboard without fabricated dashboard metrics', async 
   assert.equal(ar.status, 200);
   assert.equal(ar.headers.get('content-language'), 'ar');
   const arabic = await ar.text();
-  assert.match(arabic, /<html lang="ar" dir="rtl">/);
+  assert.match(arabic, /<html lang="ar" dir="rtl" data-theme="dark">/);
   assert.match(arabic, /سجّل الدخول لعرض مساحة عملك/);
   assert.match(arabic, /غير مفعّل/);
   assert.match(arabic, /class="skip" href="#main"/);
@@ -33,7 +33,7 @@ test('serves a bilingual dashboard without fabricated dashboard metrics', async 
   const en = await fetch(`${base}/?lang=en`);
   assert.equal(en.headers.get('content-language'), 'en');
   const english = await en.text();
-  assert.match(english, /<html lang="en" dir="ltr">/);
+  assert.match(english, /<html lang="en" dir="ltr" data-theme="dark">/);
   assert.match(english, /Sign in to see your workspace/);
   assert.doesNotMatch(english, /Demo data|Assessing rainwater harvesting/);
   assert.match(english, /<svg class="icon"/);

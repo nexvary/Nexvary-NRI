@@ -62,7 +62,7 @@ test('requires a session and serves a localized login with generic credential er
   assert.equal(login.status, 200);
   assert.equal(login.headers.get('cache-control'), 'no-store');
   const html = await login.text();
-  assert.match(html, /<html lang="ar" dir="rtl">/);
+  assert.match(html, /<html lang="ar" dir="rtl" data-theme="dark">/);
   assert.match(html, /href="\/login\?lang=en" hreflang="en"/);
   for (const email of [alice, 'unknown@example.test']) {
     const denied = await post('/login?lang=en', { email, password: 'incorrect' });

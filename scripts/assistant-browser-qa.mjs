@@ -18,6 +18,7 @@ const email = 'visual@example.test';
 const fixturePassword = 'browser fixture password';
 store.addAccount(email, await hashPassword(fixturePassword));
 const { id } = store.credentials(email);
+assert.equal(store.settings.updateProfile(id, 'NRI Visual Reader', 'light'), 303);
 const session = store.newSession(id);
 const project = store.createProject(id, { title: 'Source review sample', description: '' });
 const pages = ['NRI READING SAMPLE', 'VERSION-SCOPED ANNOTATIONS'].map((line) =>
@@ -285,6 +286,13 @@ try {
         url: origin, name: 'nri_session', value: session, httpOnly: true, sameSite: 'Strict',
       });
       assert.equal(success, true);
+      await send('Page.navigate', { url: origin + '/workspace/settings?lang=' + lang });
+      await waitFor(() => inspect(send, 'Boolean(document.querySelector("select[name=theme]"))'), 'profile and theme settings');
+      assert.deepEqual(await inspect(send, `({ theme: document.documentElement.dataset.theme,
+        selected: document.querySelector('select[name=theme]').value,
+        name: document.querySelector('input[name="display-name"]').value })`),
+      { theme: 'light', selected: 'light', name: 'NRI Visual Reader' });
+      await captureLayout(send, 'settings', lang, name, width, height);
       await send('Page.navigate', { url: origin + '/workspace/projects/' + project + '/documents/' +
         textDocument + '/versions/1/preview?lang=' + lang });
       await waitFor(() => inspect(send,

@@ -17,7 +17,7 @@ export const passwordRecoverySchema = `
   CREATE TABLE security_events (
     id INTEGER PRIMARY KEY,
     account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-    action TEXT NOT NULL CHECK(action IN ('sign-in', 'sign-out', 'revoke-others', 'password-reset')),
+    action TEXT NOT NULL CHECK(action IN ('sign-in', 'sign-out', 'revoke-others', 'password-reset', 'profile-updated')),
     recorded_at INTEGER NOT NULL
   ) STRICT;
   INSERT INTO security_events SELECT * FROM old_security_events;
@@ -26,7 +26,28 @@ export const passwordRecoverySchema = `
   PRAGMA user_version = 27;
 `;
 
-export function settingsStore(db, now) {
+export const profilePreferencesSchema = `
+  DROP INDEX IF EXISTS security_events_account;
+  ALTER TABLE security_events RENAME TO security_events_v44;
+  CREATE TABLE security_events (
+    id INTEGER PRIMARY KEY,
+    account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    action TEXT NOT NULL CHECK(action IN ('sign-in','sign-out','revoke-others','password-reset','profile-updated')),
+    recorded_at INTEGER NOT NULL
+  ) STRICT;
+  INSERT INTO security_events SELECT * FROM security_events_v44;
+  DROP TABLE security_events_v44;
+  CREATE INDEX security_events_account ON security_events(account_id,id DESC);
+  CREATE TABLE IF NOT EXISTS account_preferences (
+    account_id TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
+    display_name TEXT NOT NULL DEFAULT '',
+    theme TEXT NOT NULL DEFAULT 'dark' CHECK(theme IN ('dark','light')),
+    updated_at INTEGER NOT NULL
+  ) STRICT;
+  PRAGMA user_version = 45;
+`;
+
+export function settingsStore(db, now, transact) {
   const insert = db.prepare('INSERT INTO security_events(account_id, action, recorded_at) VALUES (?, ?, ?)');
   const trim = db.prepare(`
     DELETE FROM security_events WHERE account_id=? AND id IN (
@@ -34,12 +55,21 @@ export function settingsStore(db, now) {
     )
   `);
   const list = db.prepare('SELECT action, recorded_at AS recordedAt FROM security_events WHERE account_id=? ORDER BY id DESC LIMIT 25');
+  const profile = db.prepare("SELECT display_name AS displayName,theme FROM account_preferences WHERE account_id=?");
+  const saveProfile = db.prepare(`INSERT INTO account_preferences(account_id,display_name,theme,updated_at) VALUES (?,?,?,?)
+    ON CONFLICT(account_id) DO UPDATE SET display_name=excluded.display_name,theme=excluded.theme,updated_at=excluded.updated_at`);
   return {
     record(owner, action) {
       insert.run(owner, action, now());
       trim.run(owner, owner);
     },
     list: (owner) => list.all(owner),
+    profile: (owner) => profile.get(owner) ?? { displayName: '', theme: 'dark' },
+    updateProfile(owner, displayName, theme) {
+      const name=typeof displayName==='string'?displayName.trim():'';
+      if(name.length>80 || /[\u0000-\u001f\u007f]/.test(name) || !['dark','light'].includes(theme))return 422;
+      return transact(db,()=>{saveProfile.run(owner,name,theme,now());insert.run(owner,'profile-updated',now());trim.run(owner,owner);return 303;});
+    },
   };
 }
 
@@ -58,6 +88,7 @@ const labels = {
   'sign-in': ['Signed in', 'تسجيل الدخول'],
   'sign-out': ['Signed out', 'تسجيل الخروج'],
   'revoke-others': ['Other sessions revoked', 'أُلغيت الجلسات الأخرى'],
+  'profile-updated': ['Profile and appearance updated', 'تم تحديث الملف الشخصي والمظهر'],
   back: ['Research workspace', 'مساحة الأبحاث'],
 };
 
@@ -66,6 +97,7 @@ export function settingsPage(store, lang, account, token) {
   const subscription = store.licensing.effectiveSubscription(account.id);
   const renewal = store.licensing.renewalNotice(account.id);
   const recent = store.settings.list(account.id);
+  const profile = store.settings.profile(account.id);
   const count = store.otherSessions(account.id, token);
   const current = new Intl.NumberFormat(lang).format(count);
   const date = new Intl.DateTimeFormat(lang, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' });
@@ -81,6 +113,13 @@ export function settingsPage(store, lang, account, token) {
       ${store.billing.canReview(account.id) ? `<a href="/control-center/billing?lang=${lang}">${lang === 'ar' ? 'سجلات الفوترة التجريبية' : 'Sandbox billing records'}</a>` : ''}
       ${store.licensing.isOperator(account.id) && store.mfa.enabled(account.id) ? `<a href="/control-center?lang=${lang}">${t('licensing')}</a>` : ''}
       ${store.messages.isModerator(account.id) ? `<a href="/workspace/settings/message-moderation?lang=${lang}">${t('moderation')}</a>` : ''}
+      <h2>${lang==='ar'?'الملف الشخصي والمظهر':'Profile and appearance'}</h2>
+      <form class="workspace-form" method="post" action="/workspace/settings?lang=${lang}">
+        <label>${lang==='ar'?'اسم العرض':'Display name'}<input name="display-name" maxlength="80" value="${escapeHtml(profile.displayName)}" autocomplete="name"></label>
+        <label>${lang==='ar'?'السمة':'Theme'}<select name="theme"><option value="dark"${profile.theme==='dark'?' selected':''}>${lang==='ar'?'داكن':'Dark'}</option><option value="light"${profile.theme==='light'?' selected':''}>${lang==='ar'?'فاتح':'Light'}</option></select></label>
+        <label>${lang==='ar'?'كلمة المرور الحالية للتأكيد':'Current password for confirmation'}<input name="password" type="password" required maxlength="128" autocomplete="current-password"></label>
+        <button class="action" name="intent" value="update-profile">${lang==='ar'?'حفظ الملف والمظهر':'Save profile and theme'}</button>
+      </form>
       <dl class="reference-meta"><div><dt>${t('email')}</dt><dd><bdi>${escapeHtml(account.email)}</bdi></dd></div>
         <div><dt>${t('other')}</dt><dd>${current}</dd></div></dl>
       ${count ? `<form method="post" action="/workspace/settings?lang=${lang}">
