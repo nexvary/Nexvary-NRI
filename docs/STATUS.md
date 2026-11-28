@@ -4,7 +4,7 @@
 
 Researcher profiles can now publish bounded text updates while discoverable. Signed-in researchers can comment and react; profile visibility and block relationships constrain post and comment reads, and rendered content is escaped. Content reports enter the existing moderator-only review queue. Actioned reports hide the post/comment, close related pending reports and record reviewer attribution. Content writes and reports have bounded per-account rates.
 
-- `node --test test/network-content.test.js test/network.test.js`: 2 passed, 0 failed. The full local suite passed 85/85, with 2 optional document-renderer tests skipped.
+- `node --test test/network-content.test.js test/network.test.js`: 2 passed, 0 failed. The full local suite passed 85/85, with 2 optional document-renderer tests skipped. Hosted CI [46155424948](https://github.com/nexvary/Nexvary-NRI/actions/runs/46155424948) passed the full suite with real bilingual PDF/DOCX rendering and Chromium accessibility/responsive checks.
 - Reconciled the original 219 criteria: 204/219 (93.2%), 16 Verified / 4 Partial; 4 U, 5 M, 6 B. NRI-09 is 14/17 and remains Partial (groups and authorized publication sharing remain; ORCID ownership awaits verification evidence). NRI-18 is 19/19 and Verified.
 - Remaining owner decisions: NRI-16 distribution/privacy/terms approvals; NRI-20 prices and trial/grace policies. NRI-19 needs an authorized target host for deployment/backup drills and an operations-alerting policy.
 
