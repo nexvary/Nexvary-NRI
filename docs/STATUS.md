@@ -1,5 +1,13 @@
 # Development status
 
+## NRI-09 researcher content and NRI-18 moderation closure · 2026-11-28
+
+Researcher profiles can now publish bounded text updates while discoverable. Signed-in researchers can comment and react; profile visibility and block relationships constrain post and comment reads, and rendered content is escaped. Content reports enter the existing moderator-only review queue. Actioned reports hide the post/comment, close related pending reports and record reviewer attribution. Content writes and reports have bounded per-account rates.
+
+- `node --test test/network-content.test.js test/network.test.js`: 2 passed, 0 failed. The full local suite passed 85/85, with 2 optional document-renderer tests skipped.
+- Reconciled the original 219 criteria: 204/219 (93.2%), 16 Verified / 4 Partial; 4 U, 5 M, 6 B. NRI-09 is 14/17 and remains Partial (groups and authorized publication sharing remain; ORCID ownership awaits verification evidence). NRI-18 is 19/19 and Verified.
+- Remaining owner decisions: NRI-16 distribution/privacy/terms approvals; NRI-20 prices and trial/grace policies. NRI-19 needs an authorized target host for deployment/backup drills and an operations-alerting policy.
+
 ## NRI-18 · MFA-protected self-service recovery · 2026-11-28
 
 The bilingual `/recover` flow lets an account with two-step verification reset its password using a one-use authenticator or recovery code. The code check, password replacement, session revocation and security audit event run in one SQLite transaction. The response does not disclose whether an account exists or whether its MFA code was accepted. Accounts without MFA remain on the operator-assisted recovery path; this flow does not depend on an unconfigured email provider.
@@ -32,7 +40,7 @@ Plan administrators can set optional per-project team-member and per-account con
 
 ## Acceptance reconciliation · 2026-11-28
 
-The original 219 criterion audit is reconciled against direct HTTP, unit and hosted browser evidence. The matrix totals 199/219 (90.9%), 15 Verified modules and 5 Partial. The remaining criteria are 6 implemented but awaiting evidence, 8 missing/incomplete, and 6 externally blocked. NRI-03 folders are owner-scoped and distinct from collections, with bilingual copyright guidance. NRI-01 navigation exposes an accessible pending state, and database errors produce a bilingual retry response without internal diagnostics. NRI-09 reports for published researcher profiles now enter an existing moderator-only, rate-limited and audited queue. NRI-18 profile editing and persisted dark/light theme selection require current-password reauthentication and are security-audited; MFA-protected self-service password recovery is transactional, one-use and revokes sessions. The light-theme settings view passed Arabic and English hosted Chromium checks in [CI run 46149174214](https://github.com/nexvary/Nexvary-NRI/actions/runs/46149174214), including keyboard focus, accessible names, WCAG AA contrast and responsive layouts. The hosted regression passed 81/81 tests before the report-queue change; previous local full regression passed 79, failed 0, skipped 2 optional report-renderer tests. NRI-20 adds billing-reviewer-only commercial analytics, per-project team-member limits, concurrent-session limits, and authenticated archive restore-checks, alongside operator-managed reviewer roles with reauthentication and audit logging. NRI-09, NRI-18 and NRI-20 remain Partial.
+The original 219 criterion audit is reconciled against direct HTTP, unit and hosted browser evidence. The latest matrix totals 204/219 (93.2%), 16 Verified modules and 4 Partial. The remaining criteria are 4 implemented but awaiting evidence, 5 missing/incomplete, and 6 externally blocked. NRI-09 now covers opt-in posts, comments, reactions and audited moderator review of reported content; groups and authorized publication sharing remain incomplete. NRI-18 is 19/19 and Verified. NRI-20 adds billing-reviewer-only commercial analytics, per-project team-member limits, concurrent-session limits, and authenticated archive restore-checks, alongside operator-managed reviewer roles with reauthentication and audit logging.
 
 ## Browser regression · 2026-11-27 (Cairo)
 

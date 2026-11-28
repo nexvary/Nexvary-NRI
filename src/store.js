@@ -21,7 +21,7 @@ import { educationSchema, educationStore } from './education.js';
 import { sharingSchema, sharingStore } from './sharing-store.js';
 import { passwordRecoverySchema, profilePreferencesSchema, settingsSchema, settingsStore } from './settings.js';
 import { observatorySchema, observatoryStore } from './observatory-store.js';
-import { networkModerationSchema, networkSchema, networkStore } from './network-store.js';
+import { networkContentSchema, networkModerationSchema, networkSchema, networkStore } from './network-store.js';
 import { libraryStore } from './library.js';
 import { economicsSchema, economicsStore } from './economics.js';
 import { readinessReviewSchema, readinessSchema, readinessStore } from './readiness-store.js';
@@ -30,7 +30,7 @@ import { referenceSchema, referenceMigrationV4, referenceStore } from './referen
 
 export const sessionLifetime = 8 * 60 * 60;
 export const sessionIdle = 30 * 60_000;
-const schemaVersion = 48;
+const schemaVersion = 49;
 const schema = `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -132,6 +132,7 @@ function initialize(db, path) {
       upgradePlanQuotaSchema(db);
       db.exec('PRAGMA user_version = 48;');
     }
+    if (version < 49) db.exec(networkContentSchema);
     return bindDocumentKey(db, path);
   });
 }
