@@ -191,6 +191,7 @@ test('billing reviewers with MFA can read sandbox records without gaining operat
   const securityHtml=await securityView.text();
   assert.match(securityHtml,/Firefox\/132\.0/);
   assert.match(securityHtml,/Actual backup archive history[\s\S]*workspace-20261127T000000Z\.nribak[\s\S]*NRIBAK container header recognized/);
+  assert.match(await (await request(admin,'/control-center/security?lang=ar')).text(),/سجل أرشيفات النسخ الاحتياطية الفعلية[\s\S]*workspace-20261127T000000Z\.nribak/);
   const deviceRef=store.operations.lookup(adminId,'security','researcher@billing.test').sessions
     .find((session)=>session.userAgent.includes('Firefox/132.0')).sessionRef;
   assert.equal((await request(admin,securityPath,'POST',{email:'researcher@billing.test','session-ref':deviceRef,password:adminPassword})).status,303);

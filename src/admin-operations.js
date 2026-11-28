@@ -294,12 +294,12 @@ export async function handleOperations({ request, reply, redirect, lang, account
     : `<p>${t('MFA', 'المصادقة المتعددة')} · ${result.posture.mfa ? t('Enabled', 'مفعّلة') : t('Disabled', 'معطّلة')}</p>
       <p>${t('Active sessions', 'الجلسات النشطة')} · ${new Intl.NumberFormat(lang).format(result.posture.sessions)}</p>
       ${sessionList}
-      ${backupSection}
       <h2>${t('Recent security events', 'أحداث الأمان الأخيرة')}</h2>
       <ol>${result.events.map((event) => `<li>${t(...actions[event.action])} · <time>${date.format(event.recorded_at)} UTC</time></li>`).join('')}</ol>`;
   reply(status===200 ? result?.status ?? 200 : status, { title, path, controlCenter: true, billingOnly: true,
     html: `<section class="surface panel detail workspace-page"><h1>${title}</h1>
       ${role === 'security' ? `<p>${t('Workspace schema', 'مخطط مساحة العمل')} · ${store.healthy() ? t('Ready', 'جاهز') : t('Unavailable', 'غير متاح')}</p>` : ''}
+      ${backupSection}
       ${status===409 ? `<p role="status">${t('Session unavailable, stale or cannot be revoked from this session.','الجلسة غير متاحة أو قديمة أو لا يمكن إلغاؤها من جلستك الحالية.')}</p>`:''}
       <form class="workspace-form" method="get" action="${path}"><input type="hidden" name="lang" value="${lang}">
         <label>${t('Exact account email', 'البريد الإلكتروني المطابق')}<input type="email" name="email" maxlength="254" required dir="ltr"></label>
