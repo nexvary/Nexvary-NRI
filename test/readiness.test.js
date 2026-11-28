@@ -46,14 +46,37 @@ test('records a private six-dimension L-READY assessment and preserves revisions
     const [first] = store.readiness.list(owner, project);
     assert.deepEqual(first.dimensions.map((row) => row.letter), [...'LREADY']);
     assert.equal(first.reviewer, owner);
-    const revise = { ...fields, id: first.id, revision: first.revision, authorization: 'documented', safety: 'documented' };
+    const doi = '10.0000/readiness';
+    store.references.save(owner, project, {
+      doi, provider: 'crossref', checkedAt: 42, status: 'found', metadata: { title: 'Readiness source' },
+    });
+    store.evidence.addClaim(owner, project, 'Fixture readiness claim');
+    const [claim] = store.evidence.list(owner, project);
+    store.evidence.link(owner, project, {
+      claim: claim.id, doi, provider: 'crossref', relation: 'supports', studyType: '', limitations: 'Limited scope',
+    });
+    const [source] = store.evidence.list(owner, project)[0].evidence;
+    const categories = { 'L-level': 'preliminary', 'R-level': 'independent', 'E-level': 'integrated' };
+    const sources = { 'L-source': source.id, 'R-source': source.id, 'E-source': source.id };
+    const revise = {
+      ...fields, ...categories, ...sources, id: first.id, revision: first.revision,
+      authorization: 'documented', safety: 'documented',
+    };
+    assert.equal((await submit(revise)).status, 422);
+    store.evidence.review(owner, project, { item: source.id, decision: 'accepted', note: 'Reviewed for the fixture' });
     assert.equal((await submit(revise)).status, 303);
     assert.equal((await submit(revise)).status, 422);
-    assert.equal(store.readiness.list(owner, project).length, 2);
+    const [current, original] = store.readiness.list(owner, project);
+    assert.equal(original.revision, first.revision);
+    assert.deepEqual(current.dimensions.map(({ level }) => level),
+      ['preliminary', 'independent', 'integrated', 'unavailable', 'unavailable', 'unavailable']);
+    assert.equal(current.dimensions[0].evidence.source.identifier, doi);
+    assert.equal(current.dimensions[0].limits, 'Evidence missing');
     const page = await (await fetch(url, { headers: { cookie: ownerCookie } })).text();
     assert.match(page, /Evidence gaps remain/);
     assert.match(page, /Assessment blocked by safety or authorization/);
     assert.match(page, /Revision history/);
+    assert.match(page, /https:\/\/doi\.org\/10\.0000\/readiness/);
   } finally {
     await new Promise((resolve, reject) => app.close((error) => error ? reject(error) : resolve()));
   }

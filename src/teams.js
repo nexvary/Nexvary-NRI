@@ -90,6 +90,16 @@ export function handleTeam({ request, reply, redirect, route, account, form, lan
       });
       return result === 303 ? redirect(action + '&manuscript=' + manuscript) : reply(result);
     }
+    if (intent === 'delete-manuscript') {
+      if (permission.role !== 'owner') return reply(403);
+      const manuscript = form.get('manuscript') ?? '';
+      if (!uuid.test(manuscript)) return reply(404);
+      if (form.get('confirm') !== 'yes') return reply(422);
+      const result = teams.deleteManuscript(actor, id, {
+        manuscript, version: Number(form.get('version')), revision: Number(form.get('revision') ?? NaN),
+      });
+      return result === 303 ? redirect(action) : reply(result);
+    }
     if (intent === 'review-readiness') {
       const result = teams.reviewReadiness(actor, id, {
         revision: Number(form.get('revision')),
@@ -178,6 +188,14 @@ export function handleTeam({ request, reply, redirect, route, account, form, lan
     ${latest ? `<h2>${t('Version history', 'سجل الإصدارات')}</h2><ol class="message-list project-list">${current.versions.map((version) =>
       `<li class="provider-block"><h3>v${version.version} · ${when(version.recorded_at)}</h3><small><bdi>${author(version.author)}</bdi></small><p dir="auto">${escapeHtml(version.body)}</p>
       ${review ? instance(hidden('version',version.id)) : ''}</li>`).join('')}</ol>` : ''}
+    ${latest && current.role === 'owner' ? `<details>
+      <summary>${t('Delete manuscript', 'حذف المخطوطة')}</summary>
+      <form class="workspace-form" method="post" action="${action}">
+        ${hidden('manuscript',selected)}${hidden('version',latest.version)}${hidden('revision',meta?.revision ?? 0)}
+        <label><input type="checkbox" name="confirm" value="yes" required>
+          ${t('Delete this manuscript, its versions, catalog history and manuscript reviews.', 'احذف هذه المخطوطة وإصداراتها وسجل فهرسها ومراجعاتها.')}</label>
+        ${button('delete-manuscript',t('Delete manuscript','احذف المخطوطة'))}
+      </form></details>` : ''}
     <h2>${t('Evidence for review', 'الأدلة للمراجعة')}</h2>
     <ul class="project-list">${current.evidence.map((item) => `<li class="provider-block"><p dir="auto">${escapeHtml(item.statement)}</p>
       <details><summary>${t('Source snapshot', 'لقطة المصدر')}</summary><p dir="auto">${escapeHtml(item.source_snapshot)}</p></details>

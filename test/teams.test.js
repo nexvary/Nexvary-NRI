@@ -43,6 +43,19 @@ test('project roles gate direct actions, bind consent to an invitation, and pres
   assert.equal((await grant(manager, researcher, 'researcher')).status, 303);
   assert.equal((await grant(manager, reviewer, 'reviewer')).status, 303);
   assert.equal((await grant(manager, reader, 'read-only')).status, 303);
+  const declined = invitation(reader);
+  const decline = { intent: 'declined', project, role: 'read-only', invitation: declined };
+  assert.match(await (await request(reader, '/?lang=en')).text(), /Team invitations · 1/);
+  assert.equal((await request(stranger, inbox, decline)).status, 404);
+  assert.equal((await request(reader, inbox, decline)).status, 303);
+  assert.doesNotMatch(await (await request(reader, '/?lang=en')).text(), /Team invitations · 1/);
+  assert.doesNotMatch(await (await request(reader, inbox)).text(), /Field study/);
+  assert.equal((await request(reader, path)).status, 404);
+  assert.equal((await accept(reader, 'read-only', declined)).status, 404);
+  assert.ok(store.teams.view(owner.id, project).events.some((event) =>
+    event.actor === reader.id && event.subject === reader.id && event.action === 'declined'));
+  assert.equal((await grant(manager, reader, 'read-only')).status, 303);
+  assert.equal((await accept(reader, 'read-only', declined)).status, 404);
   const old = invitation(reader);
   assert.equal((await grant(owner, reader, 'researcher')).status, 303);
   assert.equal((await accept(reader, 'read-only', old)).status, 404);
@@ -109,4 +122,23 @@ test('project roles gate direct actions, bind consent to an invitation, and pres
   assert.equal((await request(reader, manuscriptPath)).status, 404);
   assert.ok(store.network.interact(owner.id, reader.id, 'unblock'));
   assert.equal((await request(reader, manuscriptPath)).status, 404);
+  const removal = { intent: 'delete-manuscript', manuscript, version: 2, revision: 2, confirm: 'yes' };
+  assert.match(await (await request(owner, manuscriptPath)).text(), /Delete manuscript/);
+  assert.doesNotMatch(await (await request(manager, manuscriptPath)).text(), /Delete manuscript/);
+  assert.equal((await request(manager, path, removal)).status, 403);
+  assert.equal((await request(owner, path, { ...removal, confirm: '' })).status, 422);
+  assert.equal((await request(owner, path, { ...removal, version: 1 })).status, 409);
+  assert.equal((await request(owner, path, { ...removal, revision: 1 })).status, 409);
+  assert.equal((await request(owner, path, removal, 'https://foreign.test')).status, 403);
+  assert.equal((await request(stranger, '/workspace/projects/' + other + '/team?lang=en', removal)).status, 404);
+  assert.equal((await request(owner, path, removal)).status, 303);
+  assert.equal((await request(owner, manuscriptPath)).status, 404);
+  assert.equal((await request(owner, path, removal)).status, 404);
+  const teamAfterDeletion = store.teams.view(owner.id, project, manuscript);
+  assert.equal(teamAfterDeletion.metadata.length, 0);
+  assert.equal(teamAfterDeletion.versions.length, 0);
+  assert.ok(teamAfterDeletion.reviews.every((entry) => entry.manuscript_id !== manuscript));
+  assert.ok(teamAfterDeletion.reviews.some((entry) => entry.evidence_id === item));
+  assert.ok(teamAfterDeletion.events.some((event) =>
+    event.actor === owner.id && event.action === 'manuscript-deleted' && event.target === manuscript));
 });

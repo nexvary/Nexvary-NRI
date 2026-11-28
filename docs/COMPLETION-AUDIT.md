@@ -1,0 +1,73 @@
+# NRI completion audit and scope freeze
+
+Baseline: `3a0088f82c828f15a7c2a72e31191b01e3ea7fbc`, [draft PR #19](https://github.com/nexvary/Nexvary-NRI/pull/19), [passing baseline CI](https://github.com/nexvary/Nexvary-NRI/actions/runs/46075085576).
+
+Scope: [owner functional requirements](REQUIREMENTS.md), the [charter](PROJECT.md), and the [accepted SaaS ADR](decisions/0002-commercial-saas.md) where referenced by the baseline. The original matrix's 8 Verified / 12 Partial measures whole-module classifications. It gives every partial module the same weight regardless of its gaps and includes vague residuals such as “wider acceptance.” This audit counts observable outcomes. Each semicolon-delimited item is one criterion. V = implemented with direct regression or recorded functional evidence, U = implementation observed but evidence incomplete, M = missing or only partly implemented, B = final evidence requires an external decision or authorized access. Each V counts once. Overall completion divides all verified criteria by all mandatory criteria. Shared release gates are reported below.
+
+| ID | Verified criteria (V) | Implemented, evidence incomplete (U) | Missing or incomplete (M) | External blocker (B) | Verification evidence |
+|---|---|---|---|---|---|
+| NRI-01 Dashboard | Private project count; library count; collaborator count; evidence count; metered cost; recent activity; quick actions and module navigation; displayed ORCID profile field; empty state; isolation | Server request error response needs dashboard-specific verification | Loading feedback for pending dashboard navigation | None | `library.test.js`, `shell.test.js`, `qa/nri-01/`. Verify loading and error behavior on the actual dashboard. |
+| NRI-02 Workspace | Project CRUD; manuscript create and update; version history; authors; tags; search; shared notes; tasks; collaborators; permissions and access denial; publication status; DOI; scoped manuscript deletion with dependent-data cleanup | None | None | None | `workspace.test.js`, `teams.test.js`, `readiness.test.js`, `qa/nri-02/`. Direct HTTP tests cover confirmation, stale revisions, isolation and attributable deletion. Document-format expansion is outside this module's closure. |
+| NRI-03 Library | PDF and document upload; stored metadata; named collections; search; filters; embedded PDF reading; annotations; bookmarks; stored citations; BibTeX and RIS import; BibTeX and RIS export; controlled deduplication; authorized reads and downloads | Copyright guidance is currently draft text | Folder organization distinct from collections | None for implementation | `documents.test.js`, `docx.test.js`, `library.test.js`, `citations.test.js`, `resource-sharing.test.js`, `qa/nri-03/`. Add folders and verify the guidance in the upload flow. |
+| NRI-04 References | Crossref; OpenAlex; ORCID public records; Zenodo public records; DOI resolution and agency identification; bibliographic comparison; supported correction and retraction indicators; dated provenance; unknown and unavailable states; request throttling; caching; integrity checks against mismatched records | None | None | None | `references.test.js`, recorded provider QA in STATUS. Public record lookup satisfies the reference criterion. ORCID account ownership belongs to identity verification where required. |
+| NRI-05 Evidence | Claim to source mapping; study type; limitations; supporting and conflicting findings; human review with attribution; evidence matrix; traceable export; warnings and no automatic validity claim | None | None | None | `evidence.test.js`, `teams.test.js`, `reports.test.js`, CI 46014688736. |
+| NRI-06 L-READY | Six dimensions; intended use; reviewer; limitations; revision history; gaps; safety and authorization blockers; no aggregate score or certification claim; all four qualitative categories persist in a single assessment; source selection requires prior review and renders the reviewed-source link | None | None | None | `readiness.test.js`, `teams.test.js`, `reports.test.js`. Direct HTTP coverage verifies all four categories, rejects unreviewed sources and checks the rendered DOI link. |
+| NRI-07 Economics | Assumptions; units; currency; capacity; sensitivity; scenario comparison; reproducible calculation; export; hypothetical labeling | None | None | None | `economics.test.js`, recorded economics browser QA in STATUS. |
+| NRI-08 Assistant | BYOK and provider adapters; explicit consent; cited answers; source verification; model selection; usage limits; token and cost ledger; cancellation; caching; offline core and paid calls off by default | None | None | None for synthetic acceptance | `assistant.test.js`, `assistant-settings.test.js`, `assistant-answer.test.js`. |
+| NRI-09 Network | Researcher profiles; interests; discovery and search; follow and unfollow; collaboration requests; private and public visibility; blocking; request limits; exposure tests | Self-reported ORCID field does not verify account ownership | Posts; comments; reactions; groups; authorized publication sharing; network reporting; network moderation | None established for local implementation | `network.test.js`, `sharing.test.js`. Build the missing social flows with privacy and moderation coverage. If verified ORCID ownership is required, confirm the OAuth registration before counting live verification. |
+| NRI-10 Collaboration | Project invitations; project roles; shared notes; tasks; attributable activity; accept, decline and revoke; pending invitation notifications; direct decline clears the notice, is audited, denies access and invalidates stale invitation replay | None | None | None | `teams.test.js`, `sharing.test.js`, `resource-sharing.test.js`, `qa/nri-10/`. Direct HTTP tests cover the decline and replay paths before and after reinvitation. |
+| NRI-11 Messages | Private conversations; unread counts; notification preferences; blocking; reporting; participant authorization; rate limiting | None | None | None | `messages.test.js` and recorded browser QA in STATUS. |
+| NRI-12 Observatory | Topic watchlists; dated updates; filters; saved searches; provenance; user-initiated updates without paid polling | None | None | None | `observatory.test.js` and recorded browser QA in STATUS. |
+| NRI-13 Analytics | CSV import; validation; descriptive statistics; charts; outliers; units; reproducible exports; descriptive-only interpretation | None | None | None | `analytics.test.js` and recorded browser QA in STATUS. |
+| NRI-14 Education | Learning library; bilingual tutorials; conceptual simulation; quizzes; private progress | None | None | None | `education.test.js` and recorded browser QA in STATUS. |
+| NRI-15 Reports | Actual PDF export; actual DOCX export; citations; evidence tables; L-READY findings; limitations; versions; bilingual templates | None | None | None | `reports.test.js`, `resource-sharing.test.js`, real-render regression. |
+| NRI-16 About system | Purpose; build version; changelog; documentation; support; framework limitations | None | None | Owner-approved distribution license; owner-approved privacy policy and retention terms; owner-approved terms of use including governing law | `shell.test.js`, `qa/nri-about/`, `src/about.js`. Publish approved text once received. |
+| NRI-17 About developer | Company identity; official website; contact methods; official channel links; no partnership or endorsement claims | None | None | None | `shell.test.js`, `src/about.js`, `qa/nri-about/`. |
+| NRI-18 Settings/admin | Authentication; MFA; operator password recovery; RBAC; account isolation; RTL and LTR; privacy controls; account export; account deletion; security audit; backup and restore; message moderation; integration settings; usage limits | Accessibility has partial device and keyboard evidence | General account profile editing; theme selection; self-service recovery; broader moderation for network content | None established for local implementation | `settings.test.js`, `mfa.test.js`, `workspace.test.js`, `privacy.test.js`, `recovery.test.js`, `messages.test.js`, `assistant-settings.test.js`, `entitlements.test.js`. Complete missing paths and full accessibility QA. |
+| NRI-19 Commercial readiness | Debian service template; loopback HTTPS; migration and rollback rehearsal; schema health and structured logs; session and origin security; encrypted backup and restore rehearsal | Backup timer has only local unit verification | Operating alerts and monitoring policy | Approval and authorized Debian target for HTTPS, backup scheduling, recovery and workload verification | `transport.test.js`, `recovery.test.js`, `key-rotation.test.js`, DEPLOYMENT and RECOVERY. No production changes under scope freeze. |
+| NRI-20 Subscription management | Server module eligibility independent of RBAC; individual subscriptions; organizations and seats; configurable plan pricing and currency; project capacity; document and storage limits; report quotas; AI budgets; expiry, suspension, cancellation and revocation; audited synthetic renewals and plan changes; invoice and payment records; refunds and reconciliation; discounts; complimentary and promotional assignments; manual institutional assignments; webhook signatures and idempotency; post-expiry portability; separate Control Center; role and MFA gates; sensitive-action reauthentication and origin checks; usage data and audit | Support and security portals have read-only coverage; cross-role and cross-organization acceptance is partial | Automated past-due and grace orchestration with renewal notices; trial and grace duration policies; team-member and concurrent-session quotas; complete Control Center sections for administration, devices and sessions, security response, moderation, system health and backups, settings and commercial analytics | Owner approval of commercial prices and trial policies for release; authorized target host for deployed HTTPS, migration, backup and rollback | `entitlements.test.js`, `institutional-licensing.test.js`, `licensing.test.js`, `billing.test.js`, ENTITLEMENTS and CI 46074792870/46075085576. Exercise synthetic billing only. |
+
+## Baseline counts
+
+| Module | Total | Verified | Remaining | Verified % | U | M | B |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| NRI-01 | 12 | 10 | 2 | 83.3% | 1 | 1 | 0 |
+| NRI-02 | 13 | 13 | 0 | 100.0% | 0 | 0 | 0 |
+| NRI-03 | 15 | 13 | 2 | 86.7% | 1 | 1 | 0 |
+| NRI-04 | 12 | 12 | 0 | 100.0% | 0 | 0 | 0 |
+| NRI-05 | 8 | 8 | 0 | 100.0% | 0 | 0 | 0 |
+| NRI-06 | 10 | 10 | 0 | 100.0% | 0 | 0 | 0 |
+| NRI-07 | 9 | 9 | 0 | 100.0% | 0 | 0 | 0 |
+| NRI-08 | 10 | 10 | 0 | 100.0% | 0 | 0 | 0 |
+| NRI-09 | 17 | 9 | 8 | 52.9% | 1 | 7 | 0 |
+| NRI-10 | 8 | 8 | 0 | 100.0% | 0 | 0 | 0 |
+| NRI-11 | 7 | 7 | 0 | 100.0% | 0 | 0 | 0 |
+| NRI-12 | 6 | 6 | 0 | 100.0% | 0 | 0 | 0 |
+| NRI-13 | 8 | 8 | 0 | 100.0% | 0 | 0 | 0 |
+| NRI-14 | 5 | 5 | 0 | 100.0% | 0 | 0 | 0 |
+| NRI-15 | 8 | 8 | 0 | 100.0% | 0 | 0 | 0 |
+| NRI-16 | 9 | 6 | 3 | 66.7% | 0 | 0 | 3 |
+| NRI-17 | 5 | 5 | 0 | 100.0% | 0 | 0 | 0 |
+| NRI-18 | 19 | 14 | 5 | 73.7% | 1 | 4 | 0 |
+| NRI-19 | 9 | 6 | 3 | 66.7% | 1 | 1 | 1 |
+| NRI-20 | 29 | 21 | 8 | 72.4% | 2 | 4 | 2 |
+| Overall | 219 | 188 | 31 | 85.8% | 7 | 18 | 6 |
+
+## Scope freeze
+
+- Prioritize explicitly named outcomes. PubMed, DOAJ and arXiv adapters are optional in NRI-04. Wider file formats beyond those used to meet document acceptance, native apps, alternate notification channels and expanded analytics are deferred.
+- Keep production deployment, production billing configuration and payment activation outside this work. Synthetic lifecycle, quotas and role tests remain required. No production server or visibility changes.
+- Shared release gate: full bilingual desktop, phone and tablet QA, keyboard and assistive technology, contrast, RTL and unclipped layouts, approved design and running captures. Prior desktop and phone captures and limited accessibility checks are partial evidence. This shared gate does not multiply the same gap across feature counts.
+- Use the formal baseline for counting. Latest explicitly requested commercial follow-ups remain queued under NRI-20 when they support its approved lifecycle or Control Center. Broader social or research features require an explicit existing criterion.
+
+## Closure order and results
+
+1. NRI-10 (7/8 at baseline) required only direct team-decline evidence. The extended HTTP regression passed and verifies decline, notice clearing, audit attribution, no access, and replay denial before and after reinvitation. Status: 8/8 locally verified. Full suite: 78 passed, 0 failed, 0 skipped, including real bilingual PDF/DOCX.
+2. NRI-02 (12/13 at baseline) now supports bilingual, owner-confirmed manuscript deletion. The transaction checks current text and metadata revisions, removes dependent manuscript versions, catalog history and manuscript reviews, and records an attributable event. HTTP tests exercise authorization, confirmation, stale requests and project isolation. Status: 13/13 locally verified.
+3. NRI-04 and NRI-05 met the documented original scope during targeted source and test review. Required provider paths passed with fixture coverage and historical provider evidence. Claim-source mapping, review and export passed. Optional provider adapters and wider review functionality remain frozen. Status: 12/12 and 8/8 locally verified.
+4. NRI-06 (8/10 at baseline) now has direct evidence for all four categories and reviewed source links. The HTTP test rejects selection before review, checks the persisted categories, and verifies the rendered DOI link. Status: 10/10 locally verified.
+5. NRI-03 (13/15) and NRI-01 (10/12) are the closest open modules with no confirmed external dependency.
+
+**Local result: 188/219 verified (85.8%).** The local module matrix is 13 Verified and 7 Partial. Of the 31 remaining criteria, 7 need evidence for implemented functionality, 18 are missing or incomplete, and 6 are externally blocked. The focused suite passed 18/18. The recorded full suite passed 78/78 with real bilingual PDF/DOCX rendering; a fresh run in this workspace passed 76 tests and skipped 2 renderer-dependent tests because the report runtime is not installed here. Hosted CI is the source of truth for this checkpoint's real-render regression. The Chromium regression completed with 60 WebP captures. Full device and accessibility acceptance remains the shared release gate.
+
+Owner authorization to publish to the existing public repository is recorded. The verified source and matrix are being published to the existing feature branch; PR #19 remains draft and unmerged. Production and live billing remain out of scope.

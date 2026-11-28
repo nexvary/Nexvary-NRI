@@ -314,3 +314,9 @@
 
 - Schema v41 preserves billing reviewers and adds independently provisioned support and security reviewers. Both require MFA. Support can look up subscription and organization seat metadata for an exact account. Security can review MFA enrollment, active session counts, recent security events and schema readiness.
 - These routes are read-only. Their queries exclude research content, messages, session tokens and encryption keys.
+
+## 2026-11-28 · Acceptance matrix reconciliation
+
+- Reconciled the 219-criterion matrix with existing direct evidence for scoped manuscript deletion (NRI-02), all L-READY categories and reviewed-source links (NRI-06), and invitation decline/replay denial (NRI-10). The module matrix is 13 Verified / 7 Partial, with 188/219 criteria verified. Remaining: 7 evidence items, 18 implementation gaps, 6 external blockers.
+- Focused HTTP/unit tests passed 11/11. A fresh full local run passed 76, skipped 2 optional renderer-dependent tests, and failed 0. The stored full-render run for this source state passed 78/78; hosted CI installs the real report runtime and will verify the actual bilingual exports again.
+- The repo remains public, publication is authorized, and PR #19 remains draft and unmerged. NRI-18 accessibility remains unverified.

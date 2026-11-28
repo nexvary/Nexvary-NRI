@@ -124,6 +124,7 @@ export function teamStore(db, now, transact) {
     JOIN team_manuscripts m ON m.id=v.manuscript_id WHERE m.project_id=? AND m.id=? ORDER BY v.version DESC LIMIT 50`);
   const latest = db.prepare(`SELECT max(v.version) AS version FROM team_manuscript_versions v
     JOIN team_manuscripts m ON m.id=v.manuscript_id WHERE m.project_id=? AND m.id=?`);
+  const deleteManuscript = db.prepare('DELETE FROM team_manuscripts WHERE project_id = ? AND id = ?');
   const addVersion = db.prepare('INSERT INTO team_manuscript_versions(manuscript_id,version,author,body,recorded_at) VALUES (?,?,?,?,?)');
   const evidence = db.prepare(`SELECT e.id,c.statement,e.relation,e.source_snapshot FROM evidence_items e
     JOIN claims c ON c.id=e.claim_id WHERE c.project_id=? ORDER BY e.created_at DESC,e.id LIMIT 100`);
@@ -287,6 +288,17 @@ export function teamStore(db, now, transact) {
         addVersion.run(manuscript, version, actor, body, now());
         record(id, actor, null, 'version', manuscript + ':' + version);
         return manuscript;
+      });
+    },
+    deleteManuscript(actor, id, { manuscript, version, revision }) {
+      return transact(db, () => {
+        if (access(actor, id)?.role !== 'owner') return 403;
+        const current = latest.get(id, manuscript).version;
+        if (current === null) return 404;
+        if (current !== version || (metadata.get(id, manuscript)?.revision ?? 0) !== revision) return 409;
+        deleteManuscript.run(id, manuscript);
+        record(id, actor, null, 'manuscript-deleted', manuscript);
+        return 303;
       });
     },
     reviewReadiness(actor, id, { revision, decision, note, independence }) {
