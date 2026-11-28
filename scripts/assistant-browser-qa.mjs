@@ -146,6 +146,64 @@ async function waitFor(check, description, attempts = 50) {
   throw new Error('Browser condition timed out: ' + description);
 }
 
+async function auditAccessibility(send, kind) {
+  const result = await inspect(send, `(() => {
+    const visible = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden'; };
+    const controls = [...document.querySelectorAll('a[href],button,input:not([type=hidden]),select,textarea,[role=button]')].filter(visible);
+    const name = (el) => el.getAttribute('aria-label') || el.getAttribute('title') ||
+      (el.getAttribute('aria-labelledby') || '').split(/\\s+/).map(id => document.getElementById(id)?.innerText || '').join(' ').trim() ||
+      (el.labels?.length ? [...el.labels].map(label => label.innerText).join(' ').trim() : el.innerText || el.value || '').trim();
+    const unlabeled = controls.filter(el => !name(el)).map(el => el.outerHTML.slice(0, 120));
+    const parse = (value) => {
+      if (!value) return null;
+      if (value[0] === '#') {
+        let hex = value.slice(1); if (hex.length === 3 || hex.length === 4) hex = [...hex].map(c => c + c).join('');
+        if (![6, 8].includes(hex.length)) return null;
+        return [parseInt(hex.slice(0,2),16),parseInt(hex.slice(2,4),16),parseInt(hex.slice(4,6),16),hex.length===8?parseInt(hex.slice(6,8),16)/255:1];
+      }
+      const match = value.match(/rgba?\\(([^)]+)\\)/i); if (!match) return null;
+      const parts = match[1].split(/[\\s,\\/]+/).filter(Boolean).map(Number);
+      return parts.length >= 3 && parts.slice(0,3).every(Number.isFinite) ? [parts[0],parts[1],parts[2],parts[3] ?? 1] : null;
+    };
+    const blend = (front, back) => { const a=front[3]; return [0,1,2].map(i=>Math.round(front[i]*a+back[i]*(1-a))).concat(1); };
+    const luminance = (color) => color.slice(0,3).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4}).reduce((sum,v,i)=>sum+v*[.2126,.7152,.0722][i],0);
+    const ratio = (a,b) => { const x=luminance(a),y=luminance(b); return (Math.max(x,y)+.05)/(Math.min(x,y)+.05); };
+    const textNodes = [...document.querySelectorAll('h1,h2,h3,p,small,strong,em,label,button,a,dt,dd,li,legend,time,summary,span')]
+      .filter(el=>visible(el)&&el.children.length===0&&el.innerText.trim());
+    const lowContrast=[];
+    for (const el of textNodes) {
+      const style=getComputedStyle(el), fg=parse(style.color); if(!fg) continue;
+      let ancestor=el, candidates=[], fallback=[6,8,13,1];
+      while(ancestor&&ancestor!==document.documentElement) {
+        const bg=getComputedStyle(ancestor), tokens=bg.backgroundImage==='none'?[]:(bg.backgroundImage.match(/#[\\da-f]{3,8}|rgba?\\([^)]+\\)/gi)||[]).map(parse).filter(Boolean);
+        if(tokens.length){candidates=tokens.map(color=>blend(color,fallback));break;}
+        const solid=parse(bg.backgroundColor); if(solid&&solid[3]>.05){fallback=blend(solid,fallback); if(solid[3]>.95){candidates=[fallback];break;}}
+        ancestor=ancestor.parentElement;
+      }
+      if(!candidates.length)candidates=[fallback];
+      const size=parseFloat(style.fontSize),weight=parseInt(style.fontWeight)||400,minimum=size>=24||size>=18.66&&weight>=700?3:4.5;
+      const min=Math.min(...candidates.map(bg=>ratio(fg,bg)));
+      if(min<minimum)lowContrast.push({text:el.innerText.slice(0,60),ratio:Number(min.toFixed(2)),minimum});
+    }
+    return {unlabeled,lowContrast:lowContrast.slice(0,12),checkedControls:controls.length,checkedText:textNodes.length};
+  })()`);
+  assert.deepEqual(result.unlabeled, [], kind + ' has unnamed interactive controls');
+  assert.deepEqual(result.lowContrast, [], kind + ' has text below WCAG AA contrast');
+  assert.ok(result.checkedControls > 0, kind + ' accessibility controls were inspected');
+}
+
+async function verifyKeyboardFocus(send) {
+  await inspect(send, 'document.activeElement.blur()');
+  await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+  await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+  assert.equal(await inspect(send, 'document.activeElement.classList.contains("skip")'), true, 'keyboard Tab reaches the skip link first');
+  const focus = await inspect(send, '({ outline: getComputedStyle(document.activeElement).outlineStyle, width: parseFloat(getComputedStyle(document.activeElement).outlineWidth), visible: document.activeElement.getBoundingClientRect().top >= 0 })');
+  assert.ok(focus.outline !== 'none' && focus.width >= 2 && focus.visible, 'skip link focus is visible');
+  await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+  await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+  await waitFor(() => inspect(send, 'document.activeElement.id === "main"'), 'skip link transfers focus to main content');
+}
+
 async function captureLayout(send, kind, lang, name, width, height) {
   const layout = await inspect(send, `document.fonts.ready.then(() => ({
     lang: document.documentElement.lang, direction: document.documentElement.dir,
@@ -156,6 +214,7 @@ async function captureLayout(send, kind, lang, name, width, height) {
   assert.equal(layout.page, layout.client, kind + ' layout has no horizontal overflow');
   assert.deepEqual({ lang: layout.lang, direction: layout.direction, viewport: layout.viewport, svg: layout.svg },
     { lang, direction: lang === 'ar' ? 'rtl' : 'ltr', viewport: width, svg: true });
+  await auditAccessibility(send, kind);
   const { cssContentSize } = await send('Page.getLayoutMetrics');
   const contentHeight = Math.ceil(cssContentSize.height);
   const capture = contentHeight > height ? {
@@ -252,11 +311,19 @@ try {
         const [reported] = store.messages.list(peer, thread, null);
         assert.equal(store.messages.report(peer, thread, reported.id, 'other'), 303);
       }
-      if ((lang === 'ar' && name === 'desktop') || (lang === 'en' && name === 'mobile')) {
+      await send('Page.navigate', { url: origin + '/?lang=' + lang });
+      const tokenLabel = lang === 'ar' ? 'الرموز التي أبلغ عنها المزوّد' : 'Provider-reported tokens';
+      await waitFor(() => inspect(send, 'document.body?.textContent.includes(' + JSON.stringify(tokenLabel) + ')'), 'private dashboard metrics');
+      await captureLayout(send, 'dashboard', lang, name, width, height);
+      await verifyKeyboardFocus(send);
+      if (name === 'desktop') {
+        await send('Emulation.setDeviceMetricsOverride', { width: 768, height: 1024, deviceScaleFactor: 1, mobile: true });
         await send('Page.navigate', { url: origin + '/?lang=' + lang });
-        const tokenLabel = lang === 'ar' ? 'الرموز التي أبلغ عنها المزوّد' : 'Provider-reported tokens';
-        await waitFor(() => inspect(send, 'document.body?.textContent.includes(' + JSON.stringify(tokenLabel) + ')'), 'private dashboard metrics');
-        await captureLayout(send, 'dashboard', lang, name, width, height);
+        await waitFor(() => inspect(send, 'document.body?.textContent.includes(' + JSON.stringify(tokenLabel) + ')'), 'tablet dashboard');
+        await captureLayout(send, 'dashboard', lang, 'tablet', 768, 1024);
+        await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
+      }
+      if ((lang === 'ar' && name === 'desktop') || (lang === 'en' && name === 'mobile')) {
         const teamUrl = origin + '/workspace/projects/' + project + '/team?lang=' + lang;
         if (lang === 'ar') {
           await send('Page.navigate', { url: teamUrl });

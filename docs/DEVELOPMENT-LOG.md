@@ -330,3 +330,8 @@
 
 - Dashboard navigation announces pending movement with a live region and `aria-busy`; database failures use a bilingual accessible retry state and never expose internal diagnostics.
 - Focused dashboard regressions passed. NRI-01 is now 12/12; acceptance is 192/219 (87.7%), 15 Verified / 5 Partial. Full regression remains for the next milestone.
+
+# 2026-11-28 · Hosted accessibility verification
+
+- Extended the existing Chromium acceptance run to inspect accessible names, WCAG AA text contrast, keyboard-visible skip-link focus and focus transfer, Arabic RTL/English LTR, and desktop/tablet/mobile overflow across captured screens.
+- Full local regression after NRI-01: 78 passed, 0 failed, 2 optional report-render tests skipped because renderer dependencies are not installed in this workspace. The hosted workflow installs them. NRI-18 remains Partial until the hosted browser assertions pass.
