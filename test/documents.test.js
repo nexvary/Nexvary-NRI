@@ -212,6 +212,9 @@ test('migrates a P1a database and persists encrypted files across restarts', asy
       DROP TABLE readiness_revisions;
       DROP TABLE evidence_items;
       DROP TABLE claims;
+      DROP TABLE control_center_security_events;
+      DROP TABLE control_center_admin_events;
+      ALTER TABLE sessions DROP COLUMN user_agent;
       ALTER TABLE license_assignments DROP COLUMN state;
       PRAGMA user_version = 1;
     `);

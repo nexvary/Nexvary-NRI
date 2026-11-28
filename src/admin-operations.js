@@ -1,4 +1,8 @@
 import { createLoginThrottle } from './login-throttle.js';
+import { createHash } from 'node:crypto';
+import { constants } from 'node:fs';
+import { lstat, open, readdir } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { normalizeAddress, verifyPassword } from './password.js';
 import { escapeHtml } from './workspace-view.js';
 
@@ -33,9 +37,24 @@ export const operationsAdminSchema = `
   PRAGMA user_version = 43;
 `;
 
-const roleAdminThrottle = createLoginThrottle();
+export const operationsSessionSchema = `
+  ALTER TABLE sessions ADD COLUMN user_agent TEXT NOT NULL DEFAULT '';
+  CREATE TABLE control_center_security_events (
+    id INTEGER PRIMARY KEY,
+    actor TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+    subject TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    session_hash TEXT NOT NULL,
+    action TEXT NOT NULL CHECK(action='session-revoked'),
+    recorded_at INTEGER NOT NULL
+  ) STRICT;
+  CREATE INDEX control_center_security_recent ON control_center_security_events(id DESC);
+  PRAGMA user_version = 44;
+`;
 
-export function operationsStore(db, now, sessionIdle) {
+const roleAdminThrottle = createLoginThrottle();
+const securityActionThrottle = createLoginThrottle();
+
+export function operationsStore(db, now, sessionIdle, backupDirectory = process.env.NRI_BACKUP_DIRECTORY || '/var/backups/nri') {
   const authorized = db.prepare(`SELECT 1 FROM account_mfa m WHERE m.account_id=:account AND m.pending_until=0
     AND (EXISTS(SELECT 1 FROM license_operators WHERE account_id=:account)
       OR EXISTS(SELECT 1 FROM control_center_roles WHERE account_id=:account AND role=:role))`);
@@ -51,7 +70,41 @@ export function operationsStore(db, now, sessionIdle) {
   const security = db.prepare(`SELECT EXISTS(SELECT 1 FROM account_mfa WHERE account_id=:account AND pending_until=0) AS mfa,
     (SELECT count(*) FROM sessions s JOIN session_activity a USING(token_hash)
       WHERE s.account_id=:account AND s.expires_at>:now AND a.seen_at>:idle) AS sessions`);
-  const events = db.prepare('SELECT action,recorded_at FROM security_events WHERE account_id=? ORDER BY id DESC LIMIT 25');
+  const events = db.prepare(`SELECT action,recorded_at FROM (
+    SELECT action,recorded_at FROM security_events WHERE account_id=?
+    UNION ALL SELECT action,recorded_at FROM control_center_security_events WHERE subject=?
+  ) ORDER BY recorded_at DESC LIMIT 25`);
+  const activeSessions = db.prepare(`SELECT s.token_hash AS sessionRef,s.expires_at AS expiresAt,s.user_agent AS userAgent,a.seen_at AS lastSeen
+    FROM sessions s JOIN session_activity a USING(token_hash)
+    WHERE s.account_id=? AND s.expires_at>? AND a.seen_at>? ORDER BY a.seen_at DESC LIMIT 50`);
+  const activeSession = db.prepare(`SELECT s.token_hash FROM sessions s JOIN session_activity a USING(token_hash)
+    WHERE s.account_id=? AND s.token_hash=? AND s.expires_at>? AND a.seen_at>?`);
+  const deleteSession = db.prepare('DELETE FROM sessions WHERE account_id=? AND token_hash=?');
+  const insertSecurityEvent = db.prepare(`INSERT INTO control_center_security_events(actor,subject,session_hash,action,recorded_at)
+    VALUES (?,?,?,'session-revoked',?)`);
+  async function backupHistory(actor) {
+    if(!canReview(actor,'security'))return undefined;
+    const directory=resolve(backupDirectory);
+    let names;
+    try{names=await readdir(directory);}catch(error){
+      if(error.code==='ENOENT'||error.code==='EACCES')return {available:false,files:[]};
+      throw error;
+    }
+    const files=[];
+    for(const name of names.filter((entry)=>/^workspace-[A-Za-z0-9T_-]+\.nribak$/.test(entry))){
+      try{
+        const path=resolve(directory,name), info=await lstat(path);
+        if(!info.isFile()||info.isSymbolicLink())continue;
+        const file=await open(path,constants.O_RDONLY|constants.O_NOFOLLOW|constants.O_NONBLOCK);
+        try{
+          const header=Buffer.alloc(8), {bytesRead}=await file.read(header,0,8,0), current=await file.stat();
+          files.push({name,size:current.size,modifiedAt:current.mtimeMs,containerRecognized:bytesRead===8&&header.toString('ascii')==='NRIBAK01'});
+        }finally{await file.close();}
+      }catch(error){if(!['ENOENT','EACCES','ELOOP'].includes(error.code))throw error;}
+    }
+    files.sort((a,b)=>b.modifiedAt-a.modifiedAt||a.name.localeCompare(b.name));
+    return {available:true,files:files.slice(0,50)};
+  }
   const canManage = db.prepare(`SELECT 1 FROM license_operators o JOIN account_mfa m ON m.account_id=o.account_id
     WHERE o.account_id=? AND m.pending_until=0`);
   const targetByEmail = db.prepare('SELECT id,email FROM accounts WHERE email=?');
@@ -63,6 +116,7 @@ export function operationsStore(db, now, sessionIdle) {
   const canReview = (account, role) => Object.hasOwn(operationsPaths, role) && Boolean(authorized.get({ account, role }));
   return {
     canReview,
+    backupHistory,
     canManageRoles: (actor) => Boolean(canManage.get(actor)),
     adminLookup(actor, email) {
       if (!canManage.get(actor)) return { status: 403 };
@@ -103,7 +157,22 @@ export function operationsStore(db, now, sessionIdle) {
           organizations: organizations.all(target.id).map(effective) };
       }
       return { status: 200, posture: security.get({ account: target.id, now: timestamp, idle: timestamp - sessionIdle }),
-        events: events.all(target.id) };
+        sessions: activeSessions.all(target.id, timestamp, timestamp - sessionIdle), events: events.all(target.id,target.id) };
+    },
+    revokeSession(actor,email,sessionRef,currentToken) {
+      if (!/^[a-f0-9]{64}$/.test(sessionRef ?? '') || !canReview(actor,'security')) return 403;
+      const target=targetByEmail.get(email);
+      if(!target)return 404;
+      const timestamp=now(), idle=timestamp-sessionIdle;
+      if(sessionRef===createHash('sha256').update(currentToken).digest('hex') || !activeSession.get(target.id,sessionRef,timestamp,idle))return 409;
+      db.exec('BEGIN IMMEDIATE');
+      try {
+        if(!canReview(actor,'security')){db.exec('ROLLBACK');return 403;}
+        if(!deleteSession.run(target.id,sessionRef).changes){db.exec('ROLLBACK');return 409;}
+        insertSecurityEvent.run(actor,target.id,sessionRef,timestamp);
+        db.exec('COMMIT');
+        return 303;
+      }catch(error){db.exec('ROLLBACK');throw error;}
     },
   };
 }
@@ -165,6 +234,7 @@ export async function handleOperationsAdmin({ request, reply, redirect, lang, ac
 const actions = {
   'sign-in': ['Sign-in', 'تسجيل الدخول'], 'sign-out': ['Sign-out', 'تسجيل الخروج'],
   'revoke-others': ['Session revocation', 'إلغاء الجلسات'], 'password-reset': ['Password reset', 'إعادة تعيين كلمة المرور'],
+  'session-revoked': ['Administrator revoked a session', 'ألغى مشرف جلسة'],
 };
 const states = {
   active: ['Active', 'نشط'], trial: ['Trial', 'تجريبي'], grace: ['Grace', 'مهلة'],
@@ -172,31 +242,65 @@ const states = {
   cancelled: ['Cancelled', 'ملغى'], revoked: ['Revoked', 'مسحوب'],
 };
 
-export function handleOperations({ request, reply, lang, account, store, role }) {
+export async function handleOperations({ request, reply, redirect, lang, account, token, form, store, role }) {
   if (!store.operations.canReview(account.id, role)) return reply(403);
   const t = (en, ar) => lang === 'ar' ? ar : en;
   const title = role === 'support' ? t('Support administration', 'إدارة الدعم') : t('Security administration', 'إدارة الأمان');
   const path = operationsPaths[role];
   const url = new URL(request.url, 'http://localhost');
-  const input = url.searchParams.get('email');
+  const input = form?.get('email') ?? url.searchParams.get('email');
   const email = input === null ? '' : normalizeAddress(input);
   if (input !== null && !email) return reply(422);
+  let status=200;
+  if(form){
+    if(role!=='security')return reply(405);
+    const retry=securityActionThrottle.begin(request.socket.remoteAddress ?? '',account.email);
+    if(retry)return reply(429,null,{'Retry-After':String(retry)});
+    try{
+      const credentials=store.credentials(account.email);
+      if((form.get('password') ?? '').length>128 || !await verifyPassword(form.get('password') ?? '',credentials) || store.session(token)?.id!==account.id)return reply(403);
+      status=store.operations.revokeSession(account.id,email,form.get('session-ref') ?? '',token);
+    }finally{securityActionThrottle.finish();}
+    if(status===303)return redirect(path+'?email='+encodeURIComponent(email)+'&lang='+lang);
+  }
   const result = email ? store.operations.lookup(account.id, role, email) : undefined;
   if (result?.status === 403) return reply(403);
+  const backups=role==='security' ? await store.operations.backupHistory(account.id) : undefined;
   const date = new Intl.DateTimeFormat(lang, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' });
   const summary = (row) => row?.plan ? `<bdi>${escapeHtml(row.plan)}</bdi> · ${t(...states[row.state])}
     ${row.expires_at === null ? '' : ` · <time>${date.format(row.expires_at)} UTC</time>`}` : t('No assignment', 'لا يوجد تعيين');
+  const sessionList=role==='security' && result?.status===200 ? `<h2>${t('Active sessions','الجلسات النشطة')}</h2>
+    ${result.sessions.length ? `<ul class="activity">${result.sessions.map((session,index)=>`<li>
+      <p>${t('Browser/client','المتصفح/العميل')} · <bdi>${escapeHtml(session.userAgent || t('Not reported by this client','لم يرسله هذا العميل'))}</bdi></p>
+      <p>${t('Last activity','آخر نشاط')} · <time>${date.format(session.lastSeen)} UTC</time> · ${t('Expires','تنتهي')} · <time>${date.format(session.expiresAt)} UTC</time></p>
+      <form class="workspace-form" method="post" action="${path}">
+        <input type="hidden" name="email" value="${escapeHtml(email)}"><input type="hidden" name="session-ref" value="${session.sessionRef}">
+        <label>${t('Current password','كلمة المرور الحالية')}<input name="password" type="password" required maxlength="128" autocomplete="current-password"></label>
+        <button class="action">${t('Revoke session','ألغِ الجلسة')} · ${index+1}</button>
+      </form>
+    </li>`).join('')}</ul>` : `<p>${t('No active sessions with recent activity.','لا توجد جلسات نشطة ذات نشاط حديث.')}</p>`}` : '';
+  const backupSection=role==='security' ? `<h2>${t('Actual backup archive history','سجل أرشيفات النسخ الاحتياطية الفعلية')}</h2>
+    <p>${backups?.available ? t('Backup directory is readable. This page checks archive files and their format header only; it does not authenticate or restore them.',
+      'مجلد النسخ الاحتياطية قابل للقراءة. تفحص هذه الصفحة الملفات وترويسة الصيغة فقط؛ ولا تصادق عليها تشفيريًا أو تستعيدها.')
+      : t('Backup directory is unavailable or not configured for this process.', 'مجلد النسخ الاحتياطية غير متاح أو غير مضبوط لهذه العملية.')}</p>
+    ${backups?.files.length ? `<ol class="activity">${backups.files.map((file)=>`<li><bdi>${escapeHtml(file.name)}</bdi> ·
+      ${file.containerRecognized?t('NRIBAK container header recognized','تم التعرف على ترويسة حاوية NRIBAK'):t('Unrecognized archive header','ترويسة أرشيف غير معروفة')} ·
+      ${new Intl.NumberFormat(lang).format(file.size)} ${t('bytes','بايت')} · <time>${date.format(file.modifiedAt)} UTC</time></li>`).join('')}</ol>`
+      : `<p>${t('No backup archives found.','لم يُعثر على أرشيفات نسخ احتياطية.')}</p>`}` : '';
   const details = !result ? '' : result.status === 404 ? `<p>${t('Account unavailable', 'الحساب غير متاح')}</p>`
     : role === 'support' ? `<p>${summary(result.subscription)}</p><h2>${t('Organizations', 'المؤسسات')}</h2>
       <ul>${result.organizations.map((row) => `<li><bdi>${escapeHtml(row.name)}</bdi> · ${summary(row)} ·
         ${row.has_seat ? t('Seat allocated', 'مقعد مخصص') : t('No seat', 'بلا مقعد')}</li>`).join('')}</ul>`
     : `<p>${t('MFA', 'المصادقة المتعددة')} · ${result.posture.mfa ? t('Enabled', 'مفعّلة') : t('Disabled', 'معطّلة')}</p>
       <p>${t('Active sessions', 'الجلسات النشطة')} · ${new Intl.NumberFormat(lang).format(result.posture.sessions)}</p>
+      ${sessionList}
+      ${backupSection}
       <h2>${t('Recent security events', 'أحداث الأمان الأخيرة')}</h2>
       <ol>${result.events.map((event) => `<li>${t(...actions[event.action])} · <time>${date.format(event.recorded_at)} UTC</time></li>`).join('')}</ol>`;
-  reply(result?.status ?? 200, { title, path, controlCenter: true, billingOnly: true,
+  reply(status===200 ? result?.status ?? 200 : status, { title, path, controlCenter: true, billingOnly: true,
     html: `<section class="surface panel detail workspace-page"><h1>${title}</h1>
       ${role === 'security' ? `<p>${t('Workspace schema', 'مخطط مساحة العمل')} · ${store.healthy() ? t('Ready', 'جاهز') : t('Unavailable', 'غير متاح')}</p>` : ''}
+      ${status===409 ? `<p role="status">${t('Session unavailable, stale or cannot be revoked from this session.','الجلسة غير متاحة أو قديمة أو لا يمكن إلغاؤها من جلستك الحالية.')}</p>`:''}
       <form class="workspace-form" method="get" action="${path}"><input type="hidden" name="lang" value="${lang}">
         <label>${t('Exact account email', 'البريد الإلكتروني المطابق')}<input type="email" name="email" maxlength="254" required dir="ltr"></label>
         <button class="action">${t('Look up account', 'ابحث عن الحساب')}</button>

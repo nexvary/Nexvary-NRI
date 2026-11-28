@@ -1,4 +1,4 @@
-import { operationsAdminSchema, operationsSchema, operationsStore } from './admin-operations.js';
+import { operationsAdminSchema, operationsSchema, operationsSessionSchema, operationsStore } from './admin-operations.js';
 import { billingAccessSchema, billingDiscountSchema, billingReconciliationSchema, billingSchema, billingStore } from './billing-store.js';
 import { resourceSchema, resourceStore } from './resource-store.js';
 import { citationSchema, citationStore } from './citation-store.js';
@@ -30,7 +30,7 @@ import { referenceSchema, referenceMigrationV4, referenceStore } from './referen
 
 export const sessionLifetime = 8 * 60 * 60;
 export const sessionIdle = 30 * 60_000;
-const schemaVersion = 43;
+const schemaVersion = 44;
 const schema = `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -124,6 +124,7 @@ function initialize(db, path) {
     if (version < 41) db.exec(operationsSchema);
     if (version < 42) db.exec(folderSchema);
     if (version < 43) db.exec(operationsAdminSchema);
+    if (version < 44) db.exec(operationsSessionSchema);
     return bindDocumentKey(db, path);
   });
 }
@@ -136,7 +137,7 @@ function tokenHash(token) {
   return createHash('sha256').update(token).digest('hex');
 }
 
-export function openWorkspaceStore(path = ':memory:', now = Date.now) {
+export function openWorkspaceStore(path = ':memory:', now = Date.now, options = {}) {
   if (path !== ':memory:') {
     mkdirSync(dirname(path), { mode: 0o700, recursive: true });
     closeSync(openSync(path, 'a', 0o600));
@@ -171,7 +172,7 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
   const replacePassword = db.prepare('UPDATE accounts SET salt = ?, hash = ? WHERE email = ? RETURNING id');
   const currentCredentials = db.prepare('SELECT 1 FROM accounts WHERE id = ? AND salt = ? AND hash = ?');
   const revokeAccountSessions = db.prepare('DELETE FROM sessions WHERE account_id = ?');
-  const insertSession = db.prepare('INSERT INTO sessions VALUES (?, ?, ?)');
+  const insertSession = db.prepare('INSERT INTO sessions(token_hash,account_id,expires_at,user_agent) VALUES (?,?,?,?)');
   const initializeActivity = db.prepare('INSERT INTO session_activity VALUES (?,?)');
   const clearExpired = db.prepare(`DELETE FROM sessions WHERE expires_at<=? OR
     token_hash IN (SELECT token_hash FROM session_activity WHERE seen_at<=?)`);
@@ -205,12 +206,12 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
     return token ? getSession.get(tokenHash(token), at, at - sessionIdle) : undefined;
   }
 
-  function issueSession(accountId) {
+  function issueSession(accountId, userAgent = '') {
     const token = randomBytes(32).toString('base64url');
     const issuedAt = now();
     const key = tokenHash(token);
     clearExpired.run(issuedAt,issuedAt - sessionIdle);
-    insertSession.run(key, accountId, issuedAt + sessionLifetime * 1000);
+    insertSession.run(key, accountId, issuedAt + sessionLifetime * 1000, typeof userAgent === 'string' ? userAgent.slice(0,300) : '');
     initializeActivity.run(key,issuedAt);
     return token;
   }
@@ -232,7 +233,7 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
     },
     healthy: () => db.prepare('PRAGMA user_version').get().user_version === schemaVersion,
     licensing,
-    operations: operationsStore(db, now, sessionIdle),
+    operations: operationsStore(db, now, sessionIdle, options.backupDirectory),
     billing: billingStore(db, now, transact),
     teams,
     resources: resourceStore(db, now, transact, teams),
@@ -265,7 +266,7 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
     credentials(email) {
       return findAccount.get(email);
     },
-    newSession: (account) => transact(db, () => issueSession(account)),
+    newSession: (account,userAgent) => transact(db, () => issueSession(account,userAgent)),
     resetPassword(email, { salt, hash }) {
       return transact(db, () => {
         const account = replacePassword.get(salt, hash, email);
@@ -275,10 +276,10 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
         return true;
       });
     },
-    signIn({ id: accountId, salt, hash }, previousToken) {
+    signIn({ id: accountId, salt, hash }, previousToken, userAgent) {
       return transact(db, () => {
         if (!currentCredentials.get(accountId, salt, hash)) return undefined;
-        const session = issueSession(accountId);
+        const session = issueSession(accountId,userAgent);
         if (previousToken) removeSession.run(tokenHash(previousToken));
         settings.record(accountId, 'sign-in');
         return session;

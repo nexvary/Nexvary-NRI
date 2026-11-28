@@ -124,7 +124,8 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
     };
     const postOnly = kind === 'delete' || kind === 'logout' || kind === 'delete-document';
     const allowed = postOnly ? ['POST'] : ['GET', 'HEAD'];
-    if (!postOnly && !['control-operations', 'control-billing', 'control-analytics', 'download-document', 'preview-document', 'reference-projects', 'evidence-projects', 'evidence-export', 'readiness-projects', 'economics-projects', 'economics-export', 'library', 'report-projects', 'sharing-project', 'assistant'].includes(kind)) allowed.push('POST');
+    const readOnly = ['control-billing','control-analytics','download-document','preview-document','reference-projects','evidence-projects','evidence-export','readiness-projects','economics-projects','economics-export','library','report-projects','sharing-project','assistant'].includes(kind) || (kind==='control-operations' && route.role==='support');
+    if (!postOnly && !readOnly) allowed.push('POST');
     const method = request.method;
     if (!allowed.includes(method)) {
       reply(405, null, { Allow: allowed.join(', ') });
@@ -178,7 +179,7 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
           show(401, 'login', { error: 'credentials' });
           return;
         }
-        const session = store.signIn(credentials, token);
+        const session = store.signIn(credentials, token, request.headers['user-agent'] ?? '');
         if (!session) {
           show(401, 'login', { error: 'credentials' });
           return;
@@ -246,7 +247,7 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
       return;
     }
     if (kind === 'control-operations') {
-      handleOperations({ request, reply, lang, account, store, role: route.role });
+      await handleOperations({ request, reply, redirect, lang, account, token, form, store, role: route.role });
       return;
     }
     if (kind === 'control-admin') {

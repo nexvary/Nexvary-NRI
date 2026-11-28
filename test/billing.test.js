@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { once } from 'node:events';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import { createSandboxBillingAdapter } from '../src/billing-sandbox.js';
 import { totp } from '../src/mfa.js';
@@ -40,7 +43,11 @@ test('sandbox billing verifies original bytes and deduplicates normalized events
 
 test('billing reviewers with MFA can read sandbox records without gaining operator or research access', async (t) => {
   const timestamp = Date.UTC(2026, 10, 27);
-  const store = openWorkspaceStore(':memory:', () => timestamp);
+  const folder=await mkdtemp(join(tmpdir(),'nri-control-center-'));
+  const backupDirectory=join(folder,'backups'); await mkdir(backupDirectory);
+  await writeFile(join(backupDirectory,'workspace-20261127T000000Z.nribak'),Buffer.concat([Buffer.from('NRIBAK01'),Buffer.alloc(40)]));
+  const store = openWorkspaceStore(':memory:', () => timestamp,{backupDirectory});
+  t.after(()=>rm(folder,{recursive:true,force:true}));
   const credential = { salt: Buffer.alloc(16), hash: Buffer.alloc(32) };
   const create = (name) => {
     const email = name + '@billing.test';
@@ -176,6 +183,19 @@ test('billing reviewers with MFA can read sandbox records without gaining operat
   assert.equal((await request(admin, adminPath, 'POST', { email: 'researcher@billing.test', role: 'support', action: 'revoke', password: adminPassword })).status, 303);
   assert.deepEqual(store.operations.adminLookup(adminId, 'researcher@billing.test').roles, []);
   assert.equal(store.operations.adminLookup(adminId, 'researcher@billing.test').events.length, 2);
+  const deviceSession=store.newSession(researcher.id,'Mozilla/5.0 (X11; Linux x86_64) Firefox/132.0');
+  store.operations.setReviewer(adminId,'security',true);
+  const securityPath='/control-center/security?email=researcher%40billing.test&lang=en';
+  const securityView=await request(admin,securityPath);
+  assert.equal(securityView.status,200);
+  const securityHtml=await securityView.text();
+  assert.match(securityHtml,/Firefox\/132\.0/);
+  assert.match(securityHtml,/Actual backup archive history[\s\S]*workspace-20261127T000000Z\.nribak[\s\S]*NRIBAK container header recognized/);
+  const deviceRef=store.operations.lookup(adminId,'security','researcher@billing.test').sessions
+    .find((session)=>session.userAgent.includes('Firefox/132.0')).sessionRef;
+  assert.equal((await request(admin,securityPath,'POST',{email:'researcher@billing.test','session-ref':deviceRef,password:adminPassword})).status,303);
+  assert.equal(store.session(deviceSession),undefined);
+  assert.match(store.operations.lookup(adminId,'security','researcher@billing.test').events[0].action,/session-revoked/);
   store.licensing.setOperator(reviewer.id, false);
   const support = '/control-center/support?email=researcher%40billing.test&lang=en';
   const security = '/control-center/security?email=researcher%40billing.test&lang=ar';
@@ -195,7 +215,7 @@ test('billing reviewers with MFA can read sandbox records without gaining operat
   assert.equal(securityPage.status, 200);
   assert.match(await securityPage.text(), /الجلسات النشطة/);
   assert.equal((await request(reviewer, support)).status, 403);
-  assert.equal((await request(reviewer, security, 'POST')).status, 405);
+  assert.equal((await request(reviewer, security, 'POST')).status, 415);
   assert.equal((await request(reviewer, '/workspace/projects/' + project)).status, 403);
   store.operations.setReviewer(reviewer.id, 'security', false);
   assert.equal((await request(reviewer, security)).status, 403);

@@ -42,6 +42,9 @@ test('migrates v4, links a saved source to a claim, records human review and exp
       DROP TABLE readiness_revisions;
       DROP TABLE evidence_items;
       DROP TABLE claims;
+      DROP TABLE control_center_security_events;
+      DROP TABLE control_center_admin_events;
+      ALTER TABLE sessions DROP COLUMN user_agent;
       ALTER TABLE license_assignments DROP COLUMN state;
       PRAGMA user_version = 4;`);
     raw.close();

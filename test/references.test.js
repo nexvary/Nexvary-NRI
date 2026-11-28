@@ -234,6 +234,9 @@ test('migrates a P1b database and persists reference snapshots and the local cac
       DROP TABLE claims;
       DROP TABLE project_references;
       DROP TABLE reference_cache;
+      DROP TABLE control_center_security_events;
+      DROP TABLE control_center_admin_events;
+      ALTER TABLE sessions DROP COLUMN user_agent;
       ALTER TABLE license_assignments DROP COLUMN state;
       PRAGMA user_version = 2;`);
     raw.close();
