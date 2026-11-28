@@ -3,7 +3,7 @@ import { billingAccessSchema, billingDiscountSchema, billingReconciliationSchema
 import { resourceSchema, resourceStore } from './resource-store.js';
 import { citationSchema, citationStore } from './citation-store.js';
 import { folderSchema, organizationSchema, organizationStore } from './library-organization.js';
-import { institutionalSeatSchema, institutionalSubscriptionSchema, licenseSchema, lifecycleScheduleSchema, licensingStore, moduleEntitlementSchema, planAudienceSchema, planPricingSchema, quotaSchema, subscriptionSchema } from './licensing-store.js';
+import { institutionalSeatSchema, institutionalSubscriptionSchema, licenseSchema, lifecycleScheduleSchema, licensingStore, moduleEntitlementSchema, planAudienceSchema, planPricingSchema, quotaSchema, subscriptionSchema, upgradePlanQuotaSchema } from './licensing-store.js';
 import { manuscriptCatalogSchema, teamSchema, teamStore, teamWorkSchema } from './team-store.js';
 import { privacyStore } from './privacy-store.js';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
@@ -30,7 +30,7 @@ import { referenceSchema, referenceMigrationV4, referenceStore } from './referen
 
 export const sessionLifetime = 8 * 60 * 60;
 export const sessionIdle = 30 * 60_000;
-const schemaVersion = 47;
+const schemaVersion = 48;
 const schema = `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -128,6 +128,10 @@ function initialize(db, path) {
     if (version < 45) db.exec(profilePreferencesSchema);
     if (version < 46) db.exec(networkModerationSchema);
     if (version < 47) db.exec(operationsBackupSchema);
+    if (version < 48) {
+      upgradePlanQuotaSchema(db);
+      db.exec('PRAGMA user_version = 48;');
+    }
     return bindDocumentKey(db, path);
   });
 }
@@ -214,13 +218,14 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now, options = 
     const issuedAt = now();
     const key = tokenHash(token);
     clearExpired.run(issuedAt,issuedAt - sessionIdle);
+    if(!licensing.canStartSession(accountId))return undefined;
     insertSession.run(key, accountId, issuedAt + sessionLifetime * 1000, typeof userAgent === 'string' ? userAgent.slice(0,300) : '');
     initializeActivity.run(key,issuedAt);
     return token;
   }
 
   const mfa = mfaStore(db, workspaceKey, now, transact, revokeOthers);
-  const teams = teamStore(db, now, transact);
+  const teams = teamStore(db, now, transact, (owner,project) => licensing.canAddTeamMember(owner,project));
   const privacy = privacyStore(db, workspaceKey, now);
   return {
     privacyAction(owner, token, code, action) {
@@ -294,6 +299,7 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now, options = 
       return transact(db, () => {
         if (!currentCredentials.get(accountId, salt, hash)) return undefined;
         const session = issueSession(accountId,userAgent);
+        if (!session) return undefined;
         if (previousToken) removeSession.run(tokenHash(previousToken));
         settings.record(accountId, 'sign-in');
         return session;

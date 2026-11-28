@@ -77,7 +77,7 @@ const rights = {
   'read-only': [],
 };
 
-export function teamStore(db, now, transact) {
+export function teamStore(db, now, transact, canAddTeamMember = () => true) {
   const project = db.prepare('SELECT id, owner_id, title FROM projects WHERE id = ?');
   const member = db.prepare('SELECT role, state FROM project_members WHERE project_id = ? AND account_id = ?');
   const blocked = db.prepare(`SELECT 1 FROM researcher_links WHERE kind = 'block'
@@ -216,6 +216,7 @@ export function teamStore(db, now, transact) {
         if (!current?.rights.includes('manage') || !teamRoles.includes(role) || subject === actor || subject === current.owner_id) return false;
         if (current.role !== 'owner' && (role === 'administrator' || member.get(id, subject)?.role === 'administrator')) return false;
         if (!discoverable.get(subject) || isBlocked(actor, subject) || isBlocked(current.owner_id, subject)) return false;
+        if (!canAddTeamMember(current.owner_id,id)) return false;
         if (!invite.run(id, subject, role).changes) return false;
         record(id, actor, subject, 'invited', role);
         return true;

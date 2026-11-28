@@ -227,7 +227,8 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
           optional('monthly-minor'), optional('annual-minor'));
       } else if (intent === 'save') {
         status = store.licensing.save(account.id, code, whole(form.get('project-limit')), whole(form.get('ai-tokens')),
-          optional('storage-mib'), optional('daily-reports'), optional('institutional-seats'), form.get('audience') || null);
+          optional('storage-mib'), optional('daily-reports'), optional('institutional-seats'), form.get('audience') || null,
+          optional('team-members'), optional('concurrent-sessions'));
       } else {
         const email = normalizeAddress(form.get('email') ?? '');
         const expiresAt = endDate(form.get('expires'));
@@ -377,6 +378,8 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
         <label>${t('Daily external AI tokens', 'الحد اليومي لرموز الذكاء الاصطناعي الخارجي')}<input name="ai-tokens" type="number" required min="0" max="1000000000"></label>
         <label>${t('PDF storage limit in MiB (optional)', 'حد تخزين PDF بالميبي بايت (اختياري)')}<input name="storage-mib" type="number" min="0" max="1048576"></label>
         <label>${t('Daily report exports (optional)', 'عدد تصديرات التقارير يوميًا (اختياري)')}<input name="daily-reports" type="number" min="0" max="10000"></label>
+        <label>${t('Project team members (optional)', 'أعضاء فريق المشروع (اختياري)')}<input name="team-members" type="number" min="0" max="10000"></label>
+        <label>${t('Concurrent sessions per account (optional)', 'الجلسات المتزامنة للحساب (اختياري)')}<input name="concurrent-sessions" type="number" min="1" max="1000"></label>
         <label>${t('Institutional seats (optional)', 'المقاعد المؤسسية (اختياري)')}<input name="institutional-seats" type="number" min="1" max="10000"></label>
         <label>${t('Plan audience', 'الفئة المستهدفة')}<select name="audience">
           <option value="">${t('Keep current or use default', 'احتفظ بالإعداد الحالي أو استخدم الافتراضي')}</option>
@@ -387,6 +390,8 @@ export async function handleLicensing({ request, reply, redirect, lang, account,
       ${data.plans.length ? `<ul class="project-list">${data.plans.map((item) => `<li><bdi>${escapeHtml(item.code)}</bdi> · ${t(...audiences[item.audience])} ·
         ${t('PDF storage','تخزين PDF')} <bdi>${item.storage_mib === null ? t('Unlimited','غير محدود') : count.format(item.storage_mib) + ' MiB'}</bdi> ·
         ${t('Daily reports','التقارير اليومية')} <bdi>${item.daily_reports === null ? t('Unlimited','غير محدودة') : count.format(item.daily_reports)}</bdi> ·
+        ${t('Team members / project','أعضاء الفريق / المشروع')} <bdi>${item.team_members === null ? t('Unlimited','غير محدود') : count.format(item.team_members)}</bdi> ·
+        ${t('Concurrent sessions','الجلسات المتزامنة')} <bdi>${item.concurrent_sessions === null ? t('Unlimited','غير محدودة') : count.format(item.concurrent_sessions)}</bdi> ·
         ${t('Institutional seats','المقاعد المؤسسية')} <bdi>${item.institutional_seats === null ? t('Unset','غير محددة') : count.format(item.institutional_seats)}</bdi></li>`).join('')}</ul>` : ''}
       ${individualPlans.length ? `<h2>${t('Assign a plan', 'تعيين خطة')}</h2>
       <form class="workspace-form" method="post" action="${url}">

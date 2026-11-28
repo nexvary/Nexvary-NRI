@@ -1,0 +1,43 @@
+import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
+import { test } from 'node:test';
+import { totp } from '../src/mfa.js';
+import { hashPassword } from '../src/password.js';
+import { openWorkspaceStore } from '../src/store.js';
+
+test('configured team-member and concurrent-session limits are enforced without revoking existing access', async () => {
+  const now=1_800_000_000_000;
+  const store=openWorkspaceStore(':memory:',()=>now);
+  const password=await hashPassword('quota test operator password');
+  for(const email of ['owner@quota.test','first@quota.test','second@quota.test'])store.addAccount(email,email==='owner@quota.test'?password:{salt:randomBytes(16),hash:randomBytes(32)});
+  const owner=store.credentials('owner@quota.test').id;
+  const first=store.credentials('first@quota.test').id;
+  const second=store.credentials('second@quota.test').id;
+  const session=store.newSession(owner);
+  store.licensing.setOperator(owner,true);
+  assert.equal(store.mfa.begin(owner),true);
+  const alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  const bits=[...store.mfa.pending(owner)].map((letter)=>alphabet.indexOf(letter).toString(2).padStart(5,'0')).join('');
+  const secret=Buffer.from(bits.match(/.{8}/g).map((byte)=>Number.parseInt(byte,2)));
+  assert.equal(store.mfa.confirm(owner,totp(secret,Math.floor(now/30_000)),session).length,8);
+  assert.equal(store.licensing.save(owner,'quota-plan',10,0,null,null,null,null,1,1),303);
+  assert.equal(store.licensing.assign(owner,'owner@quota.test','quota-plan',null),303);
+  assert.equal(store.licensing.dashboard(owner).plans[0].team_members,1);
+  assert.equal(store.licensing.dashboard(owner).plans[0].concurrent_sessions,1);
+  assert.equal(store.licensing.canStartSession(owner),false);
+  assert.equal(store.newSession(owner),undefined);
+  assert.equal(store.signIn(store.credentials('owner@quota.test'),session),undefined);
+  assert.equal(store.session(session)?.id,owner);
+
+  store.network.save(owner,{name:'Owner',interests:'',orcid:'',discoverable:true});
+  store.network.save(first,{name:'First',interests:'',orcid:'',discoverable:true});
+  store.network.save(second,{name:'Second',interests:'',orcid:'',discoverable:true});
+  const project=store.createProject(owner,{title:'Quota project',description:''});
+  assert.equal(store.teams.grant(owner,project,first,'researcher'),true);
+  assert.equal(store.teams.grant(owner,project,second,'researcher'),false);
+  assert.equal(store.teams.revoke(owner,project,first),true);
+  assert.equal(store.teams.grant(owner,project,second,'researcher'),true);
+  assert.equal(store.licensing.transition(owner,'owner@quota.test','active','expired',null),303);
+  assert.equal(store.licensing.canStartSession(owner),true);
+  assert.ok(store.newSession(owner));
+});

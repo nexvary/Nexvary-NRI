@@ -41,6 +41,12 @@ export const quotaSchema = `
   PRAGMA user_version = 26;
 `;
 
+export function upgradePlanQuotaSchema(db) {
+  const columns = new Set(db.prepare('PRAGMA table_info(license_plan_quotas)').all().map(({ name }) => name));
+  if (!columns.has('team_members')) db.exec('ALTER TABLE license_plan_quotas ADD COLUMN team_members INTEGER CHECK(team_members BETWEEN 0 AND 10000)');
+  if (!columns.has('concurrent_sessions')) db.exec('ALTER TABLE license_plan_quotas ADD COLUMN concurrent_sessions INTEGER CHECK(concurrent_sessions BETWEEN 1 AND 1000)');
+}
+
 export const subscriptionSchema = `
   ALTER TABLE license_assignments ADD COLUMN state TEXT NOT NULL DEFAULT 'active'
     CHECK(state IN ('trial','active','grace','past_due','expired','suspended','cancelled','revoked'));
@@ -152,7 +158,7 @@ export function licensingStore(db, now, transact) {
     WHERE o.account_id = ? AND m.pending_until = 0`);
   const grant = db.prepare('INSERT OR IGNORE INTO license_operators VALUES (?)');
   const revoke = db.prepare('DELETE FROM license_operators WHERE account_id = ?');
-  const plans = db.prepare(`SELECT p.*,q.storage_mib,q.daily_reports,s.institutional_seats,COALESCE(a.audience,'all') AS audience,price.currency,price.monthly_minor,price.annual_minor
+  const plans = db.prepare(`SELECT p.*,q.storage_mib,q.daily_reports,q.team_members,q.concurrent_sessions,s.institutional_seats,COALESCE(a.audience,'all') AS audience,price.currency,price.monthly_minor,price.annual_minor
     FROM license_plans p LEFT JOIN license_plan_quotas q ON q.code=p.code
     LEFT JOIN license_plan_seats s ON s.code=p.code
     LEFT JOIN license_plan_prices price ON price.plan=p.code
@@ -179,7 +185,7 @@ export function licensingStore(db, now, transact) {
     JOIN license_organization_members m ON m.organization=seats.organization AND m.account_id=seats.account_id
     WHERE seats.account_id=:account AND NOT EXISTS (SELECT 1 FROM license_assignments WHERE account_id=:account)
   `;
-  const entitlement = db.prepare(`SELECT p.code,p.project_limit,p.daily_ai_tokens,a.expires_at,a.state,q.storage_mib,q.daily_reports
+  const entitlement = db.prepare(`SELECT p.code,p.project_limit,p.daily_ai_tokens,a.expires_at,a.state,q.storage_mib,q.daily_reports,q.team_members,q.concurrent_sessions
     FROM (${effectiveAssignment}) a JOIN license_plans p ON p.code=a.plan
     LEFT JOIN license_plan_quotas q ON q.code=a.plan`);
   const assign = db.prepare(`INSERT INTO license_assignments(account_id,plan,expires_at,state) VALUES (?,?,?,'active')
@@ -190,8 +196,11 @@ export function licensingStore(db, now, transact) {
     (SELECT count(*) FROM projects) AS projects,
     (SELECT count(*) FROM license_assignments WHERE state IN ('trial','active','grace') AND (expires_at IS NULL OR expires_at > ?)) AS active`);
   const ownedProjects = db.prepare('SELECT count(*) AS total FROM projects WHERE owner_id = ?');
-  const saveQuotas = db.prepare(`INSERT INTO license_plan_quotas VALUES (?,?,?)
-    ON CONFLICT(code) DO UPDATE SET storage_mib=excluded.storage_mib,daily_reports=excluded.daily_reports`);
+  const projectMembers = db.prepare("SELECT count(*) AS total FROM project_members WHERE project_id=? AND state IN ('pending','accepted')");
+  const activeSessions = db.prepare('SELECT count(*) AS total FROM sessions WHERE account_id=? AND expires_at>?');
+  const saveQuotas = db.prepare(`INSERT INTO license_plan_quotas(code,storage_mib,daily_reports,team_members,concurrent_sessions) VALUES (?,?,?,?,?)
+    ON CONFLICT(code) DO UPDATE SET storage_mib=excluded.storage_mib,daily_reports=excluded.daily_reports,
+      team_members=excluded.team_members,concurrent_sessions=excluded.concurrent_sessions`);
   const saveSeats = db.prepare(`INSERT INTO license_plan_seats VALUES (?,?)
     ON CONFLICT(code) DO UPDATE SET institutional_seats=excluded.institutional_seats`);
   const bytes = db.prepare(`SELECT COALESCE(SUM(v.size),0) AS total FROM document_versions v
@@ -259,10 +268,11 @@ export function licensingStore(db, now, transact) {
 
   function limits(account) {
     const current = entitlement.get({ account });
-    if (!current) return { projectLimit: Infinity, aiTokens: Infinity, storage: Infinity, reports: Infinity };
-    if (!usableStates.has(stateAt(current, now()))) return { projectLimit: 0, aiTokens: 0, storage: 0, reports: 0 };
+    if (!current) return { projectLimit: Infinity, aiTokens: Infinity, storage: Infinity, reports: Infinity, teamMembers: Infinity, concurrentSessions: Infinity };
+    if (!usableStates.has(stateAt(current, now()))) return { projectLimit: 0, aiTokens: 0, storage: 0, reports: 0, teamMembers: 0, concurrentSessions: Infinity };
     return { projectLimit: current.project_limit, aiTokens: current.daily_ai_tokens,
-      storage: (current.storage_mib ?? Infinity) * 1024 * 1024, reports: current.daily_reports ?? Infinity };
+      storage: (current.storage_mib ?? Infinity) * 1024 * 1024, reports: current.daily_reports ?? Infinity,
+      teamMembers: current.team_members ?? Infinity, concurrentSessions: current.concurrent_sessions ?? Infinity };
   }
 
   return {
@@ -297,19 +307,21 @@ export function licensingStore(db, now, transact) {
         organizations: organizationList.all().map((current) => ({ ...current, state: stateAt(current, timestamp) })),
         institutionalHistory: institutionalHistory.all(), subscriptions: subscriptions.all().map((current) => ({ ...current, state: stateAt(current, timestamp) })) };
     },
-    save(actor, code, projectLimit, aiTokens, storage = null, dailyReports = null, institutionalSeats = null, audience = null) {
+    save(actor, code, projectLimit, aiTokens, storage = null, dailyReports = null, institutionalSeats = null, audience = null,
+      teamMembers = null, concurrentSessions = null) {
       return transact(db, () => {
         if (!authorized.get(actor)) return 403;
         if (!/^[a-z][a-z0-9-]{1,30}$/.test(code) || !Number.isInteger(projectLimit) || projectLimit < 0 || projectLimit > 10000 ||
             !Number.isInteger(aiTokens) || aiTokens < 0 || aiTokens > 1_000_000_000 ||
-            !optionalLimit(storage,1048576) || !optionalLimit(dailyReports,10000) ||
+            !optionalLimit(storage,1048576) || !optionalLimit(dailyReports,10000) || !optionalLimit(teamMembers,10000) ||
+            !optionalLimit(concurrentSessions,1000) || concurrentSessions === 0 ||
             !optionalLimit(institutionalSeats,10000) || institutionalSeats === 0) return 422;
         if (audience !== null && !planAudiences.has(audience)) return 422;
         if ((audience === 'individual' && hasOrganizationAssignments.get(code)) ||
             (audience !== null && audience !== 'all' && audience !== 'individual' && hasIndividualAssignments.get(code)) ||
             (institutionalSeats ?? 0) < maxSeatsInUse.get(code).total) return 409;
         save.run(code, projectLimit, aiTokens);
-        saveQuotas.run(code, storage, dailyReports);
+        saveQuotas.run(code, storage, dailyReports, teamMembers, concurrentSessions);
         saveSeats.run(code, institutionalSeats);
         if (audience !== null) saveAudience.run(code, audience);
         record.run(actor, null, code, 'plan-saved', now());
@@ -525,6 +537,12 @@ export function licensingStore(db, now, transact) {
     },
     canCreateProject(owner) {
       return ownedProjects.get(owner).total < limits(owner).projectLimit;
+    },
+    canAddTeamMember(owner, projectId) {
+      return projectMembers.get(projectId).total < limits(owner).teamMembers;
+    },
+    canStartSession(account) {
+      return activeSessions.get(account,now()).total < limits(account).concurrentSessions;
     },
     canStore(owner, amount) {
       const maximum = limits(owner).storage;
