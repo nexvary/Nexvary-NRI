@@ -14,7 +14,7 @@ async function hashFile(path) {
   return hash.digest('hex');
 }
 
-async function validateWorkspace(databasePath, keyPath) {
+export async function validateWorkspace(databasePath, keyPath) {
   if ((await stat(keyPath)).size !== 32) throw new Error('Invalid document encryption key size.');
   const fingerprint = await hashFile(keyPath);
   const db = new DatabaseSync(databasePath, { readOnly: true, timeout: 5000 });
@@ -30,7 +30,7 @@ async function validateWorkspace(databasePath, keyPath) {
   }
 }
 
-async function newDirectory(destination, operation) {
+export async function newDirectory(destination, operation) {
   await mkdir(destination, { mode: 0o700 });
   try {
     return await operation(destination);

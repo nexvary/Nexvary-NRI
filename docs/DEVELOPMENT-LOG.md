@@ -78,3 +78,289 @@
 
 - P7b merged into main at [`d8b6a5f`](https://github.com/nexvary/Nexvary-NRI/commit/d8b6a5f335ef76e458a2fe04cdc5aa5ebc3b888d) after [GitHub Actions run 45902068331](https://github.com/nexvary/Nexvary-NRI/actions/runs/45902068331) succeeded.
 - Added two bilingual lessons with local scoring and a descriptive-statistics simulation. 45/45 local tests passed with PDF/DOCX rendering enabled. Both locales were exercised in Qt WebEngine.
+
+## 2026-11-27 · NRI-08a local source review
+
+- Resumed from remote main at `0c643a4`, the merge of PR #18.
+- Replaced the Assistant placeholder with a signed-in bilingual source review. Uses saved, owner-scoped snapshots, including historical provider notices. The local review uses no external APIs.
+- Targeted regression: 6/6. Full suite: 45 passed, zero failures and one optional report-renderer integration test skipped locally. Browser captures are pending.
+- Continue with BYOK, explicit external sharing consent and metered, cited answers before starting messaging.
+
+## 2026-11-27 · NRI-08a visual acceptance after resumption
+
+- Resumed draft PR #19 at `02e2cb4`. The baseline passes 46/46 with the bilingual renderer.
+- Exercised saved-source review in Chromium in both languages and at desktop and mobile sizes. The four captures are linked from [STATUS.md](STATUS.md).
+- The old CI run timed out during DevTools startup. Added launch diagnostics and a hosted-runner launch setting for the isolated fixture.
+
+## 2026-11-27 · NRI-08b provider preferences and encrypted BYOK
+
+- Added bilingual provider/model settings and account-bound encryption for OpenAI keys using the existing paired workspace key. Saving preferences makes no provider requests.
+- Full regression with real reports: 47/47. Recaptured the Assistant after adding the settings link.
+- Browser QA can discover Chrome through DevToolsActivePort and checks overflow independently of vertical scrollbar width.
+
+## 2026-11-27 · NRI-08c optional local cited answers
+
+- Added bounded loopback generation with saved-source citation matching and unsupported citation warnings, plus a short scoped cache, cancellation and deadline.
+- 48/48 with real report rendering. Provider checks used only mocked responses. External generation and the durable usage and cost ledger remain.
+
+## 2026-11-27 · NRI-08d external consent and estimated spend controls
+
+- Added opt-in OpenAI transport, consent tied to disclosed reference snapshots, daily reservations and provider-reported usage. Mocked tests verify consent and budget denial, citation results and cache hits.
+- No live OpenAI calls were made. NRI-11 is the next acceptance milestone.
+
+## 2026-11-27 · NRI-11 private researcher messages
+
+- Added participant-scoped direct threads, encrypted text, read markers, an in-app notification preference, blocking, reporting and send/report limits. Conversation creation uses accepted collaboration relationships.
+- 50/50 with real report rendering. Chromium sent a message and captured both languages at desktop and mobile sizes. See [STATUS.md](STATUS.md) for the captures and next milestone.
+
+## 2026-11-27 · NRI-18a optional authenticator MFA
+
+- Added password-confirmed setup and deactivation, encrypted TOTP seeds, one-use recovery codes, and transactional revocation of other sessions whenever MFA changes.
+- 51/51 with real report rendering. Real browser captures cover bilingual security settings.
+
+## 2026-11-27 · NRI-18b scoped report review
+
+- Added a locally provisioned moderator role and decision queue limited to reported messages. Review conflicts, immutable decisions and live role revocation are verified.
+- 52/52 with real report rendering. Chromium captured bilingual report review. Remaining NRI-18 work starts with account export and deletion.
+
+## 2026-11-27 · NRI-18c account privacy
+
+- Added password/MFA-confirmed data export and transactional deletion with explicit confirmation.
+- Verified isolation, credential and data removal, and restoration semantics for pre- and post-deletion backups. Chromium exercised export and captured the privacy page.
+
+## 2026-11-27 · NRI-10a project team roles and review
+
+- Added five team roles, version-bound invitations, role-aware contribution and review, and attributable access and version history.
+- 54/54 with real report rendering. Chromium created a manuscript and captured both locales.
+
+## 2026-11-27 · NRI-19a local licensing and readiness
+
+- Added MFA-gated operator plans, dated entitlements, project and external token ceilings, audit history and a SQLite health endpoint.
+- 55/55 with real report rendering. Chromium saved a plan and captured bilingual layouts. The recovery guide records deployment rehearsal and rollback for the loopback release.
+
+## 2026-11-27 · NRI-01a private dashboard data
+
+- Connected accepted collaborator counts, the user’s self-reported ORCID and metered usage to the signed-in dashboard.
+- 56/56 with real report rendering. Chromium captured Arabic desktop and English mobile.
+
+## 2026-11-27 · NRI-10b project work and invitations
+
+- Added team notes, concurrent-safe task status changes, attributable audit events, and pending invitation notices.
+- 56/56 with real report rendering. Chromium created a task and captured both locales.
+
+## 2026-11-27 · NRI-02a manuscript catalog
+
+- Added searchable authors, tags, publication status and DOI with independently attributable metadata revisions.
+- 56/56 with real report rendering. Chromium saved catalog metadata and captured Arabic desktop and English mobile.
+
+## 2026-11-27 · NRI-03a collections and reading marks
+
+- Added private PDF collections, bookmarks, and version-specific reading annotations. Included all three in account export and deletion coverage.
+- 57/57 with real report rendering. Chromium saved an annotation and captured both locales.
+
+## 2026-11-27 · NRI-03b citation exchange
+
+- Added private BibTeX/RIS exchange, source provenance, DOI and provider identifier grouping and controlled merges.
+- 59/59 with real report rendering. Chromium imported a citation in the running app.
+
+## 2026-11-27 · NRI-03c embedded PDF versions
+
+- Added local PDF.js rendering, version selection, page navigation and reading mark links.
+- 59/59 with real report rendering. Chromium verified actual page pixels and navigation, and npm audit found no reported vulnerabilities in installed dependencies.
+
+## 2026-11-27 · NRI-10c resource sharing
+
+- Added read-only, per-recipient grants tied to a specific membership acceptance. Verified snapshot scope, direct route protections and revocation during report generation.
+- 60/60 with real report rendering. Chromium granted an individual PDF version and captured both languages.
+
+## 2026-11-27 · NRI-19b transport and operations
+
+- Added direct TLS staging, secure cookies, idle session expiry, independent login limits, JSON request logs and a hardened service template.
+- 62/62 with real report rendering, 48 concurrent TLS reads, verified migration and rollback, and Chromium regression. Updated WeasyPrint and pip following the Python dependency audit.
+
+## 2026-11-27 · NRI-19c quotas
+
+- Added configurable PDF storage and UTC daily report limits with transactional checks, refunds on failed rendering or access revocation, and bilingual operator controls.
+- 62/62 with real report rendering. Chromium verified saving a quota-enabled plan.
+
+## 2026-11-27 · Release acceptance increment
+
+- Added Crossref DOI agency lookups with dated private snapshots and explicit unavailable and missing outcomes.
+- Completed the bilingual developer page and expanded About System with methodology, release history, support and legal drafts for owner review.
+- 64/64 tests passed with the real bilingual renderer. Chromium captured both About views at both viewport sizes in both locales.
+
+## 2026-11-27 · Local account recovery
+
+- Added private-terminal operator password reset with per-account session revocation, stale-credential rejection and a user-visible security event.
+- Verified v26 migration, existing audit history and cross-account isolation. Full local suite with the real bilingual renderer passes 65/65.
+
+## 2026-11-27 · Encrypted workspace backup
+
+- Added authenticated archive export and restore, preserving local paired bundles for compatibility.
+- Verified preservation of PDF content and isolation of failed restores, with 66/66 local tests. Added optional systemd backup units with syntax verification.
+
+## 2026-11-27 · Local concurrent workspace load
+
+- Ran 24- and 48-client mixed read/write/isolation workloads against disposable on-disk SQLite stores. The runs completed 1,440 and 2,880 requests respectively with no unexpected outcomes. Recorded throughput, latency and resource measurements in [DEPLOYMENT.md](DEPLOYMENT.md#sqlite-workload-measurements).
+
+## 2026-11-27 · Hosted browser regression reliability
+
+- Wait for a responsive DevTools endpoint, bound browser commands, close completed tabs and print the Chrome diagnostic tail when a run fails. Existing visual assertions remain active.
+- Added bilingual System and Developer captures in both viewport sizes to the existing Chromium suite.
+
+
+## 2026-11-27 · Private TXT documents
+
+- Added versioned UTF-8 TXT uploads and escaped previews, with private downloads, filtering and shared storage quotas. [CI passed](https://github.com/nexvary/Nexvary-NRI/actions/runs/46009913116) at `1d4d604`.
+
+## 2026-11-27 · Private DOCX documents
+
+- Added bounded archive and XML validation and escaped plain-text previews. Security tests cover malformed XML, DTD declarations, ZIP traversal and expansion limits, macros and external relationships. [CI passed](https://github.com/nexvary/Nexvary-NRI/actions/runs/46010490212) at `7004239`.
+
+## 2026-11-27 · Recoverable workspace key rotation
+
+- Added offline SQLite snapshot rotation for document bytes, messages, MFA secrets and provider credentials, with version history and recovery-code preservation. [CI passed 71/71](https://github.com/nexvary/Nexvary-NRI/actions/runs/46011042141) on `ca3fde9` with a killed-child interruption test and encrypted backup rollback.
+
+## 2026-11-27 · Independent L-READY decisions
+
+- Added accepted-reviewer-only decisions with an independence declaration, one write per revision and attributable history. Current-revision decisions appear in Report Studio. [Regression and browser evidence](https://github.com/nexvary/Nexvary-NRI/actions/runs/46011593215).
+
+## 2026-11-27 · NRI-20 account subscription lifecycle
+
+- Adopted the centralized Debian SaaS architecture and added NRI-20 to the acceptance matrix.
+- Migrated existing assignments as active with their prior expiry dates. Added audited, validated state changes, trials and current-password confirmation in the existing operator console.
+- Project creation, document storage, report rendering and external AI reservations use the effective subscription state. Existing private data and resource access checks are preserved.
+- Local regression: 73 passed, zero failed, zero skipped, with the pinned bilingual report renderer. Hosted browser verification follows in PR #19.
+
+## 2026-11-27 · Reference-to-evidence provenance
+
+- Link to an evidence form with the selected provider snapshot prefilled. Bind the submission to identifier, provider, retrieval time and metadata. A refreshed record requires a new selection even when the lookup timestamp is identical.
+- Report Studio preserves the cited snapshot and surfaces conflicting saved retraction flags and claims without a reviewed supporting link eligible as evidence.
+- Local regression: 73 passed, zero failed, zero skipped, including actual bilingual PDF and DOCX rendering.
+
+## 2026-11-27 · NRI Control Center foundation
+
+- Added a separate bilingual Control Center at `/control-center` for existing licensed operators with confirmed MFA. The previous licensing path uses the same handler and checks.
+- All commercial mutations require rate-limited current-password confirmation and an active session. Existing origin protection and transactional audit writes apply.
+- Local regression: 73 passed, zero failed, zero skipped, with actual bilingual PDF and DOCX rendering.
+
+## 2026-11-27 · Sandbox billing event ingress
+
+- Added a provider-independent verifier contract with a synthetic HMAC adapter. The adapter authenticates the original bytes, checks a five-minute timestamp window, and rejects malformed or oversized envelopes.
+- Schema v31 records normalized invoice, payment, refund, renewal and cancellation events with a unique provider and event ID. Identical retries are idempotent and conflicting retries preserve the first event.
+- This increment exposes an internal interface only. Invoice projections, subscription reconciliation and administration are pending. Local regression: 74 passed, zero failed, zero skipped.
+
+## 2026-11-27 · Production entitlement gate
+
+- Added schema v32 for explicit module grants, a default-deny HTTP route inventory and strict HTTPS defaults. Existing plan assignments need explicit grants before serving external traffic.
+- Added audited plan grant management to the existing MFA and password-confirmed Control Center. Plan permissions remain independent of account and resource authorization.
+- Local regression with the actual bilingual renderer: 75 passed, zero failed, zero skipped. Verifies TLS default-deny, isolated project access, plan edit conflicts, and in-flight report revocation. [Hosted CI and browser regression passed for the recovered SHA](https://github.com/nexvary/Nexvary-NRI/actions/runs/46067500586).
+
+
+## 2026-11-27 · Institutional subscriptions and seats
+
+- Published the original v33 seat configuration on draft PR #19. Schema v34 adds organizations, operator-managed memberships and subscriptions, seat allocation and revocation, and attributable institutional audit records.
+- Institutional seats feed the same server-side module and quota checks as individual assignments. Existing personal assignments take precedence. Membership and private resource permissions remain independent.
+- The deterministic regression covers competing allocations, revocation, expiry, blocked direct requests, unauthorized administration and post-expiry account export.
+
+## 2026-11-27 · Configurable plan pricing
+
+- Added optional ISO currency and independently configurable monthly and annual prices in integer minor units. Existing plans stay unpriced. Pricing edits and clearing require the existing MFA and password checks and are audited.
+- Local regression: 76 passed, zero failed, zero skipped, including protected pricing edits and bilingual report rendering. Price configuration does not initiate billing.
+
+## 2026-11-27 · Scoped sandbox billing review
+
+- Exposed the existing signed synthetic ledger in a bilingual, paginated Control Center view. Owners and explicitly assigned billing reviewers with MFA can read the ledger. Billing review does not confer licensing writes or access to research.
+- The local operator CLI can grant or revoke `billing-reviewer`. No payment endpoint or live payment provider was added.
+- Local regression: 77 passed, zero failed, zero skipped, with signed synthetic invoice display and access and revocation checks. The preceding [pricing](https://github.com/nexvary/Nexvary-NRI/actions/runs/46070596059) and [institutional seat](https://github.com/nexvary/Nexvary-NRI/actions/runs/46070436861) increments passed hosted regression and browser QA.
+
+## 2026-11-27 · Post-expiry document portability
+
+- Added a paginated list of owned document versions on the account Privacy screen. Downloads use existing password, conditional MFA, session and document ownership checks, independent of a subscription.
+- Direct requests for other accounts' files are denied. The full account archive keeps its existing size limit and individual downloads support large libraries.
+
+## 2026-11-27 · Sandbox invoice reconciliation
+
+- Schema v37 projects signed sandbox events into provider-scoped invoices, line items, allocations and refunds. Linked operations and their audit events commit atomically. Retries and object collisions are distinguished, and overpayments, excess refunds and currency mismatches are rejected.
+- Existing invoice events are backfilled with a single total line. Historical payments without an explicit invoice reference remain visible in the event ledger and are not inferred as allocations.
+- Signed-in billing reviewers with MFA can open bilingual invoice balances and download PDFs through the existing local renderer. Access is rechecked before delivery.
+
+## 2026-11-27 · Scheduled subscription expiry
+
+- Added an hourly unprivileged systemd timer and an idempotent local command for trial, active and grace expiration. Each batch stores effective expiry and attributable system audit rows within one SQLite transaction.
+- Account settings surface an upcoming or past expiry to the account holder. Renewal remains operator-managed and the scheduler sends no external messages or charges.
+
+## 2026-11-27 · Sandbox discount redemption
+
+- Added MFA- and password-protected discount creation and revocation for licensing operators. Codes support percentage basis points or currency-specific fixed minor units, a UTC expiry, optional plan eligibility, and bounded redemptions.
+- Signed synthetic invoice events may specify a discount code and plan code with their gross line total. The verified event, net invoice and redemption commit together. Exact retries preserve the original result and do not consume a second redemption.
+
+## 2026-11-27 · Promotional grants and administrative overrides
+
+- The bilingual Control Center can apply complimentary account assignments and sponsored organization plans through the existing MFA- and password-protected licensing paths. A reason is required and stored with the actor, target and plan in the existing audits.
+- An explicit, reasoned operator override can reopen a cancelled assignment. Revoked assignments remain terminal. Grants, plan limits and private resource checks still apply.
+
+## 2026-11-27 · Plan audiences and effective subscription preview
+
+- The Control Center can classify plans as individual, research team, enterprise, institutional or available to both assignment types. Existing plans retain both assignment paths. New assignments enforce the plan audience, and incompatible changes are rejected while existing assignments reference the plan.
+- Account settings show the effective assignment source and available modules using the same personal-over-institutional precedence as request-time entitlement enforcement.
+
+## 2026-11-28 · Synthetic subscription term changes
+
+- Added reasoned and password-confirmed operator renewal and plan changes for individual and institutional subscriptions. Stale snapshots are rejected transactionally. The sandbox cycles use fixed 30-day and 365-day terms.
+- An active, dated term retains its end date on a plan change. The same-currency adjustment uses the selected cycle's configured prices, the remaining term fraction, and integer truncation toward zero. Adjustments are audited only and do not create invoices, payments or refunds.
+
+## 2026-11-28 · Scoped operational dashboards
+
+- Schema v41 preserves billing reviewers and adds independently provisioned support and security reviewers. Both require MFA. Support can look up subscription and organization seat metadata for an exact account. Security can review MFA enrollment, active session counts, recent security events and schema readiness.
+- These routes are read-only. Their queries exclude research content, messages, session tokens and encryption keys.
+
+## 2026-11-28 · Acceptance matrix reconciliation
+
+- Reconciled the 219-criterion matrix with existing direct evidence for scoped manuscript deletion (NRI-02), all L-READY categories and reviewed-source links (NRI-06), and invitation decline/replay denial (NRI-10). The module matrix is 13 Verified / 7 Partial, with 188/219 criteria verified. Remaining: 7 evidence items, 18 implementation gaps, 6 external blockers.
+- Focused HTTP/unit tests passed 11/11. A fresh full local run passed 76, skipped 2 optional renderer-dependent tests, and failed 0. The stored full-render run for this source state passed 78/78; hosted CI installs the real report runtime and will verify the actual bilingual exports again.
+- The repo remains public, publication is authorized, and PR #19 remains draft and unmerged. NRI-18 accessibility remains unverified.
+# 2026-11-28 · NRI-03 closure
+
+- Added separate, owner-scoped library folders and document assignment; folders remain distinct from named collections and are covered by account-isolation tests.
+- Added bilingual copyright and authorization guidance to document upload.
+- Focused regression: `node --test test/library.test.js test/documents.test.js` — 10/10 passed. NRI-03 is now 15/15; acceptance is 190/219 (86.8%), 14 Verified / 6 Partial. Full regression remains for the next milestone.
+
+# 2026-11-28 · NRI-01 closure
+
+- Dashboard navigation announces pending movement with a live region and `aria-busy`; database failures use a bilingual accessible retry state and never expose internal diagnostics.
+- Focused dashboard regressions passed. NRI-01 is now 12/12; acceptance is 192/219 (87.7%), 15 Verified / 5 Partial. Full regression remains for the next milestone.
+
+# 2026-11-28 · Hosted accessibility verification
+
+- Extended the existing Chromium acceptance run to inspect accessible names, WCAG AA text contrast, keyboard-visible skip-link focus and focus transfer, Arabic RTL/English LTR, and desktop/tablet/mobile overflow across captured screens.
+- Hosted workflow [46145076955](https://github.com/nexvary/Nexvary-NRI/actions/runs/46145076955) passed 80/80 tests with the actual bilingual PDF/DOCX renderer. Chromium passed interactive accessible-name and WCAG AA contrast checks, keyboard Tab/Enter skip-link focus, Arabic RTL and English LTR, and responsive overflow checks at desktop, tablet and mobile sizes. It uploaded 64 screenshots. NRI-18 accessibility is now verified; NRI-18 remains Partial with four implementation criteria outstanding. Acceptance is 193/219 (88.1%), 15 Verified / 5 Partial; remaining 26 criteria: 6 verification, 14 implementation, 6 external blockers.
+
+# 2026-11-28 · NRI-20 commercial analytics
+
+- Added a billing-reviewer-only, read-only Control Center page with bilingual totals queried from reconciled invoices, payments, refunds, individual assignments and discount redemption rows. The response is no-store; non-reviewers are denied and POST is unsupported. No metrics are estimated or fabricated.
+- Focused `node --test test/billing.test.js` passed 2/2, including actual fixture totals in EUR, Arabic output, MFA role gating, no-store, and read-only enforcement. NRI-20 remains Partial. Acceptance is 194/219 (88.6%), 15 Verified / 5 Partial; remaining 25 criteria: 6 verification, 13 implementation, 6 external blockers.
+
+# 2026-11-28 · NRI-20 delegated role administration
+
+- Added a bilingual operator-only role administration page for billing, support and security reviewers. Grant/revoke mutations require active MFA, current-password verification, same-session confirmation and same-origin POST. Role changes and their audit row commit transactionally. No route permits delegating or removing the core operator role.
+- Added schema v43 for durable role-change history. Focused billing, licensing, settings and migration regression passed 11/11. The broader Control Center acceptance criterion remained partial while session controls, backup status/history and global settings were unfinished. Acceptance remained 194/219; this was progress within a bundled existing criterion, not a new criterion.
+
+# 2026-11-28 · NRI-20 session response and backup inventory
+
+- Schema v44 records bounded browser/client user-agent metadata for newly issued sessions. The MFA-gated security reviewer can inspect recent active session last-seen and expiry times and revoke a selected session after current-password confirmation; revocation and actor are recorded transactionally. Raw session tokens are never exposed.
+- Security review reads `.nribak` files from the configured backup directory, showing actual size, modification time and format-header recognition. It does not claim archive authentication, restore health or systemd timer status.
+- `node --test test/documents.test.js test/evidence.test.js test/references.test.js test/billing.test.js test/workspace.test.js` passed 30/30, including the v44 migration fixtures; `git diff --check` passed. Hosted run 46146646236 exposed three older migration fixtures that simulated pre-v43 schemas without removing the newer role-audit table. Those fixtures now remove the added tables/column before applying their old schema. The NRI-20 Control Center criterion remains incomplete pending system settings and host-authorized cryptographic backup/timer verification. Acceptance remains 194/219.
+
+# 2026-11-28 · NRI-18 profile and theme acceptance
+
+- Schema v45 stores an optional display name and dark/light theme per account. Settings updates require current-password confirmation, enforce name/theme bounds, are transactionally persisted and add an account-scoped security event. Settings labels and audit-event text are bilingual; the theme is applied across workspace and Control Center documents.
+- Added regressions for bad-password denial, saved preference, audit record, account isolation and theme rendering. Focused suite passed 30/30; local full suite passed 79 with two optional report-renderer skips and zero failures.
+- Hosted PR CI [46149174214](https://github.com/nexvary/Nexvary-NRI/actions/runs/46149174214) installed the real report renderer and passed 81/81 with no skips. Chromium verified the light-theme profile page in Arabic and English, desktop and mobile; keyboard focus, accessible names, WCAG AA contrast, RTL/LTR and responsive layouts passed. This closes the two original profile/theme criteria only. NRI-18 remains Partial: self-service recovery and network-content moderation remain.
+- Acceptance: 196/219 (89.5%), 15 Verified / 5 Partial; 23 criteria remain (6 verification, 11 implementation, 6 external). Source commit: `dcc4fd67751c8709127a562c1852213d0e6f4657`.
+
+# 2026-11-28 · NRI-09 researcher profile reports
+
+- Schema v46 adds a private report queue for published researcher profiles. Reports use bounded reason categories, one pending report per reporter/target, and a five-per-day reporter limit. The existing operator-managed message-moderator role can dismiss a report or hide the reported profile; each decision records reviewer, action and time. The queue reveals a short reporter reference instead of account email.
+- `network.test.js` verifies hidden profiles cannot be targeted, duplicate reports fail, non-moderators are denied, moderator review is gated, profile hiding removes it from discovery, and the action is audited. Focused network/workspace/settings tests passed 10/10. Full local regression passed 79 tests, 0 failures; 2 optional PDF/DOCX renderer tests were skipped because the local renderer is not installed. Hosted CI from the preceding profile/theme commit passed 81/81 with the renderer installed.
+- One existing criterion is verified: NRI-09 network reporting. Overall acceptance is 197/219 (90.0%), 15 Verified / 5 Partial; 22 remain (6 verification, 10 implementation, 6 external). Network moderation beyond published researcher profiles remains incomplete; NRI-18 and NRI-09 remain Partial.

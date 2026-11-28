@@ -8,6 +8,7 @@ export const copy = {
   signIn: ['Sign in to see your workspace', 'سجّل الدخول لعرض مساحة عملك'],
   noResearch: ['No projects yet', 'لا توجد مشاريع بعد'],
   noActivity: ['No library activity yet', 'لا يوجد نشاط في المكتبة بعد'],
+  dashboardLoading: ['Loading the selected dashboard section…', 'جارٍ تحميل القسم المختار من لوحة التحكم…'],
   latest: ['Recent research', 'أبحاثي الأخيرة'],
   quick: ['Explore the L-READY framework', 'استكشف إطار L-READY'],
   statistics: ['Workspace statistics', 'إحصاءات مساحة العمل'],
@@ -65,6 +66,7 @@ export const metrics = [
   ['📚', 'pdfs', ['Private PDFs', 'ملفات PDF الخاصة']],
   ['🔗', 'sources', ['Saved sources', 'المصادر المحفوظة']],
   ['🔎', 'evidence', ['Evidence links', 'روابط الأدلة']],
+  ['🤝', 'collaborations', ['Accepted collaborators', 'المتعاونون المقبولون']],
 ];
 
 export const providers = {

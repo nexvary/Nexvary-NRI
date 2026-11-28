@@ -1,0 +1,19 @@
+[Unit]
+Description=Export an encrypted NEXVARY NRI workspace backup
+RequiresMountsFor=/var/lib/nri /var/backups/nri
+
+[Service]
+Type=oneshot
+User=nri
+Group=nri
+Environment=NRI_DB_PATH=/var/lib/nri/workspace.sqlite
+Environment=NRI_BACKUP_KEY_FILE=%d/backup-key
+LoadCredential=backup-key:/etc/nri/backup.key
+ExecStart=/bin/sh -ec 'stamp=$$(date -u +%%Y%%m%%dT%%H%%M%%SZ); exec /opt/nri/runtime/bin/node /opt/nri/current/src/recovery-cli.js export "/var/backups/nri/workspace-$$stamp.nribak"'
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/backups/nri /var/lib/nri

@@ -5,7 +5,7 @@ const pageSize = 30;
 export function libraryStore(db) {
   const query = db.prepare(`
     WITH entries AS (
-      SELECT 'pdf' AS kind, p.id AS projectId, p.title AS project, d.id AS item,
+      SELECT CASE WHEN lower(substr(d.title, -4)) = '.txt' THEN 'txt' WHEN lower(substr(d.title, -5)) = '.docx' THEN 'docx' ELSE 'pdf' END AS kind, p.id AS projectId, p.title AS project, d.id AS item,
         d.title AS title, v.filename AS detail, v.created_at AS changed
       FROM projects p JOIN documents d ON d.project_id = p.id
       JOIN document_versions v ON v.document_id = d.id
@@ -15,7 +15,7 @@ export function libraryStore(db) {
       SELECT 'source', p.id, p.title, r.doi, COALESCE(NULLIF(json_extract(r.metadata, '$.title'), ''), r.doi),
         r.provider, r.checked_at
       FROM projects p JOIN project_references r ON r.project_id = p.id
-      WHERE p.owner_id = ? AND r.state = 'found' AND r.provider <> 'orcid'
+      WHERE p.owner_id = ? AND r.state = 'found' AND r.provider NOT IN ('orcid', 'agency')
     )
     SELECT * FROM entries WHERE (? = 'all' OR kind = ?)
       AND (instr(lower(title), lower(?)) > 0 OR instr(lower(project), lower(?)) > 0
@@ -24,9 +24,9 @@ export function libraryStore(db) {
   `);
   const metrics = db.prepare(`
     SELECT (SELECT count(*) FROM projects WHERE owner_id = ?) AS projects,
-      (SELECT count(*) FROM documents d JOIN projects p ON p.id = d.project_id WHERE p.owner_id = ?) AS pdfs,
+      (SELECT count(*) FROM documents d JOIN projects p ON p.id = d.project_id WHERE p.owner_id = ? AND lower(substr(d.title, -4)) <> '.txt' AND lower(substr(d.title, -5)) <> '.docx') AS pdfs,
       (SELECT count(*) FROM project_references r JOIN projects p ON p.id = r.project_id
-        WHERE p.owner_id = ? AND r.state = 'found' AND r.provider <> 'orcid') AS sources,
+        WHERE p.owner_id = ? AND r.state = 'found' AND r.provider NOT IN ('orcid', 'agency')) AS sources,
       (SELECT count(*) FROM evidence_items e JOIN claims c ON c.id = e.claim_id
         JOIN projects p ON p.id = c.project_id WHERE p.owner_id = ?) AS evidence
   `);
@@ -51,6 +51,8 @@ const labels = {
   type: ['Record type', 'نوع السجل'],
   all: ['All records', 'كل السجلات'],
   pdf: ['Private PDF', 'ملف PDF خاص'],
+  docx: ['Private DOCX', 'ملف DOCX خاص'],
+  txt: ['Private TXT', 'ملف TXT خاص'],
   source: ['Saved reference', 'مرجع محفوظ'],
   apply: ['Search', 'ابحث'],
   empty: ['No library records match this view.', 'لا توجد سجلات مطابقة في المكتبة.'],
@@ -60,7 +62,7 @@ const labels = {
 };
 
 export function libraryEntryPath(lang, entry) {
-  return entry.kind === 'pdf'
+  return entry.kind !== 'source'
     ? documentsPath(lang, entry.projectId, entry.item)
     : projectReferencesPath(lang, entry.projectId);
 }
@@ -69,7 +71,7 @@ export function libraryPage(lang, url, store, owner) {
   const t = (key) => labels[key][lang === 'ar' ? 1 : 0];
   const search = (url.searchParams.get('q') ?? '').trim().slice(0, 200);
   const requestedKind = url.searchParams.get('kind');
-  const kind = ['pdf', 'source'].includes(requestedKind) ? requestedKind : 'all';
+  const kind = ['pdf', 'txt', 'docx', 'source'].includes(requestedKind) ? requestedKind : 'all';
   const requestedPage = Number(url.searchParams.get('page'));
   const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? Math.min(requestedPage, 10000) : 1;
   const entries = store.library.list(owner, kind, search, page);
@@ -80,11 +82,13 @@ export function libraryPage(lang, url, store, owner) {
   return {
     title: t('title'), path: '/workspace/library',
     html: `<section class="surface panel detail workspace-page">
-      <h1>${t('title')}</h1><a href="${workspacePath(lang)}">${t('workspace')}</a>
+      <h1>${t('title')}</h1><nav class="project-tools"><a href="${workspacePath(lang)}">${t('workspace')}</a>
+      <a href="/workspace/library/collections?lang=${lang}">${lang === 'ar' ? 'مجموعات المكتبة' : 'Library collections'}</a>
+      <a href="/workspace/library/folders?lang=${lang}">${lang === 'ar' ? 'مجلدات المكتبة' : 'Library folders'}</a></nav>
       <form class="workspace-form" action="/workspace/library" method="get">
         <input type="hidden" name="lang" value="${lang}">
         <label>${t('search')}<input name="q" maxlength="200" dir="auto" value="${escapeHtml(search)}"></label>
-        <label>${t('type')}<select name="kind">${['all', 'pdf', 'source'].map((type) =>
+        <label>${t('type')}<select name="kind">${['all', 'pdf', 'txt', 'docx', 'source'].map((type) =>
           `<option value="${type}"${type === kind ? ' selected' : ''}>${t(type)}</option>`).join('')}</select></label>
         <button class="action">${t('apply')}</button>
       </form>

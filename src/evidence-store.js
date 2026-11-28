@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 export const evidenceSchema = `
   CREATE TABLE claims (
@@ -26,6 +26,11 @@ export const evidenceSchema = `
   PRAGMA user_version = 5;
 `;
 
+export function evidenceSourceSelection({ provider, doi, checkedAt, metadata }) {
+  if (provider === 'orcid' || provider === 'agency') return undefined;
+  return createHash('sha256').update(JSON.stringify([provider, doi, checkedAt, metadata])).digest('base64url');
+}
+
 export function evidenceStore(db, now, transact) {
   const insertClaim = db.prepare(`
     INSERT INTO claims SELECT ?, id, ?, ? FROM projects WHERE owner_id = ? AND id = ?
@@ -46,7 +51,8 @@ export function evidenceStore(db, now, transact) {
     FROM claims JOIN projects ON projects.id = claims.project_id
     JOIN project_references AS ref ON ref.project_id = projects.id
     WHERE projects.owner_id = ? AND projects.id = ? AND claims.id = ?
-      AND ref.doi = ? AND ref.provider = ? AND ref.provider <> 'orcid' AND ref.state = 'found'
+      AND ref.doi = ? AND ref.provider = ? AND ref.provider NOT IN ('orcid', 'agency') AND ref.state = 'found'
+      AND (? IS NULL OR (ref.checked_at = ? AND ref.metadata = ?))
       AND NOT EXISTS (
         SELECT 1 FROM evidence_items
         WHERE claim_id = claims.id AND json_extract(source_snapshot, '$.identifier') = ref.doi
@@ -78,9 +84,9 @@ export function evidenceStore(db, now, transact) {
     addClaim(owner, project, statement) {
       return insertClaim.run(randomUUID(), statement, now(), owner, project).changes === 1;
     },
-    link(owner, project, { claim, doi, provider, relation, studyType, limitations }) {
+    link(owner, project, { claim, doi, provider, checkedAt = null, metadata = null, relation, studyType, limitations }) {
       return transact(db, () => link.run(
-        randomUUID(), relation, studyType, limitations, now(), owner, project, claim, doi, provider,
+        randomUUID(), relation, studyType, limitations, now(), owner, project, claim, doi, provider, checkedAt, checkedAt, JSON.stringify(metadata),
       ).changes === 1);
     },
     review(owner, project, { item, decision, note }) {

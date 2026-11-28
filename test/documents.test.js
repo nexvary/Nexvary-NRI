@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { after, before, test } from 'node:test';
+import { totp } from '../src/mfa.js';
 import { createApp } from '../src/server.js';
 import { openWorkspaceStore } from '../src/store.js';
 
@@ -77,6 +78,8 @@ function documentsPath(project = firstProject) {
 test('uploads two real PDF versions and returns each original as a private attachment', async () => {
   const page = await request(`/workspace/projects/${firstProject}?lang=en`);
   assert.match(await page.text(), /Private PDFs/);
+  assert.match(await (await request(documentsPath() + '?lang=en')).text(), /only material you own or are authorized to store/);
+  assert.match(await (await request(documentsPath() + '?lang=ar')).text(), /ارفع المواد التي تملكها/);
   const empty = await request(documentsPath() + '?lang=ar');
   assert.match(await empty.text(), /لم تُضف ملفات PDF/);
   const created = await request(documentsPath() + '?lang=ar', { body: fileForm(firstPdf, 'دراسة.pdf') });
@@ -209,6 +212,10 @@ test('migrates a P1a database and persists encrypted files across restarts', asy
       DROP TABLE readiness_revisions;
       DROP TABLE evidence_items;
       DROP TABLE claims;
+      DROP TABLE control_center_security_events;
+      DROP TABLE control_center_admin_events;
+      ALTER TABLE sessions DROP COLUMN user_agent;
+      ALTER TABLE license_assignments DROP COLUMN state;
       PRAGMA user_version = 1;
     `);
     db.close();
@@ -252,4 +259,56 @@ test('migrates a P1a database and persists encrypted files across restarts', asy
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+
+test('validates, previews, versions and isolates private UTF-8 documents', async () => {
+  const upload = (bytes, name = 'field-notes.txt') => {
+    const form = new FormData();
+    form.set('file', new Blob([bytes]), name);
+    return form;
+  };
+  const original = 'ملخص البحث\n<script>alert(1)</script>';
+  const created = await request(documentsPath(), { body: upload(original) });
+  assert.equal(created.status, 303);
+  const history = created.headers.get('location').split('?')[0];
+  assert.match(await (await request(history + '?lang=ar')).text(), /معاينة النص/);
+  assert.equal((await request(history, { body: upload(firstPdf, 'different.pdf') })).status, 422);
+  assert.equal((await request(history, { body: upload('Second version') })).status, 303);
+  const preview = history + '/versions/1/preview?lang=en';
+  const shown = await request(preview);
+  assert.equal(shown.status, 200);
+  const html = await shown.text();
+  assert.match(html, /ملخص البحث/);
+  assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+  assert.doesNotMatch(html, /<script>alert/);
+  assert.equal((await request(preview, { cookie: bobCookie })).status, 404);
+  assert.equal((await request(history + '/versions/1', { cookie: bobCookie })).status, 404);
+  const download = await request(history + '/versions/1');
+  assert.equal(download.headers.get('content-type'), 'text/plain; charset=utf-8');
+  assert.match(download.headers.get('content-disposition'), /attachment; filename="document-v1\.txt"/);
+  assert.equal(await download.text(), original);
+  const search = '/workspace/library?lang=en&kind=txt&q=field-notes';
+  assert.match(await (await request(search)).text(), /field-notes\.txt/);
+  assert.doesNotMatch(await (await request(search, { cookie: bobCookie })).text(), /<bdi>field-notes\.txt/);
+  assert.equal((await request(documentsPath(), { body: upload(Uint8Array.of(0xc3, 0x28)) })).status, 422);
+  assert.equal((await request(documentsPath(), { body: upload('Binary\0data') })).status, 422);
+  assert.equal((await request(documentsPath(), { body: upload(Buffer.alloc(256 * 1024 + 1, 65)) })).status, 413);
+  const operator = store.credentials(bob).id;
+  store.licensing.setOperator(operator, true);
+  store.mfa.begin(operator);
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  const bits = [...store.mfa.pending(operator)].map((character) => alphabet.indexOf(character).toString(2).padStart(5, '0')).join('');
+  const secret = Buffer.from(bits.match(/.{8}/g).map((byte) => parseInt(byte, 2)));
+  const counter = Math.floor(Date.now() / 30_000);
+  assert.equal(store.mfa.confirm(operator, totp(secret, counter), bobCookie.slice('nri_session='.length)).length, 8);
+  try {
+    assert.equal(store.licensing.save(operator, 'txt-test', 100, 0, 0), 303);
+    assert.equal(store.licensing.assign(operator, alice, 'txt-test', null), 303);
+    assert.equal((await request(history, { body: upload('Over quota') })).status, 429);
+  } finally {
+    store.licensing.setOperator(operator, false);
+  }
+  assert.equal((await request(history + '/delete', { body: new URLSearchParams({ confirm: 'yes' }) })).status, 303);
+  assert.equal((await request(preview)).status, 404);
 });

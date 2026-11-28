@@ -1,3 +1,5 @@
+import { evidenceSourceSelection } from './evidence-store.js';
+import { doiAgencyUrl } from './doi-agency.js';
 import { crossrefUrl, resolverUrl } from './crossref.js';
 import { openAlexUrl, safeOpenAccessUrl } from './openalex.js';
 import { orcidUrl, zenodoUrl } from './public-identifiers.js';
@@ -19,6 +21,13 @@ const copy = {
   empty: ['No identifier checks saved for this project.', 'لا توجد نتائج تحقق محفوظة لهذا المشروع.'],
   source: ['Source', 'المصدر'],
   retrieved: ['Retrieved (UTC)', 'تاريخ الجلب بتوقيت UTC'],
+  'found-agency': ['Registration agency returned by Crossref', 'جهة التسجيل بحسب Crossref'],
+  'not-found-agency': ['No agency record was returned. DOI status is unknown.', 'لم تُرجَع جهة التسجيل. حالة المعرّف غير معروفة.'],
+  'limited-agency': ['DOI agency checks are temporarily limited.', 'التحقق من جهة تسجيل DOI محدود مؤقتًا.'],
+  'unavailable-agency': ['The DOI agency could not be checked.', 'تعذّر التحقق من جهة تسجيل DOI.'],
+  agency: ['Registration agency', 'جهة التسجيل'],
+  linkEvidence: ['Use this source as evidence', 'استخدم هذا المصدر كدليل'],
+  agencyOption: ['DOI agency (Crossref)', 'جهة تسجيل DOI (Crossref)'],
   'found-crossref': ['Metadata found in Crossref', 'عُثِر على البيانات في Crossref'],
   'found-openalex': ['Metadata found in OpenAlex', 'عُثِر على البيانات في OpenAlex'],
   'not-found-crossref': ['Crossref returned no record. DOI status is unknown.', 'لم يُرجع Crossref سجلًا. حالة المعرّف غير معروفة.'],
@@ -71,6 +80,7 @@ const providers = {
   openalex: { label: 'OpenAlex', url: openAlexUrl },
   zenodo: { label: 'Zenodo', url: zenodoUrl },
   orcid: { label: 'ORCID', url: orcidUrl },
+  agency: { label: 'Crossref', url: doiAgencyUrl },
 };
 
 export function referencePage(lang, options = {}) {
@@ -131,6 +141,7 @@ export function referencePage(lang, options = {}) {
     const data = record.metadata;
     if (record.provider === 'openalex') return openalexMeta(data);
     if (record.provider === 'crossref') return crossrefMeta(data);
+    if (record.provider === 'agency') return `<dl class="reference-meta">${row('agency', data.agencyLabel + ' (' + data.agencyId + ')')}</dl>`;
     if (record.provider === 'orcid') return `<dl class="reference-meta">${row('researcher', data.title)}</dl>`;
     const authors = data.authors.join(', ') + (data.moreAuthors ? ` · ${t('moreAuthors')}` : '');
     return `<dl class="reference-meta">${row('title', data.title)}${row('zenodoType', data.type)}${row('authors', authors)}${row('issued', data.issued)}${row('license', data.license)}</dl>`;
@@ -156,6 +167,7 @@ export function referencePage(lang, options = {}) {
       const d = new Date(record.checkedAt);
       const statusKey = `${record.status}-${record.provider}`;
       const statusLabel = t(statusKey) || t(record.status);
+      const evidenceSource = record.status === 'found' && evidenceSourceSelection(record);
       return `<div class="provider-block">
         <dl class="reference-meta">
           <div><dt>${t('source')}</dt><dd><a href="${providers[record.provider].url(doi)}" lang="en" dir="ltr">${providers[record.provider].label}</a></dd></div>
@@ -163,6 +175,7 @@ export function referencePage(lang, options = {}) {
         </dl>
         <p class="tag">${statusLabel}</p>
         ${renderMeta(record)}
+        ${evidenceSource ? `<p><a href="/workspace/projects/${id}/evidence?lang=${lang}&amp;source=${evidenceSource}">${t('linkEvidence')}</a></p>` : ''}
         <form class="project-tools" method="post" action="${action}">
           <input type="hidden" name="doi" value="${escapeHtml(doi)}">
           <input type="hidden" name="provider" value="${record.provider}">
@@ -195,7 +208,7 @@ export function referencePage(lang, options = {}) {
           <fieldset class="provider-select">
             <legend>${t('provider')}</legend>
             ${Object.entries(providers).map(([key, { label }]) =>
-              `<label><input type="radio" name="provider" value="${key}"${provider === key ? ' checked' : ''}> ${label}</label>`).join('')}
+              `<label><input type="radio" name="provider" value="${key}"${provider === key ? ' checked' : ''}> ${key === 'agency' ? t('agencyOption') : label}</label>`).join('')}
           </fieldset>
           <small id="doi-disclosure">${t('disclosure')}</small>
           <button class="action" name="action" value="check">${t('lookup')}</button>

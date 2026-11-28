@@ -1,3 +1,4 @@
+import { developerInformation, systemInformation } from './about.js';
 import { copy, modules, dimensions, metrics, providers } from './content.js';
 
 import { icon } from './icons.js';
@@ -9,15 +10,17 @@ const shortcuts = ['research', 'evidence', 'l-ready', 'economics', 'assistant', 
 const additional = ['references', 'messages', 'observatory', 'analytics', 'education'];
 const repo = 'https://github.com/nexvary/Nexvary-NRI';
 
-export function render({ lang, view, version, page, workspace }) {
+export function render({ lang, view, version, page, workspace, unread = 0, invitations = 0, theme = 'dark' }) {
+  const formatCost = new Intl.NumberFormat(lang, { style: 'currency', currency: 'USD', maximumFractionDigits: 6 });
   const tr = (pair) => pair[lang === 'ar' ? 1 : 0];
   const t = (key) => tr(copy[key]);
   const href = (target, language = lang) => `/?lang=${language}&amp;view=${target}`;
   const label = (id) => tr(modules[id][2]);
-  const link = (id) => `<a href="${href(id)}"${view === id ? ' aria-current="page"' : ''}>${icon(modules[id][0])}<span>${label(id)}</span></a>`;
+  const dashboardLink = view === 'dashboard' ? ' data-dashboard-nav' : '';
+  const link = (id) => `<a href="${href(id)}"${dashboardLink}${view === id ? ' aria-current="page"' : ''}>${icon(modules[id][0])}<span>${label(id)}</span></a>`;
   const tile = (id) => {
     const [glyph, color, name, description] = modules[id];
-    return `<a class="tile surface ${color}" href="${href(id)}">${icon(glyph)}<strong>${tr(name)}</strong><small>${tr(description)}</small></a>`;
+    return `<a class="tile surface ${color}" href="${href(id)}"${dashboardLink}>${icon(glyph)}<strong>${tr(name)}</strong><small>${tr(description)}</small></a>`;
   };
   const dimensionList = `<ul class="dimensions">${dimensions.map(([letter, glyph, color, name]) =>
     `<li class="${color}">${icon(glyph)}<bdi>${letter}</bdi><small>${tr(name)}</small></li>`).join('')}</ul>`;
@@ -25,6 +28,7 @@ export function render({ lang, view, version, page, workspace }) {
   const title = page?.title ?? (isModule ? label(view) : t(view === 'developer' ? 'aboutDeveloper' : 'unknown'));
   const direction = lang === 'ar' ? 'rtl' : 'ltr';
   const dashboard = () => `
+    <p id="dashboard-navigation-status" role="status" aria-live="polite" hidden>${t('dashboardLoading')}</p>
     <section class="hero surface" aria-labelledby="hero-title">
       <div class="hero-copy">
         <h1 id="hero-title" class="wordmark"><bdi>NEXVARY <em>NRI</em></bdi></h1>
@@ -61,12 +65,19 @@ export function render({ lang, view, version, page, workspace }) {
           <h2>${icon('📊')}${t('statistics')}</h2>
           ${workspace ? `<dl class="metrics">${metrics.map(([glyph, key, name]) =>
             `<div>${icon(glyph)}<dt>${tr(name)}</dt><dd>${new Intl.NumberFormat(lang).format(workspace.metrics[key])}</dd></div>`).join('')}</dl>` : ''}
-          <dl class="metrics"><div>${icon('🧾')}<dt>${t('api')}</dt><dd class="inactive">${t('inactive')}</dd></div></dl>
+          ${workspace ? `<dl class="metrics">
+            <div>${icon('🧾')}<dt>${tr(['Estimated API usage today (UTC)', 'تكلفة الاستخدام التقديرية اليوم (UTC)'])}</dt>
+              <dd><bdi>${formatCost.format(workspace.usage.observedCost / 1_000_000)}</bdi></dd></div>
+            <div>${icon('📊')}<dt>${tr(['Provider-reported tokens', 'الرموز التي أبلغ عنها المزوّد'])}</dt>
+              <dd>${new Intl.NumberFormat(lang).format(workspace.usage.observedTokens)}</dd></div>
+          </dl>` : `<dl class="metrics"><div>${icon('🧾')}<dt>${t('api')}</dt><dd class="inactive">${t('inactive')}</dd></div></dl>`}
+          ${workspace?.orcid ? `<p><a href="https://orcid.org/${escapeHtml(workspace.orcid)}"><bdi>ORCID ${escapeHtml(workspace.orcid)}</bdi></a>
+            · ${tr(['Self-reported', 'أضافه صاحب الحساب'])}</p>` : ''}
         </section>
         ${workspace ? `<section class="surface panel">
           <h2>${icon('🕒')}${t('activity')}</h2>
           ${workspace.activity.length ? `<ul class="activity">${workspace.activity.map((item) =>
-            `<li>${icon(item.kind === 'pdf' ? '📄' : '🔗')}<a href="${libraryEntryPath(lang, item)}"><bdi>${escapeHtml(item.title)}</bdi></a></li>`).join('')}</ul>`
+            `<li>${icon(item.kind !== 'source' ? '📄' : '🔗')}<a href="${libraryEntryPath(lang, item)}"><bdi>${escapeHtml(item.title)}</bdi></a></li>`).join('')}</ul>`
             : `<p>${t('noActivity')}</p>`}
         </section>` : ''}
         <section class="surface panel summary"><h2>${t('aboutSystem')}</h2><p>${t('motto')}</p><a href="${href('about')}">${label('about')}</a></section>
@@ -80,9 +91,8 @@ export function render({ lang, view, version, page, workspace }) {
       </nav>
       <h1>${t(view === 'about' ? 'aboutSystem' : 'aboutDeveloper')}</h1>
       ${view === 'about'
-        ? `<p>${t('motto')}</p><p>${t('framework')}</p><p>${t('version')} <bdi>${version}</bdi> · ${t('build')}</p>
-           <ul class="about-links"><li><a href="${repo}/blob/main/docs/PROJECT.md">${t('docs')}</a></li><li><a href="${repo}/blob/main/docs/STATUS.md">${t('status')}</a></li></ul>`
-        : `<p>${t('developer')}</p><a href="https://nexvary.com/">${t('website')}</a>`}
+        ? `<p>${t('version')} <bdi>${version}</bdi> · ${t('build')}</p>${systemInformation(tr)}`
+        : developerInformation(tr)}
     </section>`;
   const detail = () => `
     <section class="surface panel detail">
@@ -101,12 +111,39 @@ export function render({ lang, view, version, page, workspace }) {
   const otherLanguage = lang === 'ar' ? 'en' : 'ar';
   const validView = isModule || view === 'developer' ? view : 'dashboard';
   const languageLink = page ? `${page.path}?lang=${otherLanguage}` : href(validView, otherLanguage);
-  return `<!doctype html>
-<html lang="${lang}" dir="${direction}">
+  if (page?.controlCenter) return `<!doctype html>
+<html lang="${lang}" dir="${direction}" data-theme="${theme}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="dark">
+  <meta name="color-scheme" content="${theme}">
+  <title>${title} | NRI CONTROL CENTER</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <a class="skip" href="#main">${t('skip')}</a>
+  <header class="topbar">
+    <strong lang="en" dir="ltr">NRI CONTROL CENTER — NEXVARY INC.</strong>
+    <nav class="language" aria-label="${t('language')}">
+      <a href="${languageLink}" hreflang="${otherLanguage}" lang="${otherLanguage}" dir="auto">${icon('🌐')}${otherLanguage === 'ar' ? 'العربية' : 'English'}</a>
+    </nav>
+  </header>
+  <main id="main" class="control-center" tabindex="-1">
+    <nav class="project-tools" aria-label="${tr(['Control Center', 'مركز التحكم'])}">
+      ${page.billingOnly ? '' : `<a href="#overview">${tr(['Dashboard', 'لوحة التحكم'])}</a>
+      <a href="#plans">${tr(['Subscription plans', 'خطط الاشتراك'])}</a>`}
+      <a href="/workspace/settings?lang=${lang}">${tr(['Researcher settings', 'إعدادات الباحث'])}</a>
+    </nav>
+    ${content}
+  </main>
+</body>
+</html>`;
+  return `<!doctype html>
+<html lang="${lang}" dir="${direction}" data-theme="${theme}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="${theme}">
   <title>${title} | NEXVARY NRI</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
@@ -115,6 +152,8 @@ export function render({ lang, view, version, page, workspace }) {
   <header class="topbar">
     <a class="wordmark" href="${href('dashboard')}" lang="en" dir="ltr">NEXVARY <em>NRI</em><span>Research Intelligence</span></a>
     <nav class="language" aria-label="${t('language')}">
+      ${invitations ? `<a href="/workspace/team-invitations?lang=${lang}">${icon('🤝')}${tr(['Team invitations', 'دعوات الفريق'])} · ${new Intl.NumberFormat(lang).format(invitations)}</a>` : ''}
+      ${unread ? `<a href="${href('messages')}">${icon('💬')}${tr(['Unread messages', 'الرسائل غير المقروءة'])} · ${new Intl.NumberFormat(lang).format(unread)}</a>` : ''}
       <a href="${languageLink}" hreflang="${otherLanguage}" lang="${otherLanguage}" dir="auto">${icon('🌐')}${otherLanguage === 'ar' ? 'العربية' : 'English'}</a>
     </nav>
   </header>
@@ -130,6 +169,7 @@ export function render({ lang, view, version, page, workspace }) {
   <footer class="surface footer"><nav aria-label="${t('docs')}">
     <ul>${additional.map((id) => `<li>${link(id)}</li>`).join('')}<li><a href="${repo}/blob/main/docs/PROJECT.md">${icon('📘')}${t('docs')}</a></li></ul>
   </nav></footer>
+  ${view === 'dashboard' && !page ? '<script src="/dashboard-navigation.js" defer></script>' : ''}
 </body>
 </html>`;
 }

@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { test } from 'node:test';
 import { createCrossrefClient, crossrefUrl, normalizeDoi, resolverUrl } from '../src/crossref.js';
+import { createDoiAgencyClient } from '../src/doi-agency.js';
 import { createOpenAlexClient, openAlexUrl } from '../src/openalex.js';
 import { createOrcidClient, createZenodoClient, normalizeOrcid, normalizeZenodoDoi } from '../src/public-identifiers.js';
 import { createApp } from '../src/server.js';
@@ -233,6 +234,10 @@ test('migrates a P1b database and persists reference snapshots and the local cac
       DROP TABLE claims;
       DROP TABLE project_references;
       DROP TABLE reference_cache;
+      DROP TABLE control_center_security_events;
+      DROP TABLE control_center_admin_events;
+      ALTER TABLE sessions DROP COLUMN user_agent;
+      ALTER TABLE license_assignments DROP COLUMN state;
       PRAGMA user_version = 2;`);
     raw.close();
     store = openWorkspaceStore(path, now);
@@ -546,7 +551,13 @@ test('validates public identifiers and saves dated ORCID and Zenodo snapshots in
       },
     });
   } });
-  const app = createApp(store, { orcid, zenodo });
+  let agencyCalls = 0;
+  const agency = createDoiAgencyClient({ fetchRecord: async (url) => {
+    assert.equal(url, 'https://api.crossref.org/works/' + doi + '/agency');
+    agencyCalls++;
+    return responseFor(doi, { agency: { id: 'datacite', label: 'DataCite' } });
+  } });
+  const app = createApp(store, { orcid, zenodo, agency });
   app.listen(0, '127.0.0.1');
   await new Promise((resolve) => app.once('listening', resolve));
   const origin = 'http://127.0.0.1:' + app.address().port;
@@ -564,11 +575,32 @@ test('validates public identifiers and saves dated ORCID and Zenodo snapshots in
     assert.equal((await check('orcid', id)).status, 303);
     assert.equal(orcidCalls, 1);
     assert.equal((await check('zenodo', doi)).status, 303);
+    assert.equal((await check('agency', doi, otherCookie)).status, 404);
+    assert.equal((await check('agency', id)).status, 422);
+    assert.equal(agencyCalls, 0);
+    assert.equal((await check('agency', doi)).status, 303);
+    assert.equal((await check('agency', doi)).status, 303);
+    assert.equal(agencyCalls, 1);
+    assert.ok(!store.references.list(owner, project).some(({ provider }) => provider === 'agency'));
+    assert.ok(!store.references.review(owner, project, '', 10).some(({ provider }) => provider === 'agency'));
     const html = await (await fetch(url, { headers: { cookie: ownerCookie } })).text();
-    for (const expected of ['Synthetic public name', 'Ownership is unverified', 'Synthetic dataset', 'cc-by-4.0', 'Retrieved (UTC)']) {
+    for (const expected of ['Registration agency returned by Crossref', 'DataCite (datacite)', 'Synthetic public name', 'Ownership is unverified', 'Synthetic dataset', 'cc-by-4.0', 'Retrieved (UTC)']) {
       assert.ok(html.includes(expected), expected);
     }
   } finally {
     await new Promise((resolve, reject) => app.close((error) => error ? reject(error) : resolve()));
   }
+});
+
+test('distinguishes DOI agency records from mismatched responses and provider downtime', async () => {
+  let now = fixtureTime;
+  let response = responseFor('10.5555/other', { agency: { id: 'crossref', label: 'Crossref' } });
+  const agency = createDoiAgencyClient({ now: () => now, fetchRecord: async () => response });
+  assert.deepEqual(await agency(doi), { status: 'unavailable' });
+  now += 1001;
+  response = new Response(null, { status: 404 });
+  assert.deepEqual(await agency(doi), { status: 'not-found', checkedAt: now, metadata: null });
+  now += 1001;
+  response = new Response(null, { status: 503 });
+  assert.deepEqual(await agency(doi), { status: 'unavailable' });
 });

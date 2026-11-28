@@ -2,8 +2,10 @@ const labels = {
   signIn: ['Sign in', 'تسجيل الدخول'],
   signOut: ['Sign out', 'تسجيل الخروج'],
   email: ['Email address', 'البريد الإلكتروني'],
+  projectLimit: ['Your plan’s project limit has been reached.', 'بلغت الحد الأقصى للمشاريع في خطتك.'],
+  mfaCode: ['Authenticator or recovery code (if enabled)', 'رمز المصادقة أو الاسترداد، إذا كان التحقق مفعّلًا'],
   password: ['Password', 'كلمة المرور'],
-  credentials: ['The email address or password is incorrect.', 'البريد الإلكتروني أو كلمة المرور غير صحيحة.'],
+  credentials: ['The sign-in details are incorrect.', 'بيانات تسجيل الدخول غير صحيحة.'],
   rateLimit: ['Too many attempts. Try again shortly.', 'محاولات كثيرة. جرّب مجددًا بعد قليل.'],
   workspace: ['Research workspace', 'إدارة الأبحاث'],
   projects: ['My projects', 'مشاريعي'],
@@ -17,28 +19,35 @@ const labels = {
   missing: ['Project unavailable', 'المشروع غير متاح'],
   empty: ['Your projects will appear here after you create one.', 'ستظهر مشاريعك هنا بعد إنشاء أول مشروع.'],
   confirmProject: ['Confirm deletion of this project and its files', 'أؤكد حذف المشروع وكل ملفاته'],
-  documents: ['Private PDFs', 'ملفات PDF الخاصة'],
+  documents: ['Private PDFs, DOCX and text files', 'ملفات PDF وDOCX والنصوص الخاصة'],
   sharing: ['Project invitations', 'دعوات المشروع'],
   reports: ['Report studio', 'استوديو التقارير'],
   economics: ['Economic feasibility', 'الجدوى الاقتصادية'],
   readiness: ['L-READY assessment', 'تقييم L-READY'],
   evidence: ['Evidence intelligence', 'تحليل الأدلة'],
   references: ['Reference validator', 'التحقق من المراجع'],
-  emptyDocuments: ['This project has no PDFs yet.', 'لم تُضف ملفات PDF إلى هذا المشروع بعد.'],
+  emptyDocuments: ['This project has no PDF, DOCX or text files yet.', 'لم تُضف ملفات PDF أو DOCX أو ملفات نصية إلى هذا المشروع بعد.'],
   backToProject: ['Back to the project', 'العودة إلى المشروع'],
   backToDocuments: ['Back to project files', 'العودة إلى ملفات المشروع'],
-  pdfFile: ['PDF file', 'ملف PDF'],
-  upload: ['Upload PDF', 'رفع ملف PDF'],
+  pdfFile: ['Document file', 'ملف المستند'],
+  upload: ['Upload document', 'رفع مستند'],
   uploadVersion: ['Upload new version', 'رفع إصدار جديد'],
   history: ['Version history', 'سجل الإصدارات'],
   version: ['Version', 'الإصدار'],
-  download: ['Download PDF', 'تنزيل PDF'],
+  download: ['Download file', 'تنزيل الملف'],
   bytes: ['bytes', 'بايت'],
-  fileLimit: ['Up to 8 MiB per PDF.', 'الحد الأقصى 8 ميبيبايت لكل ملف PDF.'],
+  fileLimit: ['PDF and DOCX up to 8 MiB. UTF-8 TXT up to 256 KiB. Upload only material you own or are authorized to store; check the applicable license and copyright terms.', 'الحد الأقصى 8 ميبيبايت لملفات PDF وDOCX و256 كيبيبايت لملف TXT بترميز UTF-8. ارفع المواد التي تملكها أو تملك إذنًا بتخزينها فقط، وتحقق من شروط الترخيص وحقوق النشر المنطبقة.'],
+  preview: ['Preview text', 'معاينة النص'],
+  invalidDocx: ['This DOCX is malformed or uses unsupported content.', 'ملف DOCX تالف أو يتضمن محتوى غير مدعوم.'],
+  docxUnavailable: ['DOCX processing is temporarily unavailable.', 'معالجة ملفات DOCX غير متاحة مؤقتًا.'],
+  invalidText: ['Choose a valid UTF-8 text file.', 'اختر ملفًا نصيًا صالحًا بترميز UTF-8.'],
+  largeText: ['The TXT file exceeds 256 KiB.', 'يتجاوز الملف النصي 256 كيبيبايت.'],
+  versionFormat: ['Versions must use the original file format.', 'يجب أن تطابق الإصدارات صيغة الملف الأصلي.'],
   invalidPdf: ['Choose one PDF file with a valid PDF signature.', 'اختر ملف PDF واحدًا بتوقيع صالح.'],
   largePdf: ['The PDF exceeds the 8 MiB limit.', 'يتجاوز الملف الحد الأقصى البالغ 8 ميبيبايت.'],
+  storageLimit: ['The plan PDF storage limit has been reached for documents.', 'بلغت الحد الأقصى لتخزين المستندات في خطتك.'],
   uploadBusy: ['Other uploads are in progress. Try again shortly.', 'هناك ملفات أخرى قيد الرفع. جرّب مرة أخرى بعد قليل.'],
-  deleteDocument: ['Delete PDF and all versions', 'حذف ملف PDF وكل إصداراته'],
+  deleteDocument: ['Delete document and all versions', 'حذف المستند وكل إصداراته'],
   confirmDocument: ['Confirm file deletion', 'أؤكد حذف الملف'],
   invalid: ['Enter a title of up to 120 characters and a summary of up to 2,000 characters.', 'أدخل اسمًا من 120 حرفًا بحد أقصى وملخّصًا من 2000 حرف بحد أقصى.'],
 };
@@ -83,8 +92,19 @@ export function workspacePage(lang, kind, options = {}) {
         <form method="post" action="${loginPath(lang)}" class="workspace-form">
           <label>${t('email')}<input name="email" type="email" dir="ltr" autocomplete="username" maxlength="254" required></label>
           <label>${t('password')}<input name="password" type="password" dir="ltr" autocomplete="current-password" maxlength="128" required></label>
+          <label>${t('mfaCode')}<input name="mfa-code" dir="ltr" autocomplete="one-time-code" maxlength="19"></label>
           <button class="action" type="submit">${t('signIn')}</button>
         </form>
+        <p><a href="/recover?lang=${lang}">${lang === 'ar' ? 'هل نسيت كلمة المرور؟ استعد الوصول' : 'Forgot your password? Recover access'}</a></p>
+      </section>`);
+  }
+  if (kind === 'entitlement') {
+    const title = lang === 'ar' ? 'الميزة غير متاحة في اشتراكك' : 'Feature unavailable with your subscription';
+    const settings = lang === 'ar' ? 'أمان الحساب وتصدير البيانات' : 'Account security and data export';
+    return panel(title, '/workspace/settings', `
+      <section class="surface panel detail workspace-page">
+        <h1>${title}</h1>
+        <a class="action" href="/workspace/settings?lang=${lang}">${settings}</a>
       </section>`);
   }
   if (kind === 'missing') {
@@ -98,10 +118,12 @@ export function workspacePage(lang, kind, options = {}) {
     const { project, document, documents, versions, documentId } = options;
     const route = documentsPath(lang, id, documentId);
     const path = route.split('?')[0];
+    const textDocument = Boolean(document && /\.(?:txt|docx)$/iu.test(document.title));
+    const accept = document ? (textDocument ? document.title.slice(document.title.lastIndexOf(".")).toLowerCase() : ".pdf") : ".pdf,.txt,.docx";
     const upload = `
       ${feedback}
       <form method="post" action="${route}" enctype="multipart/form-data" class="workspace-form">
-        <label>${t('pdfFile')}<input type="file" name="pdf" accept="application/pdf,.pdf" aria-describedby="pdf-limit" required></label>
+        <label>${t('pdfFile')}<input type="file" name="file" accept="${accept}" aria-describedby="pdf-limit" required></label>
         <small id="pdf-limit">${t('fileLimit')}</small>
         <button class="action" type="submit">${t(document ? 'uploadVersion' : 'upload')}</button>
       </form>`;
@@ -128,6 +150,7 @@ export function workspacePage(lang, kind, options = {}) {
       <section class="surface panel detail workspace-page">
         <a href="${documentsPath(lang, id)}">${t('backToDocuments')}</a>
         <h1 dir="auto">${escapeHtml(document.title)}</h1>
+        ${textDocument ? '' : `<p><a href="${path}/reading?lang=${lang}">${lang === 'ar' ? 'ملاحظات القراءة' : 'Reading notes'}</a></p>`}
         <section class="project-list">
           <h2>${t('history')}</h2>
           <ol class="document-history">
@@ -135,7 +158,7 @@ export function workspacePage(lang, kind, options = {}) {
               <li><div><strong>${t('version')} ${numeric.format(item.number)}</strong><br>
                 <bdi>${escapeHtml(item.filename)}</bdi><br>
                 <time datetime="${new Date(item.created_at).toISOString()}">${date.format(item.created_at)}</time> · ${numeric.format(item.size)} ${t('bytes')}
-              </div><a class="action" href="${path}/versions/${item.number}?lang=${lang}">${t('download')}</a></li>`).join('')}
+              </div><div class="project-tools">${textDocument ? `<a href="${path}/versions/${item.number}/preview?lang=${lang}">${t('preview')}</a>` : ''}<a class="action" href="${path}/versions/${item.number}?lang=${lang}">${t('download')}</a></div></li>`).join('')}
           </ol>
         </section>
         <section class="project-editor"><h2>${t('uploadVersion')}</h2>${upload}</section>
@@ -162,6 +185,8 @@ export function workspacePage(lang, kind, options = {}) {
         <h1 dir="auto">${escapeHtml(values.title)}</h1>
         <nav class="project-tools" aria-label="${t('workspace')}">
           <a class="action project-files" href="${documentsPath(lang, id)}">${t('documents')}</a>
+          <a class="action" href="/workspace/projects/${id}/team?lang=${lang}">${lang === 'ar' ? 'فريق المشروع' : 'Project team'}</a>
+          <a class="action" href="/workspace/projects/${id}/citations?lang=${lang}">${lang === 'ar' ? 'مكتبة الاستشهادات' : 'Citation library'}</a>
           <a class="action" href="${projectReferencesPath(lang, id)}">${t('references')}</a>
           <a class="action" href="/workspace/projects/${id}/evidence?lang=${lang}">${t('evidence')}</a>
           <a class="action" href="/workspace/projects/${id}/readiness?lang=${lang}">${t('readiness')}</a>

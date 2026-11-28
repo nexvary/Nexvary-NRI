@@ -68,7 +68,7 @@ export function createSharingHandler(store) {
         invalid = true;
       }
       const entries = store.sharing.inbox(owner);
-      panel('inbox', '/workspace/project-invitations', `<p>${t('scope')}</p>
+      panel('inbox', '/workspace/project-invitations', `<p><a href="/workspace/team-invitations?lang=${lang}">${lang === 'ar' ? 'دعوات فرق المشاريع' : 'Project team invitations'}</a></p><p>${t('scope')}</p>
         ${entries.length ? `<ul class="project-list">${entries.map((project) => `<li class="provider-block">
           <h2 dir="auto">${escapeHtml(project.title)}</h2><p>${t('role')} · ${t(project.state)}</p>
           ${project.state === 'accepted' ? `<a href="${sharedPath(lang,project.id)}">${t('shared')}</a>`
@@ -101,7 +101,7 @@ export function createSharingHandler(store) {
     const entries = store.sharing.outbox(owner,id);
     const history = store.sharing.history(owner,id);
     panel('manage', `/workspace/projects/${id}/sharing`, `<a href="${workspacePath(lang,id)}">${t('return')}</a>
-      <h2 dir="auto">${escapeHtml(project.title)}</h2><p>${t('scope')}</p>
+      <h2 dir="auto">${escapeHtml(project.title)}</h2><p><a href="/workspace/projects/${id}/team?lang=${lang}">${lang === 'ar' ? 'فريق المشروع' : 'Project team'}</a></p><p>${t('scope')}</p>
       <form class="workspace-form" method="get" action="/workspace/projects/${id}/sharing">
         <input type="hidden" name="lang" value="${lang}">
         <label>${t('search')}<input name="q" maxlength="120" value="${escapeHtml(query)}"></label>

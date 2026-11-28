@@ -86,7 +86,15 @@ export function referenceStore(db, now, transact) {
   const list = db.prepare(`
     SELECT record.doi, record.provider, record.state, record.checked_at, record.metadata
     FROM project_references AS record JOIN projects ON projects.id = record.project_id
-    WHERE projects.owner_id = ? AND projects.id = ? ORDER BY record.doi, record.provider, record.checked_at DESC
+    WHERE projects.owner_id = ? AND projects.id = ? AND (? OR record.provider <> 'agency') ORDER BY record.doi, record.provider, record.checked_at DESC
+  `);
+  const review = db.prepare(`
+    SELECT r.doi, r.provider, r.state, r.checked_at, r.metadata
+    FROM project_references r JOIN projects p ON p.id = r.project_id
+    WHERE p.owner_id = ? AND p.id = ? AND r.provider NOT IN ('orcid', 'agency')
+      AND (? = '' OR instr(lower(r.doi), lower(?)) > 0
+        OR instr(lower(COALESCE(json_extract(r.metadata, '$.title'), '')), lower(?)) > 0)
+    ORDER BY r.checked_at DESC, r.doi, r.provider LIMIT ?
   `);
   const upsert = db.prepare(`
     INSERT INTO project_references
@@ -107,8 +115,11 @@ export function referenceStore(db, now, transact) {
       const row = cached.get(owner, doi, provider, now());
       return row ? snapshot(row) : null;
     },
-    list(owner, projectId) {
-      return list.all(owner, projectId).map(snapshot);
+    list(owner, projectId, { includeAgency = false } = {}) {
+      return list.all(owner, projectId, Number(includeAgency)).map(snapshot);
+    },
+    review(owner, projectId, filter, limit) {
+      return review.all(owner, projectId, filter, filter, filter, limit).map(snapshot);
     },
     save(owner, projectId, { doi, provider, status, checkedAt, metadata }, fresh) {
       return transact(db, () => {

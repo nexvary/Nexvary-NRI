@@ -1,3 +1,20 @@
+import { handleOperations, handleOperationsAdmin, operationsPaths } from './admin-operations.js';
+import { allowsRoute } from './entitlements.js';
+import { createLoginThrottle } from './login-throttle.js';
+import { createPasswordRecoveryHandler } from './password-recovery.js';
+import { createResourceHandler, resolveResourceRoute } from './resource-sharing.js';
+import { handleCitations, resolveCitationRoute } from './citations.js';
+import { handleOrganization, resolveOrganizationRoute } from './library-organization.js';
+import { handleTeamWork } from './team-work.js';
+import { billingRecordsPath, commercialAnalyticsPath, controlCenterPath, handleBillingRecords, handleCommercialAnalytics, handleLicensing, legacyLicensingPath } from './licensing.js';
+import { handleTeam, resolveTeamRoute } from './teams.js';
+import { createPrivacyHandler } from './privacy.js';
+import { handleMessageModeration } from './moderation.js';
+import { createMfaSettingsHandler } from './mfa-settings.js';
+import { handleMessages, resolveMessageRoute } from './messages.js';
+import { createAssistantAnswerHandler } from './assistant-answer.js';
+import { handleAssistantSettings } from './assistant-settings.js';
+import { showAssistant } from './assistant.js';
 import { createDocumentHandler, resolveDocumentRoute } from './documents.js';
 import { createEducationHandler } from './education.js';
 import { createSharingHandler, resolveSharingRoute } from './sharing.js';
@@ -18,14 +35,25 @@ import { loginPath, workspacePage, workspacePath } from './workspace-view.js';
 
 const cookieName = 'nri_session';
 const formLimit = 24 * 1024;
-const loginWindow = 60_000;
-const maxLoginAttempts = 12;
-const maxConcurrentLogins = 2;
 
 export function resolveWorkspaceRoute(pathname) {
   if (pathname === '/login') return { kind: 'login' };
+  if (pathname === '/recover') return { kind: 'recover' };
   if (pathname === '/logout') return { kind: 'logout' };
+  if (pathname === '/workspace/assistant/answer') return { kind: 'assistant-answer' };
+  if (pathname === '/workspace/assistant/settings') return { kind: 'assistant-settings' };
+  if (pathname === '/workspace/assistant') return { kind: 'assistant' };
   if (pathname === '/workspace/education') return { kind: 'education' };
+  if (pathname === '/workspace/settings/message-moderation') return { kind: 'settings-message-moderation' };
+  if (pathname === '/workspace/settings/network-moderation') return { kind: 'network-moderation' };
+  if (pathname === operationsPaths.support) return { kind: 'control-operations', role: 'support' };
+  if (pathname === operationsPaths.security) return { kind: 'control-operations', role: 'security' };
+  if (pathname === operationsPaths.administration) return { kind: 'control-admin' };
+  if (pathname === billingRecordsPath) return { kind: 'control-billing' };
+  if (pathname === commercialAnalyticsPath) return { kind: 'control-analytics' };
+  if (pathname === controlCenterPath || pathname === legacyLicensingPath) return { kind: 'settings-licensing' };
+  if (pathname === '/workspace/settings/privacy') return { kind: 'settings-privacy' };
+  if (pathname === '/workspace/settings/mfa') return { kind: 'settings-mfa' };
   if (pathname === '/workspace/settings') return { kind: 'settings' };
   if (pathname === '/workspace/analytics') return { kind: 'analytics' };
   if (pathname === '/workspace/network') return { kind: 'network' };
@@ -34,10 +62,11 @@ export function resolveWorkspaceRoute(pathname) {
   if (pathname === '/workspace') return { kind: 'index' };
   const match = pathname.match(/^\/workspace\/projects\/([0-9a-f-]{36})(\/delete)?$/);
   if (match) return { kind: match[2] ? 'delete' : 'project', id: match[1] };
-  return resolveDocumentRoute(pathname) ?? resolveReferenceRoute(pathname) ?? resolveEvidenceRoute(pathname) ?? resolveReadinessRoute(pathname) ?? resolveEconomicsRoute(pathname) ?? resolveObservatoryRoute(pathname) ?? resolveReportRoute(pathname) ?? resolveSharingRoute(pathname);
+  return resolveResourceRoute(pathname) ?? resolveCitationRoute(pathname) ?? resolveOrganizationRoute(pathname) ?? resolveTeamRoute(pathname) ?? resolveMessageRoute(pathname) ?? resolveDocumentRoute(pathname) ?? resolveReferenceRoute(pathname) ?? resolveEvidenceRoute(pathname) ?? resolveReadinessRoute(pathname) ?? resolveEconomicsRoute(pathname) ?? resolveObservatoryRoute(pathname) ?? resolveReportRoute(pathname) ?? resolveSharingRoute(pathname);
 }
 
-function acceptsPost(request) {
+function acceptsPost(request, origin) {
+  if (origin) return request.headers.origin === origin;
   const port = request.socket.localPort;
   const host = request.headers.host;
   const portSuffix = port === 80 ? '' : `:${port}`;
@@ -47,20 +76,23 @@ function acceptsPost(request) {
   return knownAuthority && request.headers.origin === `http://${host}`;
 }
 
-export function readSessionCookie(header = '') {
-  const value = header.match(/(?:^|;\s*)nri_session=([A-Za-z0-9_-]{43})(?:;|$)/);
-  return value?.[1];
+export function readSessionCookie(header = '', secure = false) {
+  const name = (secure ? '__Host-' : '') + cookieName + '=';
+  const matches = header.split(';').map((part) => part.trim()).filter((part) => part.startsWith(name));
+  const value = matches.length === 1 ? matches[0].slice(name.length) : '';
+  return /^[A-Za-z0-9_-]{43}$/.test(value) ? value : undefined;
 }
 
-function sessionCookie(token, maxAge) {
-  return `${cookieName}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}`;
+function sessionCookie(token, maxAge, secure) {
+  const name = (secure ? '__Host-' : '') + cookieName;
+  return `${name}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${secure ? '; Secure' : ''}`;
 }
 
-async function readForm(request) {
+async function readForm(request, limit = formLimit) {
   if (request.headers['content-type']?.split(';', 1)[0].trim().toLowerCase()
     !== 'application/x-www-form-urlencoded') return { status: 415 };
 
-  const body = await readBoundedBody(request, formLimit);
+  const body = await readBoundedBody(request, limit);
   return body ? { fields: new URLSearchParams(body.toString('utf8')) } : { status: 413 };
 }
 
@@ -71,10 +103,15 @@ function projectFields(form) {
   };
 }
 
-export function createWorkspaceHandler(store, providers, version, reportRenderer) {
+export function createWorkspaceHandler(store, providers, version, reportRenderer, assistantProvider, origin, enforceEntitlements) {
+  const handlePrivacy = createPrivacyHandler(store);
+  const handlePasswordRecovery = createPasswordRecoveryHandler(store);
+  const handleMfaSettings = createMfaSettingsHandler(store);
+  const handleAssistantAnswer = createAssistantAnswerHandler(store, assistantProvider);
   const handleDocuments = createDocumentHandler(store);
   const handleNetwork = createNetworkHandler(store);
   const handleObservatory = createObservatoryHandler(store);
+  const handleResources = createResourceHandler(store, version, reportRenderer);
   const handleReports = createReportHandler(store, version, reportRenderer);
   const handleSharing = createSharingHandler(store);
   const handleEducation = createEducationHandler(store);
@@ -82,9 +119,7 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
   const handleReadiness = createReadinessHandler(store);
   const handleEvidence = createEvidenceHandler(store);
   const handleReferences = createReferenceHandler(store, providers);
-  let windowStarted = 0;
-  let attempts = 0;
-  let inFlight = 0;
+  const throttle = createLoginThrottle();
 
   return async function handle({ request, reply, redirect, route, lang }) {
     const { kind, id } = route;
@@ -93,22 +128,28 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
     };
     const postOnly = kind === 'delete' || kind === 'logout' || kind === 'delete-document';
     const allowed = postOnly ? ['POST'] : ['GET', 'HEAD'];
-    if (!postOnly && !['download-document', 'reference-projects', 'evidence-projects', 'evidence-export', 'readiness-projects', 'economics-projects', 'economics-export', 'library', 'report-projects', 'sharing-project'].includes(kind)) allowed.push('POST');
+    const readOnly = ['control-billing','control-analytics','download-document','preview-document','reference-projects','evidence-projects','evidence-export','readiness-projects','economics-projects','economics-export','library','report-projects','sharing-project','assistant'].includes(kind) || (kind==='control-operations' && route.role==='support');
+    if (!postOnly && !readOnly) allowed.push('POST');
     const method = request.method;
     if (!allowed.includes(method)) {
       reply(405, null, { Allow: allowed.join(', ') });
       return;
     }
 
-    const token = readSessionCookie(request.headers.cookie);
+    const token = readSessionCookie(request.headers.cookie, Boolean(origin));
     let form;
     if (method === 'POST') {
-      if (!acceptsPost(request)) {
+      if (!acceptsPost(request, origin)) {
         reply(403);
         return;
       }
+      if (enforceEntitlements && !['login', 'recover'].includes(kind)) {
+        const preliminary = store.session(token);
+        if (!preliminary) return redirect(loginPath(lang));
+        if (!allowsRoute(store.licensing, preliminary.id, kind)) return reply(403, workspacePage(lang, 'entitlement'));
+      }
       if (!['logout', 'documents', 'document', 'analytics'].includes(kind)) {
-        const { status, fields } = await readForm(request);
+        const { status, fields } = await readForm(request, kind === 'citations' ? 1024 * 1024 : kind === 'team-project' ? 160 * 1024 : formLimit);
         if (status) {
           reply(status);
           return;
@@ -117,6 +158,12 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
       }
     }
     const account = store.session(token);
+    const entitled = () => !enforceEntitlements || allowsRoute(store.licensing, account.id, kind);
+
+    if (kind === 'recover') {
+      await handlePasswordRecovery({ request, reply, lang, form });
+      return;
+    }
 
     if (kind === 'login') {
       if (method !== 'POST') {
@@ -125,30 +172,30 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
         return;
       }
 
-      const now = Date.now();
-      if (now - windowStarted >= loginWindow) {
-        windowStarted = now;
-        attempts = 0;
-      }
-      if (attempts >= maxLoginAttempts || inFlight >= maxConcurrentLogins) {
-        show(429, 'login', { error: 'rateLimit' }, { 'Retry-After': String(Math.ceil((windowStarted + loginWindow - now) / 1000)) });
+      const email = normalizeAddress(form.get('email') ?? '');
+      const retryAfter = throttle.begin(request.socket.remoteAddress ?? '',email);
+      if (retryAfter) {
+        show(429, 'login', { error: 'rateLimit' }, { 'Retry-After': String(retryAfter) });
         return;
       }
-      attempts++;
-      inFlight++;
       try {
-        const email = normalizeAddress(form.get('email') ?? '');
         const password = form.get('password') ?? '';
         const credentials = email ? store.credentials(email) : undefined;
         const valid = await verifyPassword(password.slice(0, 128), credentials);
-        if (!valid || password.length > 128) {
+        const code = (form.get('mfa-code') ?? '').slice(0, 32);
+        if (!valid || password.length > 128 ||
+          (store.mfa.enabled(credentials.id) && !store.mfa.verify(credentials.id, code))) {
           show(401, 'login', { error: 'credentials' });
           return;
         }
-        const session = store.signIn(credentials.id, token);
-        redirect(workspacePath(lang), { 'Set-Cookie': sessionCookie(session, sessionLifetime) });
+        const session = store.signIn(credentials, token, request.headers['user-agent'] ?? '');
+        if (!session) {
+          show(401, 'login', { error: 'credentials' });
+          return;
+        }
+        redirect(workspacePath(lang), { 'Set-Cookie': sessionCookie(session, sessionLifetime, Boolean(origin)) });
       } finally {
-        inFlight--;
+        throttle.finish();
       }
       return;
     }
@@ -157,22 +204,112 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
       redirect(loginPath(lang));
       return;
     }
+    if (!entitled()) {
+      reply(403, workspacePage(lang, 'entitlement'));
+      return;
+    }
+    const stillSignedIn = () => store.session(token)?.id === account.id && entitled();
     if (kind === 'logout') {
       store.signOut(account.id, token);
-      redirect(loginPath(lang), { 'Set-Cookie': sessionCookie('', 0) });
+      redirect(loginPath(lang), { 'Set-Cookie': sessionCookie('', 0, Boolean(origin)) });
       return;
     }
 
+    if (kind.startsWith('messages')) {
+      handleMessages({ request, reply, redirect, route, lang, account, form, store });
+      return;
+    }
+    if (kind === 'assistant-answer') {
+      await handleAssistantAnswer({ request, reply, lang, form, account, stillSignedIn });
+      return;
+    }
+    if (kind === 'assistant-settings') {
+      handleAssistantSettings({ reply, redirect, lang, form, store, account });
+      return;
+    }
+    if (kind === 'assistant') {
+      showAssistant({ reply, request, lang, store, account });
+      return;
+    }
     if (kind === 'education') {
       handleEducation({ request, reply, lang, account, form });
+      return;
+    }
+    if (kind === 'shared-resources') {
+      await handleResources({ request,reply,redirect,route,lang,account,form,stillSignedIn });
+      return;
+    }
+    if (kind === 'team-work') {
+      handleTeamWork({ request, reply, redirect, route, lang, account, form, store });
+      return;
+    }
+    if (kind.startsWith('team')) {
+      handleTeam({ request, reply, redirect, route, lang, account, form, store });
       return;
     }
     if (kind.startsWith('sharing')) {
       handleSharing({ request, reply, redirect, route, lang, account, form });
       return;
     }
+    if (kind === 'settings-message-moderation') {
+      handleMessageModeration({ request, reply, redirect, lang, account, form, store });
+      return;
+    }
+    if (kind === 'control-operations') {
+      await handleOperations({ request, reply, redirect, lang, account, token, form, store, role: route.role });
+      return;
+    }
+    if (kind === 'control-admin') {
+      await handleOperationsAdmin({ request, reply, redirect, lang, actor: account, token, form, store });
+      return;
+    }
+    if (kind === 'control-billing') {
+      await handleBillingRecords({ request, reply, lang, account, store, reportRenderer, stillSignedIn });
+      return;
+    }
+    if (kind === 'control-analytics') {
+      handleCommercialAnalytics({ reply, lang, account, store });
+      return;
+    }
+    if (kind === 'settings-licensing') {
+      await handleLicensing({ request, reply, redirect, lang, account, token, form, store });
+      return;
+    }
+    if (kind === 'settings-privacy') {
+      await handlePrivacy({ request, reply, redirect, lang, account, form, token, expiredCookie: sessionCookie('', 0, Boolean(origin)) });
+      return;
+    }
+    if (kind === 'settings-mfa') {
+      await handleMfaSettings({ reply, redirect, lang, account, token, form });
+      return;
+    }
     if (kind === 'settings') {
       if (method === 'POST') {
+        if (form.get('intent') === 'update-profile') {
+          const retryAfter = throttle.begin(request.socket.remoteAddress ?? '', account.email);
+          if (retryAfter) {
+            reply(429, settingsPage(store, lang, account, token), { 'Retry-After': String(retryAfter) });
+            return;
+          }
+          try {
+            const password = form.get('password') ?? '';
+            const credentials = store.credentials(account.email);
+            const valid = password.length <= 128 && await verifyPassword(password, credentials);
+            if (!valid || store.session(token)?.id !== account.id) {
+              reply(403);
+              return;
+            }
+            const status = store.settings.updateProfile(account.id, form.get('display-name'), form.get('theme'));
+            if (status !== 303) {
+              reply(status);
+              return;
+            }
+            redirect(`/workspace/settings?lang=${lang}`);
+            return;
+          } finally {
+            throttle.finish();
+          }
+        }
         if (form.get('intent') !== 'revoke-others') {
           reply(422);
           return;
@@ -186,7 +323,7 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
     }
 
     if (kind.startsWith('report')) {
-      await handleReports({ request, reply, route, lang, account, form, stillSignedIn: () => store.session(token)?.id === account.id });
+      await handleReports({ request, reply, route, lang, account, form, stillSignedIn });
       return;
     }
     if (kind.startsWith('observatory')) {
@@ -194,11 +331,19 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
       return;
     }
     if (kind === 'analytics') {
-      await handleAnalytics({ request, reply, lang, stillSignedIn: () => store.session(token)?.id === account.id });
+      await handleAnalytics({ request, reply, lang, stillSignedIn });
       return;
     }
-    if (kind === 'network' || kind === 'collaboration') {
+    if (kind === 'network' || kind === 'collaboration' || kind === 'network-moderation') {
       handleNetwork({ request, reply, redirect, route, lang, account, form });
+      return;
+    }
+    if (kind === 'citations') {
+      handleCitations({request,reply,redirect,route,lang,account,form,store});
+      return;
+    }
+    if (kind.startsWith('library-')) {
+      handleOrganization({ request, reply, redirect, route, lang, account, form, store });
       return;
     }
     if (kind === 'library') {
@@ -220,13 +365,12 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
       return;
     }
 
-    const stillSignedIn = () => store.session(token)?.id === account.id;
     if (['references', 'reference-projects'].includes(kind)) {
       await handleReferences({ request, reply, redirect, route, lang, account, form, stillSignedIn });
       return;
     }
 
-    if (['documents', 'document', 'delete-document', 'download-document'].includes(kind)) {
+    if (['documents', 'document', 'delete-document', 'download-document', 'preview-document'].includes(kind)) {
       if (kind === 'delete-document' && form.get('confirm') !== 'yes') {
         reply(400);
         return;
@@ -270,6 +414,11 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
       else redirect(workspacePath(lang, id));
       return;
     }
-    redirect(workspacePath(lang, store.createProject(account.id, values)));
+    const created = store.createProject(account.id, values);
+    if (!created) {
+      show(429, 'index', { account, projects: store.listProjects(account.id), values, error: 'projectLimit' });
+      return;
+    }
+    redirect(workspacePath(lang, created));
   };
 }

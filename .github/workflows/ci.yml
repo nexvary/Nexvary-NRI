@@ -19,13 +19,23 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '24.22.3'
+      - name: Install pinned PDF reader
+        run: npm ci --omit=optional --ignore-scripts
       - name: Install bilingual report runtime
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0 fonts-noto-core fonts-dejavu-core
           python3 -m venv "$RUNNER_TEMP/nri-report-python"
+          "$RUNNER_TEMP/nri-report-python/bin/python" -m pip install --upgrade pip==26.3
           "$RUNNER_TEMP/nri-report-python/bin/python" -m pip install -r scripts/report-requirements.txt
       - name: Run unit and integration tests with real report rendering
         run: |
           export NRI_REPORT_PYTHON="$RUNNER_TEMP/nri-report-python/bin/python"
           npm test
+      - name: Verify bilingual accessibility, navigation and responsive layouts in Chromium
+        run: node scripts/assistant-browser-qa.mjs "$RUNNER_TEMP/nri-assistant-qa"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: nri-browser-accessibility-qa
+          path: ${{ runner.temp }}/nri-assistant-qa/*.webp
+          if-no-files-found: error

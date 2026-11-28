@@ -33,7 +33,7 @@ function appendVersion(insert, key, now, projectId, documentId, number, file) {
   insert.run(documentId, number, file.name, now(), file.bytes.length, nonce, ciphertext, tag);
 }
 
-export function documentStore(db, key, now, transact) {
+export function documentStore(db, key, now, transact, canStore = () => true) {
   const ownedProject = db.prepare('SELECT id, title FROM projects WHERE owner_id = ? AND id = ?');
   const list = db.prepare(`
     SELECT documents.id, documents.title, COUNT(document_versions.number) AS versionCount
@@ -56,6 +56,12 @@ export function documentStore(db, key, now, transact) {
     WHERE projects.owner_id = ? AND projects.id = ? AND documents.id = ?
     ORDER BY version.number DESC
   `);
+  const exportable = db.prepare(`
+    SELECT p.id AS project_id, p.title AS project_title, d.id AS document_id, v.number, v.filename
+    FROM projects p JOIN documents d ON d.project_id=p.id
+    JOIN document_versions v ON v.document_id=d.id
+    WHERE p.owner_id=? ORDER BY p.id,d.id,v.number DESC LIMIT 51 OFFSET ?
+  `);
   const download = db.prepare(`
     SELECT version.number, version.filename, version.nonce, version.ciphertext, version.tag
     FROM document_versions AS version JOIN documents ON documents.id = version.document_id
@@ -69,6 +75,9 @@ export function documentStore(db, key, now, transact) {
   `);
 
   return {
+    exportable(owner, offset) {
+      return exportable.all(owner, offset);
+    },
     list(owner, projectId) {
       return list.all(owner, projectId);
     },
@@ -81,6 +90,7 @@ export function documentStore(db, key, now, transact) {
     create(owner, projectId, file) {
       return transact(db, () => {
         if (!ownedProject.get(owner, projectId)) return;
+        if (!canStore(owner,file.bytes.length)) throw Object.assign(new Error('PDF storage limit'),{ code:'NRI_STORAGE_LIMIT' });
         const documentId = randomUUID();
         insertDocument.run(documentId, projectId, file.name);
         appendVersion(insertVersion, key, now, projectId, documentId, 1, file);
@@ -90,6 +100,7 @@ export function documentStore(db, key, now, transact) {
     append(owner, projectId, documentId, file) {
       return transact(db, () => {
         if (!ownedDocument.get(owner, projectId, documentId)) return false;
+        if (!canStore(owner,file.bytes.length)) throw Object.assign(new Error('PDF storage limit'),{ code:'NRI_STORAGE_LIMIT' });
         const { number } = nextNumber.get(documentId);
         appendVersion(insertVersion, key, now, projectId, documentId, number, file);
         return true;

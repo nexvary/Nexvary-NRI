@@ -1,3 +1,4 @@
+import { renderLicensedReport } from './licensing-store.js';
 import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dimensions } from './content.js';
@@ -17,6 +18,7 @@ const copy = {
   pdf: ['Download PDF', 'نزّل PDF'],
   docx: ['Download DOCX', 'نزّل DOCX'],
   unavailable: ['The local report renderer is unavailable.', 'أداة إنشاء التقارير المحلية غير متاحة.'],
+  quota: ['The daily report export limit has been reached.', 'بلغت الحد اليومي لتصدير التقارير.'],
   busy: ['A report is being generated. Try again shortly.', 'يجري إنشاء تقرير. حاول مرة أخرى بعد قليل.'],
   references: ['Dated references', 'المراجع المؤرخة'],
   evidence: ['Claim-source evidence', 'أدلة الادعاءات ومصادرها'],
@@ -47,6 +49,8 @@ const copy = {
   accepted: ['Link accepted', 'قُبل الربط'],
   rejected: ['Link rejected', 'رُفض الربط'],
   pending: ['Review pending', 'المراجعة قيد الانتظار'],
+  unsupported: ['No reviewed supporting link eligible as evidence', 'لا يوجد رابط داعم خضع للمراجعة ويصلح للاستدلال'],
+  laterNotice: ['A saved record for this identifier flags a retraction', 'يشير سجل محفوظ لهذا المعرّف إلى سحب المرجع'],
   unavailableEvidence: ['Unavailable', 'غير متاح'],
   preliminary: ['Preliminary', 'أولي'],
   independent: ['Independent within limited scope', 'مستقل ضمن نطاق محدود'],
@@ -74,14 +78,43 @@ export function buildReport(store, owner, project, lang, release, now = Date.now
   for (const revision of store.readiness.list(owner, project.id)) {
     if (!revisions.has(revision.id)) revisions.set(revision.id, revision);
   }
+  const independent = new Map();
+  for (const review of store.readiness.reviews(owner, project.id)) {
+    if (!independent.has(review.revision)) independent.set(review.revision, []);
+    independent.get(review.revision).push(review);
+  }
+  const reviewRows = [...revisions.values()].flatMap((revision) => (independent.get(revision.revision) ?? []).map((review) => [
+    revision.intendedUse, String(revision.revision),
+    `${review.decision === 'accepted' ? tr(['Accepted','مقبول']) : tr(['Changes requested','طُلبت تعديلات'])} · ${utc(review.recorded_at)}\n${review.note}`,
+  ]));
   const table = (title, keys, rows) => rows.length
     ? { title: t(title), headers: keys.map(t), rows } : { title: t(title), text: [t('empty')] };
+  const retracted = (metadata) => metadata.isRetracted === true ||
+    metadata.updatedBy?.some(({ type }) => type === 'retraction');
+  const retractedIdentifiers = new Set(refs.filter(({ metadata }) => retracted(metadata)).map(({ doi }) => doi));
+  for (const claim of claims) {
+    for (const { source } of claim.evidence) {
+      if (retracted(source.metadata)) retractedIdentifiers.add(source.identifier);
+    }
+  }
   const notice = (metadata) => {
-    if (metadata.isRetracted === true) return t('flagged');
+    if (retracted(metadata)) return t('flagged');
     const updates = [...(metadata.updatedBy ?? []), ...(metadata.updates ?? [])];
     return updates.length ? updates.map((update) => [update.type, update.doi, update.date].filter(Boolean).join(' · ')).join('\n') : t('unverified');
   };
-  const sourceLine = (source) => `${resolverUrl(source.identifier)}\n${source.provider} · ${utc(source.retrievedAt)}\n${notice(source.metadata)}`;
+  const sourceLine = (source) => [
+    resolverUrl(source.identifier), source.provider + ' · ' + utc(source.retrievedAt), notice(source.metadata),
+    ...(!retracted(source.metadata) && retractedIdentifiers.has(source.identifier) ? [t('laterNotice')] : []),
+  ].join('\n');
+  const reviewedSupport = (claim) => claim.evidence.some(({ relation, review, source }) =>
+    relation === 'supports' && review?.decision === 'accepted' && !retractedIdentifiers.has(source.identifier));
+  const evidenceRows = claims.flatMap((claim) => {
+    const statement = reviewedSupport(claim) ? claim.statement : claim.statement + '\n' + t('unsupported');
+    return claim.evidence.length ? claim.evidence.map((item) => [
+      statement, sourceLine(item.source), `${item.studyType} · ${t(item.relation)}`, item.limitations,
+      item.review ? `${t(item.review.decision)} · ${utc(item.review.reviewedAt)}\n${item.review.note}` : t('pending'),
+    ]) : [[statement, '', '', '', t('pending')]];
+  });
   return {
     lang, title: project.title, subtitle: `NEXVARY NRI ${release} · ${t('version')} 1 · ${t('created')} ${utc(now())}`,
     sections: [
@@ -89,11 +122,7 @@ export function buildReport(store, owner, project, lang, release, now = Date.now
         ref.metadata.title || ref.doi, ref.metadata.authors?.join(', ') || '',
         resolverUrl(ref.doi), ref.provider, utc(ref.checkedAt), notice(ref.metadata),
       ])),
-      table('evidence', ['claim', 'identifier', 'study', 'limitations', 'review'], claims.flatMap((claim) =>
-        claim.evidence.length ? claim.evidence.map((item) => [
-          claim.statement, sourceLine(item.source), `${item.studyType} · ${t(item.relation)}`, item.limitations,
-          item.review ? `${t(item.review.decision)} · ${utc(item.review.reviewedAt)}\n${item.review.note}` : t('pending'),
-        ]) : [[claim.statement, '', '', '', t('pending')]])),
+      table('evidence', ['claim', 'identifier', 'study', 'limitations', 'review'], evidenceRows),
       table('readiness', ['intended', 'dimension', 'category', 'identifier', 'limitations', 'status'],
         [...revisions.values()].flatMap((revision) => revision.dimensions.map((row, index) => [
           revision.intendedUse, row.letter + ' · ' + tr(dimensions[index][3]),
@@ -101,6 +130,10 @@ export function buildReport(store, owner, project, lang, release, now = Date.now
           row.evidence ? sourceLine(row.evidence.source) : '', row.limits,
           `${t(readinessState(revision))}\n${utc(revision.recordedAt)}`,
         ]))),
+      ...(reviewRows.length ? [{
+        title: tr(['Independent L-READY reviews', 'مراجعات L-READY المستقلة']),
+        headers: [t('intended'), t('version'), t('review')], rows: reviewRows,
+      }] : []),
       { title: t('limitations'), text: [t('scope'), ...(project.description ? [project.description] : [])] },
     ],
   };
@@ -160,24 +193,20 @@ export function createReportHandler(store, release, renderReport) {
       return;
     }
     active = true;
-    let file;
+    let result;
     try {
       const report = buildReport(store, owner, project, lang, release);
-      if (Buffer.byteLength(JSON.stringify(report)) > 512 * 1024) {
-        reply(413);
-        return;
-      }
-      file = await renderReport(report, format);
+      if (Buffer.byteLength(JSON.stringify(report)) > 512 * 1024) return reply(413);
+      result = await renderLicensedReport(store.licensing,owner,() => renderReport(report,format),
+        () => stillSignedIn() && Boolean(store.getProject(owner,id)));
     } catch {
-      show(503, 'unavailable');
-      return;
+      return show(503,'unavailable');
     } finally {
       active = false;
     }
-    if (!stillSignedIn() || !store.getProject(owner, id)) {
-      reply(404);
-      return;
-    }
+    if (result.status === 429) return show(429,'quota');
+    if (result.status !== 200) return result.status === 503 ? show(503,'unavailable') : reply(result.status);
+    const { file } = result;
     reply(200, null, { 'Content-Type': formats[format], 'Content-Length': file.length,
       'Content-Disposition': `attachment; filename="nri-research-report.${format}"` }, file);
   };

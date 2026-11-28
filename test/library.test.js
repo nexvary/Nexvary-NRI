@@ -53,3 +53,100 @@ test('searches the private library and renders account-scoped dashboard data', a
     await new Promise((resolve, reject) => app.close((error) => error ? reject(error) : resolve()));
   }
 });
+
+test('dashboard isolates accepted collaborator counts, self-reported ORCID and metered usage', async (t) => {
+  const store = openWorkspaceStore();
+  const [owner, peer, outsider] = ['owner', 'peer', 'outsider'].map((name) => {
+    const email = name + '@dashboard.test';
+    store.addAccount(email, { salt: Buffer.alloc(16), hash: Buffer.alloc(32) });
+    const id = store.credentials(email).id;
+    store.network.save(id, { name, interests: '', orcid: name === 'owner' ? '0000-0002-1825-0097' : '', discoverable: true });
+    return { id, cookie: 'nri_session=' + store.newSession(id) };
+  });
+  store.network.interact(owner.id, peer.id, 'request');
+  store.network.interact(peer.id, owner.id, 'accept');
+  const entry = store.assistantUsage.reserve(owner.id, 'mock-dashboard', { tokens: 1000, cost: 500000 }, { tokens: 2000, cost: 1000000 });
+  store.assistantUsage.record(owner.id, entry, 500, 11, 125000);
+  const app = createApp(store);
+  await new Promise((resolve) => app.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise((resolve) => app.close(resolve)));
+  const base = 'http://127.0.0.1:' + app.address().port;
+  const view = async (user, lang = 'en') => (await fetch(base + '/?lang=' + lang, { headers: { cookie: user.cookie } })).text();
+  const html = await view(owner);
+  assert.match(html, /Accepted collaborators<\/dt><dd>1<\/dd>/);
+  assert.match(html, /https:\/\/orcid.org\/0000-0002-1825-0097/);
+  assert.match(html, /Self-reported/);
+  assert.match(html, /Provider-reported tokens<\/dt>\s*<dd>511<\/dd>/);
+  assert.match(html, /\$0\.125/);
+  const unlinked = await view(outsider);
+  assert.match(unlinked, /Accepted collaborators<\/dt><dd>0<\/dd>/);
+  assert.doesNotMatch(unlinked, /0000-0002-1825-0097|\$0\.125|>511</);
+  assert.match(await view(owner, 'ar'), /المتعاونون المقبولون/);
+});
+
+test('library collections and reading marks remain owner-scoped and tied to PDF versions', async (t) => {
+  const store = openWorkspaceStore();
+  const [owner, other] = ['owner', 'other'].map((name) => {
+    const email = name + '@organization.test';
+    store.addAccount(email, { salt: Buffer.alloc(16), hash: Buffer.alloc(32) });
+    const id = store.credentials(email).id;
+    return { id, cookie: 'nri_session=' + store.newSession(id) };
+  });
+  const project = store.createProject(owner.id, { title: 'Owner project', description: '' });
+  const document = store.documents.create(owner.id, project, { name: 'Methods.pdf', bytes: Buffer.from('%PDF-1.4\nfixture') });
+  const app = createApp(store);
+  await new Promise((resolve) => app.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise((resolve) => app.close(resolve)));
+  const origin = 'http://127.0.0.1:' + app.address().port;
+  const index = '/workspace/library/collections?lang=en';
+  const folders = '/workspace/library/folders?lang=en';
+  const reading = '/workspace/projects/' + project + '/documents/' + document + '/reading?lang=en';
+  const request = (user, path, fields, source = origin) => fetch(origin + path, {
+    redirect: 'manual', headers: { cookie: user.cookie, ...(fields ? { origin: source } : {}) },
+    ...(fields ? { method: 'POST', body: new URLSearchParams(fields) } : {}),
+  });
+  const created = await request(owner, index, { intent: 'create', name: 'Methods folder' });
+  assert.equal(created.status, 303);
+  const location = created.headers.get('location');
+  const collection = new URL(origin + location).searchParams.get('collection');
+  assert.match(await (await request(owner, folders)).text(), /Library folders/);
+  const madeFolder = await request(owner, folders, { intent: 'create', name: 'Evidence files' });
+  assert.equal(madeFolder.status, 303);
+  const folderLocation = madeFolder.headers.get('location');
+  const listedFolders = await request(owner, folders);
+  assert.match(await listedFolders.text(), /Evidence files/);
+  const folderId = store.organization.folders(owner.id)[0].id;
+  assert.equal((await request(other, folders, { intent: 'remove', folder: folderId })).status, 404);
+  assert.equal((await request(other, location)).status, 404);
+  assert.equal((await request(other, index, { intent: 'remove', collection })).status, 404);
+  assert.equal((await request(other, reading)).status, 404);
+  assert.equal((await request(owner, reading, { intent: 'link', collection }, 'https://foreign.test')).status, 403);
+  assert.equal((await request(owner, reading, { intent: 'link', collection })).status, 303);
+  assert.equal((await request(owner, reading, { intent: 'folder-link', folder: folderId })).status, 303);
+  assert.match(await (await request(owner, reading)).text(), /Remove from folder/);
+  assert.equal(store.organization.reading(owner.id, project, document, 0).folders[0].linked, 1);
+  assert.equal(store.organization.reading(owner.id, project, document, 0).collections[0].linked, 1);
+  assert.match(await (await request(owner, location)).text(), /Methods\.pdf/);
+  const mark = { intent: 'add-mark', kind: 'annotation', page: 2, version: 1, text: '<script>Review methods</script>' };
+  assert.equal((await request(owner, reading, { ...mark, version: 9 })).status, 422);
+  assert.equal((await request(owner, reading, mark)).status, 303);
+  assert.equal((await request(owner, reading, { ...mark, kind: 'bookmark', text: '' })).status, 303);
+  assert.ok(store.documents.append(owner.id, project, document, { name: 'Revision.pdf', bytes: Buffer.from('%PDF-1.4\nsecond') }));
+  const html = await (await request(owner, reading)).text();
+  assert.match(html, /Annotation · v1/);
+  assert.match(html, /reading\?lang=en&amp;version=1&amp;page=2/);
+  const selected = await request(owner, reading + '&version=1&page=2');
+  assert.match(selected.headers.get('content-security-policy'), /worker-src 'self'/);
+  assert.match(await selected.text(), /data-pdf-reader="[^"]+\/versions\/1\?lang=en" data-page="2"/);
+  assert.equal((await request(owner, reading + '&version=99')).status, 404);
+  assert.equal((await request(other, reading + '&version=1&page=2')).status, 404);
+  assert.match(html, /Bookmark · v1/);
+  assert.match(html, /&lt;script&gt;Review methods&lt;\/script&gt;/);
+  assert.equal((await request(owner, folders, { intent: 'remove', folder: folderId })).status, 303);
+  assert.equal(store.organization.list(owner.id, 0).length, 1, 'folder organization remains separate from collections');
+  assert.equal((await request(owner, location, { intent: 'remove', collection })).status, 303);
+  assert.ok(store.documents.get(owner.id, project, document));
+  assert.equal(store.organization.reading(owner.id, project, document, 0).marks.length, 2);
+  assert.ok(store.documents.delete(owner.id, project, document));
+  assert.equal((await request(owner, reading)).status, 404);
+});

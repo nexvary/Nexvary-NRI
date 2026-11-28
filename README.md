@@ -7,6 +7,7 @@ A bilingual research workspace preview for Arabic and English. It runs locally a
 With Node.js 24.16 or newer:
 
 ```sh
+npm ci --omit=optional --ignore-scripts
 npm start
 npm test
 ```
@@ -21,9 +22,14 @@ Open [the local dashboard](http://127.0.0.1:3000/). English is available from th
 
 Credentials, sessions and projects persist in `.nri/workspace.sqlite`. The account command and server both accept `NRI_DB_PATH` to select another database file. Store custom database paths outside the repository.
 
-## Use private PDF versions
+### Operator-assisted password recovery
 
-Open a project, select **Private PDFs**, and upload a PDF up to 8 MiB. Open the file history to download an existing version or upload the next one. Deleting a file removes all its versions. Deleting a project also removes its files.
+After verifying the account holder through your organization's recovery process, run
+`npm run account:reset -- researcher@example.org` from a private terminal using the service account and the same `NRI_DB_PATH` as the server. The command generates a replacement password, revokes that account's sessions and records an audit event. Deliver the replacement through an approved private channel. Existing two-step verification stays active. Users who also lost their authenticator need an unused recovery code.
+
+## Use private document versions
+
+Open a project, select **Private PDFs**, and upload a PDF or DOCX up to 8 MiB, or a UTF-8 TXT file up to 256 KiB. Open the file history to download an existing version or upload the next one. Deleting a file removes all its versions. Deleting a project also removes its files.
 
 NRI creates a 32-byte key in `<database path>.key` and encrypts PDF bytes in SQLite. File names, version dates, sizes and project metadata are stored in plaintext. Preserve both the database and its key for recovery. The preview runs on loopback for development with synthetic data. See the [document architecture decision](docs/decisions/0003-private-pdf-versions.md).
 
@@ -33,7 +39,7 @@ The signed-in library searches private PDFs and saved reference records across y
 
 ## Check references and researcher identifiers
 
-Open **Reference validator**, choose a project, and enter a DOI or a DOI link. Choose Crossref or OpenAlex for DOI comparison, Zenodo for a published record with a Zenodo-issued DOI, or ORCID for the public name associated with an ORCID iD. An ORCID lookup does not authenticate the researcher or link an account. NRI saves the result, provider link and retrieval time in that project. Each result can be checked again or removed from the project.
+Open **Reference validator**, choose a project, and enter a DOI or a DOI link. Choose DOI agency for the registration agency reported by Crossref, Crossref or OpenAlex for DOI comparison, Zenodo for a published record with a Zenodo-issued DOI, or ORCID for the public name associated with an ORCID iD. An ORCID lookup does not authenticate the researcher or link an account. NRI saves the result, provider link and retrieval time in that project. Each result can be checked again or removed from the project.
 
 The public APIs are used on demand without a paid API key. The request contains the identifier, with no project or document contents. A successful result can be reused from the local account cache for up to 24 hours. A missing result is specific to the selected provider. Save both results to compare their metadata and provenance. See the [reference architecture decision](docs/decisions/0004-crossref-reference-provenance.md).
 
@@ -49,8 +55,54 @@ NRI_REPORT_PYTHON="$(command -v python)" npm test
 
 Open a project, choose **Report studio**, then select PDF or DOCX. The local renderer receives the selected project's report data and uses no network resources.
 
-- [Local backup and recovery](docs/RECOVERY.md)
+- [Encrypted backups and local recovery](docs/RECOVERY.md)
 - [Product charter](docs/PROJECT.md)
 - [Functional acceptance baseline](docs/REQUIREMENTS.md)
 - [Visual reference](docs/VISUAL.md)
 - [Development status](docs/STATUS.md)
+
+
+### Optional local research answers
+
+Offline source review works with no model or provider credentials. For local generation, start an existing loopback OpenAI-compatible server and set `NRI_LOCAL_AI_PORT` when starting NRI. In Assistant provider settings select Local and enter the server’s model ID. Open a project with saved reference metadata, select **Generate a research answer**, and submit a question. The request includes the question and displayed reference metadata. Use a local model that returns JSON in its chat completion content.
+
+The answer identifies saved citations and flags unknown or missing citation IDs. Verify scientific claims against the original work. For external OpenAI answers, configure one Chat Completions model and all four limits and rates before starting NRI. These settings default to disabled.
+
+| Environment variable | Value |
+|---|---|
+| `NRI_OPENAI_MODEL` | Exact OpenAI model ID |
+| `NRI_OPENAI_INPUT_MICROUSD_PER_MILLION` | Input USD rate per million tokens, in millionths of a dollar |
+| `NRI_OPENAI_OUTPUT_MICROUSD_PER_MILLION` | Output USD rate per million tokens, in millionths of a dollar |
+| `NRI_OPENAI_DAILY_TOKENS` | Per-account aggregate daily token reservation ceiling |
+| `NRI_OPENAI_DAILY_MICROUSD` | Per-account daily estimated spend ceiling, in millionths of a dollar |
+
+Select OpenAI and the enabled model in provider settings and save an API key. Each request requires consent to share the question and displayed reference metadata. NRI estimates prompt tokens from UTF-8 bytes plus framing, reserves the maximum output allowance, and accounts for reported usage when available. Reservations count toward the daily ceiling even if usage is unavailable. Provider invoices depend on actual usage and pricing.
+
+
+### Optional account MFA
+
+From **Account security → Two-step verification**, confirm the current password, add the displayed key to a time-based authenticator, and confirm with a current six-digit code. Save the eight recovery codes shown during activation. Each code can be used once in place of an authenticator code during sign-in. Changing MFA signs out other active sessions. The existing workspace backup includes the encrypted seed and paired workspace key.
+
+
+### Local message moderation
+
+An operator with access to the workspace database can run `npm run account:role -- moderator@example.test grant-message-moderator`. The recipient sees **Message reports** under Account security and can review reported message text and record decisions. To revoke the role, run the same command with `revoke-message-moderator`. The role has no private conversation access.
+
+### Local plans and entitlements
+
+Enroll an authenticator on the operator account, then run `npm run account:role -- operator@example.test grant-license-operator` against the local workspace. **Account security → Plans and entitlements** lets that operator define a plan, assign it to an account and record an optional expiry date. Expiry takes effect at the start of that date in UTC. Plans cap owned project count and daily external AI tokens. An expired assignment blocks new projects and external AI requests. Existing data can still be accessed and exported. An unassigned account uses the workspace defaults.
+
+The stricter of the plan token limit and the workspace provider budget governs the Assistant. A zero-token plan disables external AI. Plans and assignments are local records with no payment integration. Use `revoke-license-operator` to remove console access and [the recovery guide](docs/RECOVERY.md#local-release-and-recovery-drill) for migration and rollback drills.
+
+
+### Embedded PDF reader
+
+Run `npm ci --omit=optional --ignore-scripts` before starting NRI to install the pinned browser PDF.js assets. The reading page renders documents in a local worker. Select a version to read it or use a bookmark or annotation to open its recorded page. Authorized downloads remain available.
+
+### HTTPS staging
+
+NRI supports direct TLS, host-scoped secure session cookies, a schema health endpoint and structured operational logs. See [the staging deployment guide](docs/DEPLOYMENT.md) for installation, the service unit and local verification.
+
+Plans can also limit stored PDF versions and daily report downloads. Leave either quota blank for unlimited usage. The report counter resets at midnight UTC and applies to owned and shared report exports.
+
+DOCX upload and text preview require Python 3.10+ and use only its standard library. Set `NRI_DOCX_PYTHON` to select the interpreter. Previews display escaped main-document text. Packages with external links, active or embedded files, or unsupported parts are rejected.

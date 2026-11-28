@@ -1,3 +1,4 @@
+import { evidenceSourceSelection } from './evidence-store.js';
 import { resolverUrl } from './crossref.js';
 import { escapeHtml, projectReferencesPath, workspacePage, workspacePath } from './workspace-view.js';
 
@@ -72,6 +73,7 @@ export function createEvidenceHandler(store) {
 
     const sources = store.references.list(owner, id).filter((source) => source.status === 'found' && source.provider !== 'orcid');
     const action = evidencePath(lang, id);
+    const selected = new URL(request.url, 'http://localhost').searchParams.get('source');
     let invalid = false;
     if (request.method === 'POST') {
       const field = (name) => (form.get(name) ?? '').trim();
@@ -80,7 +82,7 @@ export function createEvidenceHandler(store) {
       const relation = field('relation');
       const studyType = field('studyType');
       const limitations = field('limitations');
-      const source = sources.find((entry) => `${entry.provider}:${entry.doi}` === field('source'));
+      const source = sources.find((entry) => evidenceSourceSelection(entry) === field('source'));
       const decision = field('decision');
       const note = field('note');
       let saved = false;
@@ -105,6 +107,11 @@ export function createEvidenceHandler(store) {
     }
     const claims = store.evidence.list(owner, id);
     const date = (ms) => `<time datetime="${new Date(ms).toISOString()}">${new Date(ms).toISOString()}</time>`;
+    const sourceOptions = sources.map((source) => {
+      const value = evidenceSourceSelection(source);
+      const label = [source.provider, source.doi, new Date(source.checkedAt).toISOString()].join(' · ');
+      return `<option value="${value}"${selected === value ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+    }).join('');
     const matrix = claims.map((claim) => `<article class="surface panel reference-record">
       <h2 dir="auto">${escapeHtml(claim.statement)}</h2>
       ${claim.evidence.map((item) => `<section class="provider-block">
@@ -121,8 +128,7 @@ export function createEvidenceHandler(store) {
         </form>`}</section>`).join('')}
       ${sources.length ? `<form method="post" action="${action}" class="workspace-form">
         <input type="hidden" name="intent" value="link"><input type="hidden" name="claim" value="${claim.id}">
-        <label>${t('source')}<select name="source" required>${sources.map((source) =>
-          `<option value="${escapeHtml(source.provider + ':' + source.doi)}">${escapeHtml(source.provider + ' · ' + source.doi)}</option>`).join('')}</select></label>
+        <label>${t('source')}<select name="source" required>${sourceOptions}</select></label>
         <label>${t('relation')}<select name="relation">${relations.map((key) =>
           `<option value="${key}">${t(key)}</option>`).join('')}</select></label>
         <label>${t('type')}<input name="studyType" maxlength="120" required></label>

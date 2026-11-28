@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { after, before, test } from 'node:test';
-import { hashPassword } from '../src/password.js';
+import { hashPassword, verifyPassword } from '../src/password.js';
+import { settingsSchema } from '../src/settings.js';
 import { createApp } from '../src/server.js';
 import { openWorkspaceStore, sessionLifetime } from '../src/store.js';
 
@@ -60,12 +62,12 @@ test('requires a session and serves a localized login with generic credential er
   assert.equal(login.status, 200);
   assert.equal(login.headers.get('cache-control'), 'no-store');
   const html = await login.text();
-  assert.match(html, /<html lang="ar" dir="rtl">/);
+  assert.match(html, /<html lang="ar" dir="rtl" data-theme="dark">/);
   assert.match(html, /href="\/login\?lang=en" hreflang="en"/);
   for (const email of [alice, 'unknown@example.test']) {
     const denied = await post('/login?lang=en', { email, password: 'incorrect' });
     assert.equal(denied.status, 401);
-    assert.match(await denied.text(), /email address or password is incorrect/);
+    assert.match(await denied.text(), /sign-in details are incorrect/);
     assert.equal(denied.headers.get('set-cookie'), null);
   }
 });
@@ -186,6 +188,49 @@ test('reopens a migrated store with data and rejects sessions at expiry', async 
     if (process.platform !== 'win32') assert.equal((await stat(path)).mode & 0o077, 0);
   } finally {
     store.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('migrates security history, resets one password and rejects sessions based on stale credentials', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'nri-password-reset-'));
+  const path = join(directory, 'workspace.sqlite');
+  let store;
+  try {
+    store = openWorkspaceStore(path);
+    store.addAccount(alice, credentials);
+    store.addAccount(bob, credentials);
+    const previous = store.credentials(alice);
+    const originalSession = store.signIn(previous);
+    const otherSession = store.newSession(store.credentials(bob).id);
+    store.close();
+    store = undefined;
+    const db = new DatabaseSync(path);
+    try {
+      db.exec('ALTER TABLE security_events RENAME TO later_events; DROP INDEX security_events_account;');
+      db.exec(settingsSchema);
+      db.exec('INSERT INTO security_events SELECT * FROM later_events; DROP TABLE later_events; DROP TABLE control_center_admin_events; DROP TABLE control_center_security_events; ALTER TABLE sessions DROP COLUMN user_agent; ALTER TABLE license_assignments DROP COLUMN state; PRAGMA user_version = 26;');
+    } finally {
+      db.close();
+    }
+
+    store = openWorkspaceStore(path);
+    assert.equal(store.session(originalSession).id, previous.id);
+    assert.deepEqual(store.settings.list(previous.id).map(({ action }) => action), ['sign-in']);
+    const replacement = 'Replacement test workspace password';
+    assert.equal(store.resetPassword(alice, await hashPassword(replacement)), true);
+    assert.equal(store.session(originalSession), undefined);
+    assert.equal(store.signIn(previous), undefined);
+    assert.equal(store.session(otherSession).email, bob);
+    const current = store.credentials(alice);
+    assert.equal(await verifyPassword(password, current), false);
+    assert.equal(await verifyPassword(replacement, current), true);
+    assert.equal(store.session(store.signIn(current)).id, previous.id);
+    assert.equal(store.resetPassword('missing@example.test', credentials), false);
+    assert.deepEqual(store.settings.list(previous.id).map(({ action }) => action),
+      ['sign-in', 'password-reset', 'sign-in']);
+  } finally {
+    store?.close();
     await rm(directory, { recursive: true, force: true });
   }
 });

@@ -1,22 +1,36 @@
+import { operationsAdminSchema, operationsBackupSchema, operationsSchema, operationsSessionSchema, operationsStore } from './admin-operations.js';
+import { billingAccessSchema, billingDiscountSchema, billingReconciliationSchema, billingSchema, billingStore } from './billing-store.js';
+import { resourceSchema, resourceStore } from './resource-store.js';
+import { citationSchema, citationStore } from './citation-store.js';
+import { folderSchema, organizationSchema, organizationStore } from './library-organization.js';
+import { institutionalSeatSchema, institutionalSubscriptionSchema, licenseSchema, lifecycleScheduleSchema, licensingStore, moduleEntitlementSchema, planAudienceSchema, planPricingSchema, quotaSchema, subscriptionSchema, upgradePlanQuotaSchema } from './licensing-store.js';
+import { manuscriptCatalogSchema, teamSchema, teamStore, teamWorkSchema } from './team-store.js';
+import { privacyStore } from './privacy-store.js';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { closeSync, mkdirSync, openSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { mfaSchema, mfaStore } from './mfa.js';
+import { messageSchema, messageStore, moderationSchema } from './message-store.js';
+import { assistantUsageSchema, assistantUsageStore } from './assistant-usage.js';
+import { assistantSettingsSchema, assistantSettingsStore } from './assistant-settings.js';
+import { workspaceKeyVersionSchema } from './workspace-key-version.js';
 import { bindDocumentKey } from './document-crypto.js';
 import { documentSchema, documentStore } from './document-store.js';
 import { educationSchema, educationStore } from './education.js';
 import { sharingSchema, sharingStore } from './sharing-store.js';
-import { settingsSchema, settingsStore } from './settings.js';
+import { passwordRecoverySchema, profilePreferencesSchema, settingsSchema, settingsStore } from './settings.js';
 import { observatorySchema, observatoryStore } from './observatory-store.js';
-import { networkSchema, networkStore } from './network-store.js';
+import { networkContentSchema, networkModerationSchema, networkSchema, networkStore } from './network-store.js';
 import { libraryStore } from './library.js';
 import { economicsSchema, economicsStore } from './economics.js';
-import { readinessSchema, readinessStore } from './readiness-store.js';
+import { readinessReviewSchema, readinessSchema, readinessStore } from './readiness-store.js';
 import { evidenceSchema, evidenceStore } from './evidence-store.js';
 import { referenceSchema, referenceMigrationV4, referenceStore } from './reference-store.js';
 
 export const sessionLifetime = 8 * 60 * 60;
-const schemaVersion = 12;
+export const sessionIdle = 30 * 60_000;
+const schemaVersion = 49;
 const schema = `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -71,6 +85,54 @@ function initialize(db, path) {
     if (version < 10) db.exec(settingsSchema);
     if (version < 11) db.exec(sharingSchema);
     if (version < 12) db.exec(educationSchema);
+    if (version < 13) db.exec(assistantSettingsSchema);
+    if (version < 14) db.exec(assistantUsageSchema);
+    if (version < 15) db.exec(messageSchema);
+    if (version < 16) db.exec(mfaSchema);
+    if (version < 17) db.exec(moderationSchema);
+    if (version < 18) db.exec(teamSchema);
+    if (version < 19) db.exec(licenseSchema);
+    if (version < 20) db.exec(teamWorkSchema);
+    if (version < 21) db.exec(manuscriptCatalogSchema);
+    if (version < 22) db.exec(organizationSchema);
+    if (version < 23) db.exec(citationSchema);
+    if (version < 24) db.exec(resourceSchema);
+    if (version < 25) db.exec(`
+      CREATE TABLE IF NOT EXISTS session_activity (
+        token_hash TEXT PRIMARY KEY REFERENCES sessions(token_hash) ON DELETE CASCADE,
+        seen_at INTEGER NOT NULL
+      ) STRICT;
+      CREATE INDEX IF NOT EXISTS session_activity_seen ON session_activity(seen_at);
+      INSERT OR IGNORE INTO session_activity SELECT token_hash,expires_at - ${sessionLifetime * 1000} FROM sessions;
+      PRAGMA user_version = 25;
+    `);
+    if (version < 26) db.exec(quotaSchema);
+    if (version < 27) db.exec(passwordRecoverySchema);
+    if (version < 28) db.exec(workspaceKeyVersionSchema);
+    if (version < 29) db.exec(readinessReviewSchema);
+    if (version < 30) db.exec(subscriptionSchema);
+    if (version < 31) db.exec(billingSchema);
+    if (version < 32) db.exec(moduleEntitlementSchema);
+    if (version < 33) db.exec(institutionalSeatSchema);
+    if (version < 34) db.exec(institutionalSubscriptionSchema);
+    if (version < 35) db.exec(planPricingSchema);
+    if (version < 36) db.exec(billingAccessSchema);
+    if (version < 37) db.exec(billingReconciliationSchema);
+    if (version < 38) db.exec(lifecycleScheduleSchema);
+    if (version < 39) db.exec(billingDiscountSchema);
+    if (version < 40) db.exec(planAudienceSchema);
+    if (version < 41) db.exec(operationsSchema);
+    if (version < 42) db.exec(folderSchema);
+    if (version < 43) db.exec(operationsAdminSchema);
+    if (version < 44) db.exec(operationsSessionSchema);
+    if (version < 45) db.exec(profilePreferencesSchema);
+    if (version < 46) db.exec(networkModerationSchema);
+    if (version < 47) db.exec(operationsBackupSchema);
+    if (version < 48) {
+      upgradePlanQuotaSchema(db);
+      db.exec('PRAGMA user_version = 48;');
+    }
+    if (version < 49) db.exec(networkContentSchema);
     return bindDocumentKey(db, path);
   });
 }
@@ -83,20 +145,27 @@ function tokenHash(token) {
   return createHash('sha256').update(token).digest('hex');
 }
 
-export function openWorkspaceStore(path = ':memory:', now = Date.now) {
+export function openWorkspaceStore(path = ':memory:', now = Date.now, options = {}) {
   if (path !== ':memory:') {
     mkdirSync(dirname(path), { mode: 0o700, recursive: true });
     closeSync(openSync(path, 'a', 0o600));
   }
 
   const db = new DatabaseSync(path, { enableForeignKeyConstraints: true, timeout: 3000 });
+  let workspaceKey;
+  let assistantSettings;
   let documents;
+  let licensing;
   let references;
   let evidence;
   let readiness;
   let economics;
   try {
-    documents = documentStore(db, initialize(db, path), now, transact);
+    db.exec('PRAGMA secure_delete = ON');
+    workspaceKey = initialize(db, path);
+    licensing = licensingStore(db, now, transact);
+    documents = documentStore(db, workspaceKey, now, transact, licensing.canStore);
+    assistantSettings = assistantSettingsStore(db, workspaceKey);
     references = referenceStore(db, now, transact);
     evidence = evidenceStore(db, now, transact);
     readiness = readinessStore(db, now);
@@ -108,15 +177,24 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
 
   const insertAccount = db.prepare('INSERT INTO accounts VALUES (?, ?, ?, ?)');
   const findAccount = db.prepare('SELECT id, salt, hash FROM accounts WHERE email = ?');
-  const insertSession = db.prepare('INSERT INTO sessions VALUES (?, ?, ?)');
-  const clearExpired = db.prepare('DELETE FROM sessions WHERE expires_at <= ?');
+  const replacePassword = db.prepare('UPDATE accounts SET salt = ?, hash = ? WHERE email = ? RETURNING id');
+  const currentCredentials = db.prepare('SELECT 1 FROM accounts WHERE id = ? AND salt = ? AND hash = ?');
+  const revokeAccountSessions = db.prepare('DELETE FROM sessions WHERE account_id = ?');
+  const insertSession = db.prepare('INSERT INTO sessions(token_hash,account_id,expires_at,user_agent) VALUES (?,?,?,?)');
+  const initializeActivity = db.prepare('INSERT INTO session_activity VALUES (?,?)');
+  const clearExpired = db.prepare(`DELETE FROM sessions WHERE expires_at<=? OR
+    token_hash IN (SELECT token_hash FROM session_activity WHERE seen_at<=?)`);
+  const touch = db.prepare(`UPDATE session_activity SET seen_at=:now WHERE token_hash=:key AND seen_at>:idle AND seen_at<=:refresh
+    AND EXISTS (SELECT 1 FROM sessions WHERE token_hash=:key AND expires_at>:now)`);
   const getSession = db.prepare(`
     SELECT accounts.id, accounts.email FROM sessions JOIN accounts ON accounts.id = sessions.account_id
-    WHERE sessions.token_hash = ? AND sessions.expires_at > ?
+    JOIN session_activity a ON a.token_hash = sessions.token_hash
+    WHERE sessions.token_hash = ? AND sessions.expires_at > ? AND a.seen_at > ?
   `);
-  const countOthers = db.prepare('SELECT count(*) AS count FROM sessions WHERE account_id = ? AND token_hash <> ? AND expires_at > ?');
+  const countOthers = db.prepare(`SELECT count(*) AS count FROM sessions s JOIN session_activity a ON a.token_hash=s.token_hash
+    WHERE s.account_id=? AND s.token_hash<>? AND s.expires_at>? AND a.seen_at>?`);
   const removeOthers = db.prepare('DELETE FROM sessions WHERE account_id = ? AND token_hash <> ? AND expires_at > ?');
-  const settings = settingsStore(db, now);
+  const settings = settingsStore(db, now, transact);
   const sharing = sharingStore(db, now, transact);
   const removeSession = db.prepare('DELETE FROM sessions WHERE token_hash = ?');
   const insertProject = db.prepare('INSERT INTO projects VALUES (?, ?, ?, ?, ?)');
@@ -125,22 +203,65 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
   const updateProject = db.prepare('UPDATE projects SET title = ?, description = ?, updated_at = ? WHERE owner_id = ? AND id = ?');
   const deleteProject = db.prepare('DELETE FROM projects WHERE owner_id = ? AND id = ?');
 
-  function issueSession(accountId) {
+  function revokeOthers(owner, token) {
+    const removed = removeOthers.run(owner, tokenHash(token), now()).changes;
+    if (removed) settings.record(owner, 'revoke-others');
+    return removed;
+  }
+
+  function sessionFor(token) {
+    const at = now();
+    return token ? getSession.get(tokenHash(token), at, at - sessionIdle) : undefined;
+  }
+
+  function issueSession(accountId, userAgent = '') {
     const token = randomBytes(32).toString('base64url');
     const issuedAt = now();
-    clearExpired.run(issuedAt);
-    insertSession.run(tokenHash(token), accountId, issuedAt + sessionLifetime * 1000);
+    const key = tokenHash(token);
+    clearExpired.run(issuedAt,issuedAt - sessionIdle);
+    if(!licensing.canStartSession(accountId))return undefined;
+    insertSession.run(key, accountId, issuedAt + sessionLifetime * 1000, typeof userAgent === 'string' ? userAgent.slice(0,300) : '');
+    initializeActivity.run(key,issuedAt);
     return token;
   }
 
+  const mfa = mfaStore(db, workspaceKey, now, transact, revokeOthers);
+  const teams = teamStore(db, now, transact, (owner,project) => licensing.canAddTeamMember(owner,project));
+  const privacy = privacyStore(db, workspaceKey, now);
   return {
+    privacyAction(owner, token, code, action) {
+      if (action !== 'export' && action !== 'delete') return { status: 422 };
+      return mfa.authorizePrivacy(owner, code, () => sessionFor(token)?.id === owner, () =>
+        action === 'export' ? privacy.export(owner) : { status: privacy.delete(owner) ? 303 : 403 });
+    },
+    exportDocument(owner, token, code, project, document, version) {
+      return mfa.authorizePrivacy(owner, code, () => sessionFor(token)?.id === owner, () => {
+        const file = documents.download(owner, project, document, version);
+        return file ? { status: 200, file } : { status: 404 };
+      });
+    },
+    healthy: () => db.prepare('PRAGMA user_version').get().user_version === schemaVersion,
+    licensing,
+    operations: operationsStore(db, now, sessionIdle, options.backupDirectory, options.backupKeyFile),
+    billing: billingStore(db, now, transact),
+    teams,
+    resources: resourceStore(db, now, transact, teams),
+    assistantSettings,
+    mfa,
+    messages: messageStore(db, workspaceKey, now, transact),
+    assistantUsage: assistantUsageStore(db, now, transact, licensing.aiTokens),
     documents,
     references,
     evidence,
     readiness,
     economics,
     library: libraryStore(db),
-    network: networkStore(db, now, transact, sharing.revokeOnBlock),
+    citations: citationStore(db, now, transact),
+    organization: organizationStore(db, now, transact),
+    network: networkStore(db, now, transact, (first, second) => {
+      sharing.revokeOnBlock(first, second);
+      teams.revokeOnBlock(first, second);
+    }),
     observatory: observatoryStore(db, now),
     settings,
     sharing,
@@ -154,10 +275,32 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
     credentials(email) {
       return findAccount.get(email);
     },
-    newSession: issueSession,
-    signIn(accountId, previousToken) {
+    newSession: (account,userAgent) => transact(db, () => issueSession(account,userAgent)),
+    resetPassword(email, { salt, hash }) {
       return transact(db, () => {
-        const session = issueSession(accountId);
+        const account = replacePassword.get(salt, hash, email);
+        if (!account) return false;
+        revokeAccountSessions.run(account.id);
+        settings.record(account.id, 'password-reset');
+        return true;
+      });
+    },
+    recoverPassword(email, code, { salt, hash }) {
+      return transact(db, () => {
+        const credentials = findAccount.get(email);
+        if (!credentials || !mfa.enabled(credentials.id) || !mfa.verifyInTransaction(credentials.id, code)) return false;
+        const account = replacePassword.get(salt, hash, email);
+        if (!account) return false;
+        revokeAccountSessions.run(account.id);
+        settings.record(account.id, 'password-reset');
+        return true;
+      });
+    },
+    signIn({ id: accountId, salt, hash }, previousToken, userAgent) {
+      return transact(db, () => {
+        if (!currentCredentials.get(accountId, salt, hash)) return undefined;
+        const session = issueSession(accountId,userAgent);
+        if (!session) return undefined;
         if (previousToken) removeSession.run(tokenHash(previousToken));
         settings.record(accountId, 'sign-in');
         return session;
@@ -168,18 +311,18 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
         if (removeSession.run(tokenHash(token)).changes) settings.record(accountId, 'sign-out');
       });
     },
-    session(token) {
-      return token ? getSession.get(tokenHash(token), now()) : undefined;
+    session: sessionFor,
+    touchSession(token) {
+      if (!token) return;
+      const at = now();
+      touch.run({ key:tokenHash(token), now:at, idle:at-sessionIdle, refresh:at-60_000 });
     },
     otherSessions(owner, token) {
-      return countOthers.get(owner, tokenHash(token), now()).count;
+      const at = now();
+      return countOthers.get(owner,tokenHash(token),at,at - sessionIdle).count;
     },
     revokeOtherSessions(owner, token) {
-      return transact(db, () => {
-        const removed = removeOthers.run(owner, tokenHash(token), now()).changes;
-        if (removed) settings.record(owner, 'revoke-others');
-        return removed;
-      });
+      return transact(db, () => revokeOthers(owner, token));
     },
     listProjects(owner) {
       return listProjects.all(owner);
@@ -188,9 +331,12 @@ export function openWorkspaceStore(path = ':memory:', now = Date.now) {
       return getProject.get(owner, id);
     },
     createProject(owner, { title, description }) {
-      const id = randomUUID();
-      insertProject.run(id, owner, title, description, now());
-      return id;
+      return transact(db, () => {
+        if (!licensing.canCreateProject(owner)) return undefined;
+        const id = randomUUID();
+        insertProject.run(id, owner, title, description, now());
+        return id;
+      });
     },
     updateProject(owner, id, { title, description }) {
       return updateProject.run(title, description, now(), owner, id).changes === 1;

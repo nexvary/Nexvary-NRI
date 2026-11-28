@@ -35,7 +35,7 @@ export function observatoryStore(db, now) {
     FROM observatory_topics t JOIN projects p ON p.owner_id=t.owner_id
     JOIN project_references r ON r.project_id=p.id
     WHERE t.owner_id=? AND t.id=? AND p.id=? AND r.doi=? AND r.provider=?
-      AND r.state='found' AND r.provider <> 'orcid'
+      AND r.state='found' AND r.provider NOT IN ('orcid', 'agency')
   `);
   return {
     topics: (owner) => topics.all(owner),
