@@ -98,6 +98,7 @@ test('billing reviewers with MFA can read sandbox records without gaining operat
   assert.equal(response.headers.get('cache-control'), 'no-store');
   const html = await response.text();
   assert.match(html, /Invoice issued[\s\S]*fixture_invoice/);
+  assert.match(html, /Commercial analytics/);
   assert.doesNotMatch(html, /Synthetic private research/);
   assert.equal((await request(researcher, path)).status, 403);
   assert.equal((await request(reviewer, '/control-center')).status, 403);
@@ -140,6 +141,17 @@ test('billing reviewers with MFA can read sandbox records without gaining operat
   assert.equal(store.billing.invoice(reviewer.id, adapter.provider, 'fixed_invoice').outstanding, 0);
   assert.equal(store.billing.revokeDiscount(reviewer.id, 'FIXED'), 303);
   assert.equal(accept('fixed_revoked', 'invoice.issued', 'fixed_revoked', 100, useFixed), 'discount-unavailable');
+  const analyticsPath = '/control-center/analytics?lang=en';
+  const analyticsResponse = await request(reviewer, analyticsPath);
+  assert.equal(analyticsResponse.status, 200);
+  assert.equal(analyticsResponse.headers.get('cache-control'), 'no-store');
+  const analytics = await analyticsResponse.text();
+  assert.match(analytics, /Invoices 3\s+· Invoiced 2,345 EUR minor units\s+·\s+Payments recorded 1,234 EUR minor units\s+·\s+Refunds recorded 125 EUR minor units/);
+  assert.match(analytics, /Redemptions · 2/);
+  assert.equal((await request(researcher, analyticsPath)).status, 403);
+  assert.equal((await request(reviewer, analyticsPath, 'POST')).status, 405);
+  const arabicAnalytics = await (await request(reviewer, '/control-center/analytics?lang=ar')).text();
+  assert.match(arabicAnalytics, /التحليلات التجارية[\s\S]*الفواتير والحركات المسجلة/);
   store.licensing.setOperator(reviewer.id, false);
   const support = '/control-center/support?email=researcher%40billing.test&lang=en';
   const security = '/control-center/security?email=researcher%40billing.test&lang=ar';

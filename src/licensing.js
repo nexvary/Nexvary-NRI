@@ -24,6 +24,7 @@ const audiences = {
 
 export const controlCenterPath = '/control-center';
 export const billingRecordsPath = '/control-center/billing';
+export const commercialAnalyticsPath = '/control-center/analytics';
 export const legacyLicensingPath = '/workspace/settings/licensing';
 
 function whole(value) {
@@ -116,6 +117,7 @@ export async function handleBillingRecords({ request, reply, lang, account, stor
   reply(200, { title, path: billingRecordsPath, controlCenter: true, billingOnly: true,
     html: `<section class="surface panel detail workspace-page">
       <h1>${title}</h1>
+      <p><a href="${commercialAnalyticsPath}?lang=${lang}">${t('Commercial analytics', 'التحليلات التجارية')}</a></p>
       ${records.length ? `<ol class="activity">${records.slice(0, 50).map((event) => `<li>
         ${t(...billingLabels[event.kind])} · <bdi>${escapeHtml(event.provider)}</bdi> ·
         <bdi>${event.kind === 'invoice.issued' ? `<a href="${invoiceLink(lang, event.provider, event.objectId)}">${escapeHtml(event.objectId)}</a>`
@@ -127,6 +129,35 @@ export async function handleBillingRecords({ request, reply, lang, account, stor
         : `<p>${t('No verified sandbox billing records on this page.', 'لا توجد سجلات فوترة تجريبية متحققة في هذه الصفحة.')}</p>`}
       ${page > 0 ? `<a href="${pageLink(page - 1)}">${t('Previous page', 'الصفحة السابقة')}</a>` : ''}
       ${records.length > 50 && page < 10_000 ? `<a href="${pageLink(page + 1)}">${t('Next page', 'الصفحة التالية')}</a>` : ''}
+    </section>`,
+  });
+}
+
+export function handleCommercialAnalytics({ reply, lang, account, store }) {
+  if (!store.billing.canReview(account.id)) return reply(403);
+  const t = (en, ar) => lang === 'ar' ? ar : en;
+  const data = store.billing.commercialAnalytics(account.id);
+  if (!data) return reply(403);
+  const count = new Intl.NumberFormat(lang);
+  const money = (amount, currency) => `${count.format(amount)} ${escapeHtml(currency)} ${t('minor units', 'وحدة صغرى')}`;
+  const title = t('Commercial analytics', 'التحليلات التجارية');
+  reply(200, { title, path: commercialAnalyticsPath, controlCenter: true, billingOnly: true,
+    html: `<section class="surface panel detail workspace-page"><h1>${title}</h1>
+      <p>${t('Read-only totals from recorded invoices, reconciled sandbox payments and refunds, assignments, and discount redemptions.',
+        'إجماليات للقراءة فقط من الفواتير المسجلة والمدفوعات التجريبية المستوفاة والمبالغ المستردة والتعيينات واستخدام الخصومات.')}</p>
+      <h2>${t('Recorded invoices and movements', 'الفواتير والحركات المسجلة')}</h2>
+      ${data.currencies.length ? `<ul class="activity">${data.currencies.map((row) => `<li><bdi>${escapeHtml(row.currency)}</bdi> ·
+        ${t('Invoices', 'الفواتير')} ${count.format(row.invoices)} · ${t('Invoiced', 'المفوتر')} ${money(row.invoiced_minor,row.currency)} ·
+        ${t('Payments recorded', 'المدفوعات المسجلة')} ${money(row.paid_minor,row.currency)} ·
+        ${t('Refunds recorded', 'المبالغ المستردة')} ${money(row.refunded_minor,row.currency)}</li>`).join('')}</ul>`
+        : `<p>${t('No invoice records are available.', 'لا تتوفر سجلات فواتير.')}</p>`}
+      <h2>${t('Individual assignment records by stored state', 'سجلات التعيين الفردي حسب الحالة المحفوظة')}</h2>
+      ${data.assignments.length ? `<ul class="activity">${data.assignments.map((row) => `<li><bdi>${escapeHtml(row.state)}</bdi> · ${count.format(row.total)}</li>`).join('')}</ul>`
+        : `<p>${t('No individual assignments are recorded.', 'لا توجد تعيينات فردية مسجلة.')}</p>`}
+      <h2>${t('Discount redemption records', 'سجلات استخدام الخصومات')}</h2>
+      <p>${t('Redemptions', 'مرات الاستخدام')} · ${count.format(data.redemptionCount)}</p>
+      ${data.discounts.map((row) => `<p><bdi>${escapeHtml(row.currency)}</bdi> · ${t('Discounted amounts', 'مبالغ الخصم')} · ${money(row.discounted_minor,row.currency)}</p>`).join('')}
+      <a href="${billingRecordsPath}?lang=${lang}">${t('Sandbox billing records', 'سجلات الفوترة التجريبية')}</a>
     </section>`,
   });
 }

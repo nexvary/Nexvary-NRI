@@ -153,6 +153,19 @@ export function billingStore(db, now, transact) {
   const findMovement = db.prepare('SELECT * FROM billing_movements WHERE provider=? AND movement=?');
   const refunded = db.prepare('SELECT COALESCE(SUM(amount),0) AS total FROM billing_movements WHERE provider=? AND payment=?');
   const insertMovement = db.prepare('INSERT INTO billing_movements VALUES (?,?,?,?,?,?)');
+  const commercialSummary = db.prepare(`WITH movement_totals AS (
+      SELECT provider,invoice,SUM(CASE WHEN payment IS NULL THEN amount ELSE 0 END) AS paid_minor,
+        SUM(CASE WHEN payment IS NOT NULL THEN amount ELSE 0 END) AS refunded_minor
+      FROM billing_movements GROUP BY provider,invoice
+    ) SELECT i.currency,count(*) AS invoices,COALESCE(SUM(i.total),0) AS invoiced_minor,
+      COALESCE(SUM(m.paid_minor),0) AS paid_minor,COALESCE(SUM(m.refunded_minor),0) AS refunded_minor
+    FROM billing_invoices i LEFT JOIN movement_totals m ON m.provider=i.provider AND m.invoice=i.invoice
+    GROUP BY i.currency ORDER BY i.currency`);
+  const assignmentSummary = db.prepare(`SELECT state,count(*) AS total FROM license_assignments GROUP BY state ORDER BY state`);
+  const discountSummary = db.prepare(`SELECT i.currency,count(*) AS redemptions,COALESCE(SUM(r.amount),0) AS discounted_minor
+    FROM billing_discount_redemptions r JOIN billing_invoices i ON i.provider=r.provider AND i.invoice=r.invoice
+    GROUP BY i.currency ORDER BY i.currency`);
+  const discountCount = db.prepare('SELECT count(*) AS redemptions FROM billing_discount_redemptions');
 
   const discountManager = db.prepare(`SELECT 1 FROM account_mfa m JOIN license_operators o ON o.account_id=m.account_id
     WHERE m.account_id=? AND m.pending_until=0`);
@@ -238,6 +251,10 @@ export function billingStore(db, now, transact) {
       return records.all(offset).map(({ provider, payload, recorded_at }) => ({
         ...JSON.parse(payload), provider, recordedAt: recorded_at,
       }));
+    },
+    commercialAnalytics(account) {
+      if (!authorized.get({ account })) return undefined;
+      return { currencies: commercialSummary.all(), assignments: assignmentSummary.all(), discounts: discountSummary.all(), redemptionCount: discountCount.get().redemptions };
     },
     // An injected sandbox adapter verifies the original bytes and returns a provider-neutral event.
     accept(adapter, envelope) {

@@ -335,3 +335,8 @@
 
 - Extended the existing Chromium acceptance run to inspect accessible names, WCAG AA text contrast, keyboard-visible skip-link focus and focus transfer, Arabic RTL/English LTR, and desktop/tablet/mobile overflow across captured screens.
 - Hosted workflow [46145076955](https://github.com/nexvary/Nexvary-NRI/actions/runs/46145076955) passed 80/80 tests with the actual bilingual PDF/DOCX renderer. Chromium passed interactive accessible-name and WCAG AA contrast checks, keyboard Tab/Enter skip-link focus, Arabic RTL and English LTR, and responsive overflow checks at desktop, tablet and mobile sizes. It uploaded 64 screenshots. NRI-18 accessibility is now verified; NRI-18 remains Partial with four implementation criteria outstanding. Acceptance is 193/219 (88.1%), 15 Verified / 5 Partial; remaining 26 criteria: 6 verification, 14 implementation, 6 external blockers.
+
+# 2026-11-28 · NRI-20 commercial analytics
+
+- Added a billing-reviewer-only, read-only Control Center page with bilingual totals queried from reconciled invoices, payments, refunds, individual assignments and discount redemption rows. The response is no-store; non-reviewers are denied and POST is unsupported. No metrics are estimated or fabricated.
+- Focused `node --test test/billing.test.js` passed 2/2, including actual fixture totals in EUR, Arabic output, MFA role gating, no-store, and read-only enforcement. NRI-20 remains Partial. Acceptance is 194/219 (88.6%), 15 Verified / 5 Partial; remaining 25 criteria: 6 verification, 13 implementation, 6 external blockers.
