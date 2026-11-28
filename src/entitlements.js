@@ -1,5 +1,5 @@
 const routeGroups = [
-  [[], ['login', 'logout', 'settings', 'settings-privacy', 'settings-mfa', 'settings-licensing', 'control-billing', 'control-analytics', 'control-operations', 'settings-message-moderation']],
+  [[], ['login', 'logout', 'settings', 'settings-privacy', 'settings-mfa', 'settings-licensing', 'control-billing', 'control-analytics', 'control-admin', 'control-operations', 'settings-message-moderation']],
   [[2], ['index', 'project', 'delete']],
   [[3], ['documents', 'document', 'delete-document', 'download-document', 'preview-document', 'library-collections', 'library-reading']],
   [[3, 4], ['library', 'citations']],

@@ -1,4 +1,4 @@
-import { handleOperations, operationsPaths } from './admin-operations.js';
+import { handleOperations, handleOperationsAdmin, operationsPaths } from './admin-operations.js';
 import { allowsRoute } from './entitlements.js';
 import { createLoginThrottle } from './login-throttle.js';
 import { createResourceHandler, resolveResourceRoute } from './resource-sharing.js';
@@ -45,6 +45,7 @@ export function resolveWorkspaceRoute(pathname) {
   if (pathname === '/workspace/settings/message-moderation') return { kind: 'settings-message-moderation' };
   if (pathname === operationsPaths.support) return { kind: 'control-operations', role: 'support' };
   if (pathname === operationsPaths.security) return { kind: 'control-operations', role: 'security' };
+  if (pathname === operationsPaths.administration) return { kind: 'control-admin' };
   if (pathname === billingRecordsPath) return { kind: 'control-billing' };
   if (pathname === commercialAnalyticsPath) return { kind: 'control-analytics' };
   if (pathname === controlCenterPath || pathname === legacyLicensingPath) return { kind: 'settings-licensing' };
@@ -246,6 +247,10 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
     }
     if (kind === 'control-operations') {
       handleOperations({ request, reply, lang, account, store, role: route.role });
+      return;
+    }
+    if (kind === 'control-admin') {
+      await handleOperationsAdmin({ request, reply, redirect, lang, actor: account, token, form, store });
       return;
     }
     if (kind === 'control-billing') {

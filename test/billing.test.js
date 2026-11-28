@@ -4,6 +4,7 @@ import { once } from 'node:events';
 import { test } from 'node:test';
 import { createSandboxBillingAdapter } from '../src/billing-sandbox.js';
 import { totp } from '../src/mfa.js';
+import { hashPassword } from '../src/password.js';
 import { createApp } from '../src/server.js';
 import { openWorkspaceStore } from '../src/store.js';
 
@@ -57,8 +58,10 @@ test('billing reviewers with MFA can read sandbox records without gaining operat
   await once(app, 'listening');
   t.after(() => new Promise((resolve) => app.close(resolve)));
   const origin = 'http://127.0.0.1:' + app.address().port;
-  const request = (user, path, method) => fetch(origin + path, {
-    method, redirect: 'manual', headers: { cookie: 'nri_session=' + user.session, origin },
+  const request = (user, path, method = 'GET', fields) => fetch(origin + path, {
+    method, redirect: 'manual', headers: { cookie: 'nri_session=' + user.session, origin,
+      ...(fields ? { 'content-type': 'application/x-www-form-urlencoded' } : {}) },
+    ...(fields ? { body: new URLSearchParams(fields) } : {}),
   });
   const path = '/control-center/billing';
   assert.equal((await request(reviewer, path)).status, 403);
@@ -152,6 +155,27 @@ test('billing reviewers with MFA can read sandbox records without gaining operat
   assert.equal((await request(reviewer, analyticsPath, 'POST')).status, 405);
   const arabicAnalytics = await (await request(reviewer, '/control-center/analytics?lang=ar')).text();
   assert.match(arabicAnalytics, /التحليلات التجارية[\s\S]*الفواتير والحركات المسجلة/);
+
+  const adminPassword = 'managed control center password';
+  store.addAccount('managed-admin@billing.test', await hashPassword(adminPassword));
+  const adminId = store.credentials('managed-admin@billing.test').id;
+  const admin = { id: adminId, session: store.newSession(adminId) };
+  store.licensing.setOperator(adminId, true);
+  const adminPath = '/control-center/admin?lang=en';
+  assert.equal((await request(admin, adminPath)).status, 403);
+  assert.equal(store.mfa.begin(adminId), true);
+  const adminBits = [...store.mfa.pending(adminId)].map((letter) => alphabet.indexOf(letter).toString(2).padStart(5, '0')).join('');
+  const adminSeed = Buffer.from(adminBits.match(/.{8}/g).map((byte) => parseInt(byte, 2)));
+  assert.equal(store.mfa.confirm(adminId, totp(adminSeed, timestamp / 30_000), admin.session).length, 8);
+  assert.equal((await request(researcher, adminPath)).status, 403);
+  assert.equal((await request(admin, adminPath + '&email=researcher%40billing.test')).status, 200);
+  assert.equal((await request(admin, adminPath, 'POST', { email: 'researcher@billing.test', role: 'support', action: 'grant', password: 'wrong' })).status, 403);
+  assert.equal((await request(admin, adminPath, 'POST', { email: 'researcher@billing.test', role: 'support', action: 'grant', password: adminPassword })).status, 303);
+  assert.deepEqual(store.operations.adminLookup(adminId, 'researcher@billing.test').roles, ['support']);
+  assert.equal(store.operations.adminLookup(adminId, 'researcher@billing.test').events.length, 1);
+  assert.equal((await request(admin, adminPath, 'POST', { email: 'researcher@billing.test', role: 'support', action: 'revoke', password: adminPassword })).status, 303);
+  assert.deepEqual(store.operations.adminLookup(adminId, 'researcher@billing.test').roles, []);
+  assert.equal(store.operations.adminLookup(adminId, 'researcher@billing.test').events.length, 2);
   store.licensing.setOperator(reviewer.id, false);
   const support = '/control-center/support?email=researcher%40billing.test&lang=en';
   const security = '/control-center/security?email=researcher%40billing.test&lang=ar';

@@ -1,4 +1,5 @@
-import { normalizeAddress } from './password.js';
+import { createLoginThrottle } from './login-throttle.js';
+import { normalizeAddress, verifyPassword } from './password.js';
 import { escapeHtml } from './workspace-view.js';
 
 export const operationsSchema = `
@@ -16,7 +17,23 @@ export const operationsSchema = `
 export const operationsPaths = Object.freeze({
   support: '/control-center/support',
   security: '/control-center/security',
+  administration: '/control-center/admin',
 });
+
+export const operationsAdminSchema = `
+  CREATE TABLE control_center_admin_events (
+    id INTEGER PRIMARY KEY,
+    actor TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+    subject TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    role TEXT NOT NULL CHECK(role IN ('billing','support','security')),
+    action TEXT NOT NULL CHECK(action IN ('granted','revoked')),
+    recorded_at INTEGER NOT NULL
+  ) STRICT;
+  CREATE INDEX control_center_admin_recent ON control_center_admin_events(id DESC);
+  PRAGMA user_version = 43;
+`;
+
+const roleAdminThrottle = createLoginThrottle();
 
 export function operationsStore(db, now, sessionIdle) {
   const authorized = db.prepare(`SELECT 1 FROM account_mfa m WHERE m.account_id=:account AND m.pending_until=0
@@ -35,9 +52,41 @@ export function operationsStore(db, now, sessionIdle) {
     (SELECT count(*) FROM sessions s JOIN session_activity a USING(token_hash)
       WHERE s.account_id=:account AND s.expires_at>:now AND a.seen_at>:idle) AS sessions`);
   const events = db.prepare('SELECT action,recorded_at FROM security_events WHERE account_id=? ORDER BY id DESC LIMIT 25');
+  const canManage = db.prepare(`SELECT 1 FROM license_operators o JOIN account_mfa m ON m.account_id=o.account_id
+    WHERE o.account_id=? AND m.pending_until=0`);
+  const targetByEmail = db.prepare('SELECT id,email FROM accounts WHERE email=?');
+  const rolesFor = db.prepare('SELECT role FROM control_center_roles WHERE account_id=? ORDER BY role');
+  const recentAdminEvents = db.prepare(`SELECT actor.email AS actor,subject.email AS subject,e.role,e.action,e.recorded_at
+    FROM control_center_admin_events e JOIN accounts actor ON actor.id=e.actor
+    JOIN accounts subject ON subject.id=e.subject ORDER BY e.id DESC LIMIT 50`);
+  const insertAdminEvent = db.prepare('INSERT INTO control_center_admin_events(actor,subject,role,action,recorded_at) VALUES (?,?,?,?,?)');
   const canReview = (account, role) => Object.hasOwn(operationsPaths, role) && Boolean(authorized.get({ account, role }));
   return {
     canReview,
+    canManageRoles: (actor) => Boolean(canManage.get(actor)),
+    adminLookup(actor, email) {
+      if (!canManage.get(actor)) return { status: 403 };
+      const target = targetByEmail.get(email);
+      if (!target) return { status: 404, events: recentAdminEvents.all() };
+      return { status: 200, account: target, roles: rolesFor.all(target.id).map(({ role }) => role), events: recentAdminEvents.all() };
+    },
+    manageRole(actor, email, role, action) {
+      if (!['billing', 'support', 'security'].includes(role) || !['grant', 'revoke'].includes(action)) return 422;
+      db.exec('BEGIN IMMEDIATE');
+      try {
+        if (!canManage.get(actor)) { db.exec('ROLLBACK'); return 403; }
+        const target = targetByEmail.get(email);
+        if (!target) { db.exec('ROLLBACK'); return 404; }
+        const result = (action === 'grant' ? grant : revoke).run(target.id, role);
+        if (!result.changes) { db.exec('ROLLBACK'); return 409; }
+        insertAdminEvent.run(actor, target.id, role, action === 'grant' ? 'granted' : 'revoked', now());
+        db.exec('COMMIT');
+        return 303;
+      } catch (error) {
+        db.exec('ROLLBACK');
+        throw error;
+      }
+    },
     setReviewer(account, role, enabled) {
       if (!Object.hasOwn(operationsPaths, role)) return;
       return (enabled ? grant : revoke).run(account, role);
@@ -57,6 +106,60 @@ export function operationsStore(db, now, sessionIdle) {
         events: events.all(target.id) };
     },
   };
+}
+
+export async function handleOperationsAdmin({ request, reply, redirect, lang, actor, token, form, store }) {
+  if (!store.operations.canManageRoles(actor.id)) return reply(403);
+  const t = (en, ar) => lang === 'ar' ? ar : en;
+  const url = operationsPaths.administration + '?lang=' + lang;
+  let status = 200;
+  if (form) {
+    const retry = roleAdminThrottle.begin(request.socket.remoteAddress ?? '', actor.email);
+    if (retry) return reply(429, null, { 'Retry-After': String(retry) });
+    try {
+      const credentials = store.credentials(actor.email);
+      if ((form.get('password') ?? '').length > 128 || !await verifyPassword(form.get('password') ?? '', credentials) ||
+          store.session(token)?.id !== actor.id) return reply(403);
+      const email = normalizeAddress(form.get('email') ?? '');
+      status = store.operations.manageRole(actor.id, email, form.get('role') ?? '', form.get('action') ?? '');
+      if (status === 303) return redirect(url);
+    } finally {
+      roleAdminThrottle.finish();
+    }
+  }
+  const search = new URL(request.url, 'http://localhost').searchParams.get('email');
+  const email = search === null ? '' : normalizeAddress(search);
+  if (search !== null && !email) return reply(422);
+  const result = email ? store.operations.adminLookup(actor.id, email) : { status: 200, events: store.operations.adminLookup(actor.id, '').events };
+  const roles = ['billing', 'support', 'security'];
+  const roleNames = { billing: ['Billing reviewer', 'مراجع الفوترة'], support: ['Support reviewer', 'مراجع الدعم'], security: ['Security reviewer', 'مراجع الأمان'] };
+  const eventRows = (result.events ?? []).map((event) => `<li><bdi>${escapeHtml(event.actor)}</bdi> · ${t(...roleNames[event.role])} ·
+    ${event.action === 'granted' ? t('Granted to', 'مُنح إلى') : t('Revoked from', 'سُحب من')} <bdi>${escapeHtml(event.subject)}</bdi> ·
+    <time>${new Intl.DateTimeFormat(lang, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }).format(event.recorded_at)} UTC</time></li>`).join('');
+  const target = result.account ? `<h2>${t('Current roles', 'الأدوار الحالية')} · <bdi>${escapeHtml(result.account.email)}</bdi></h2>
+    <p>${result.roles.length ? result.roles.map((role) => t(...roleNames[role])).join(' · ') : t('No delegated roles', 'لا توجد أدوار مفوضة')}</p>
+    <form class="workspace-form" method="post" action="${url}">
+      <input type="hidden" name="email" value="${escapeHtml(result.account.email)}">
+      <label>${t('Role', 'الدور')}<select name="role" required>${roles.map((role) => `<option value="${role}">${t(...roleNames[role])}</option>`).join('')}</select></label>
+      <label>${t('Current password', 'كلمة المرور الحالية')}<input name="password" type="password" required maxlength="128" autocomplete="current-password"></label>
+      <button class="action" name="action" value="grant">${t('Grant role', 'امنح الدور')}</button>
+      <button class="action" name="action" value="revoke">${t('Revoke role', 'اسحب الدور')}</button>
+    </form>` : '';
+  reply(status, { title: t('User and role administration', 'إدارة المستخدمين والأدوار'), path: operationsPaths.administration,
+    controlCenter: true, billingOnly: true,
+    html: `<section class="surface panel detail workspace-page"><h1>${t('User and role administration', 'إدارة المستخدمين والأدوار')}</h1>
+      <p>${t('Manage delegated billing, support and security reviewer roles. MFA and current-password confirmation are required; each change is audited.',
+        'إدارة أدوار مراجعي الفوترة والدعم والأمان. يلزم التحقق متعدد العوامل وتأكيد كلمة المرور الحالية، ويُسجّل كل تغيير في سجل التدقيق.')}</p>
+      ${status === 409 ? `<p role="status">${t('The role was already in that state.', 'الدور مضبوط بالفعل على هذه الحالة.')}</p>` : ''}
+      ${result.status === 404 ? `<p role="status">${t('Account unavailable.', 'الحساب غير متاح.')}</p>` : ''}
+      <form class="workspace-form" method="get" action="${operationsPaths.administration}">
+        <input type="hidden" name="lang" value="${lang}">
+        <label>${t('Exact account email', 'البريد الإلكتروني المطابق')}<input type="email" name="email" maxlength="254" required dir="ltr"></label>
+        <button class="action">${t('Look up account', 'ابحث عن الحساب')}</button>
+      </form>${target}<h2>${t('Recent role changes', 'تغييرات الأدوار الأخيرة')}</h2>
+      ${eventRows ? `<ol class="activity">${eventRows}</ol>` : `<p>${t('No role changes recorded.', 'لا توجد تغييرات أدوار مسجلة.')}</p>`}
+    </section>`,
+  });
 }
 
 const actions = {

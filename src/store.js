@@ -1,4 +1,4 @@
-import { operationsSchema, operationsStore } from './admin-operations.js';
+import { operationsAdminSchema, operationsSchema, operationsStore } from './admin-operations.js';
 import { billingAccessSchema, billingDiscountSchema, billingReconciliationSchema, billingSchema, billingStore } from './billing-store.js';
 import { resourceSchema, resourceStore } from './resource-store.js';
 import { citationSchema, citationStore } from './citation-store.js';
@@ -30,7 +30,7 @@ import { referenceSchema, referenceMigrationV4, referenceStore } from './referen
 
 export const sessionLifetime = 8 * 60 * 60;
 export const sessionIdle = 30 * 60_000;
-const schemaVersion = 42;
+const schemaVersion = 43;
 const schema = `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -123,6 +123,7 @@ function initialize(db, path) {
     if (version < 40) db.exec(planAudienceSchema);
     if (version < 41) db.exec(operationsSchema);
     if (version < 42) db.exec(folderSchema);
+    if (version < 43) db.exec(operationsAdminSchema);
     return bindDocumentKey(db, path);
   });
 }

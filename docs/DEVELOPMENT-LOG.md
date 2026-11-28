@@ -340,3 +340,8 @@
 
 - Added a billing-reviewer-only, read-only Control Center page with bilingual totals queried from reconciled invoices, payments, refunds, individual assignments and discount redemption rows. The response is no-store; non-reviewers are denied and POST is unsupported. No metrics are estimated or fabricated.
 - Focused `node --test test/billing.test.js` passed 2/2, including actual fixture totals in EUR, Arabic output, MFA role gating, no-store, and read-only enforcement. NRI-20 remains Partial. Acceptance is 194/219 (88.6%), 15 Verified / 5 Partial; remaining 25 criteria: 6 verification, 13 implementation, 6 external blockers.
+
+# 2026-11-28 · NRI-20 delegated role administration
+
+- Added a bilingual operator-only role administration page for billing, support and security reviewers. Grant/revoke mutations require active MFA, current-password verification, same-session confirmation and same-origin POST. Role changes and their audit row commit transactionally. No route permits delegating or removing the core operator role.
+- Added schema v43 for durable role-change history. Focused billing, licensing, settings and migration regression passed 11/11. The broader Control Center acceptance criterion remains partial because device/session controls, backup status/history, security response and global settings are unfinished. Acceptance remains 194/219; this is progress within a bundled existing criterion, not a new criterion.
