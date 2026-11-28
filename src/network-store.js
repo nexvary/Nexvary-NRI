@@ -22,6 +22,29 @@ export const networkSchema = `
   PRAGMA user_version = 8;
 `;
 
+export const networkModerationSchema = `
+  CREATE TABLE IF NOT EXISTS researcher_reports (
+    id INTEGER PRIMARY KEY,
+    reporter_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    subject_id TEXT NOT NULL REFERENCES researcher_profiles(account_id) ON DELETE CASCADE,
+    reason TEXT NOT NULL CHECK(reason IN ('spam','impersonation','harassment','other')),
+    state TEXT NOT NULL CHECK(state IN ('pending','actioned','dismissed')),
+    created_at INTEGER NOT NULL,
+    reviewed_by TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+    reviewed_at INTEGER,
+    CHECK(reporter_id <> subject_id)
+  ) STRICT;
+  CREATE INDEX IF NOT EXISTS researcher_reports_queue ON researcher_reports(state,created_at,id);
+  CREATE TABLE IF NOT EXISTS researcher_moderation_events (
+    id INTEGER PRIMARY KEY,
+    report_id INTEGER NOT NULL REFERENCES researcher_reports(id) ON DELETE CASCADE,
+    reviewer_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT,
+    action TEXT NOT NULL CHECK(action IN ('actioned','dismissed')),
+    created_at INTEGER NOT NULL
+  ) STRICT;
+  PRAGMA user_version = 46;
+`;
+
 export function networkStore(db, now, transact, revokeShares) {
   const profile = db.prepare('SELECT name, interests, orcid, discoverable FROM researcher_profiles WHERE account_id = ?');
   const save = db.prepare(`INSERT INTO researcher_profiles VALUES (?, ?, ?, ?, ?)
@@ -64,6 +87,18 @@ export function networkStore(db, now, transact, revokeShares) {
 
   const pruneEvents = db.prepare('DELETE FROM researcher_request_events WHERE account_id=? AND created_at <= ?');
   const requestEvent = db.prepare('INSERT INTO researcher_request_events VALUES (?, ?)');
+  const pendingReport = db.prepare("SELECT 1 FROM researcher_reports WHERE reporter_id=? AND subject_id=? AND state='pending'");
+  const reportableProfile = db.prepare('SELECT 1 FROM researcher_profiles WHERE account_id=? AND discoverable=1');
+  const recentReports = db.prepare("SELECT count(*) AS total FROM researcher_reports WHERE reporter_id=? AND created_at>?");
+  const insertReport = db.prepare("INSERT INTO researcher_reports(reporter_id,subject_id,reason,state,created_at) VALUES (?,?,?,'pending',?)");
+  const reportQueue = db.prepare(`SELECT r.id,r.reason,r.created_at AS createdAt,p.account_id AS subjectId,p.name AS subjectName,
+      substr(r.reporter_id,1,8) AS reporterRef FROM researcher_reports r
+      JOIN researcher_profiles p ON p.account_id=r.subject_id
+      WHERE r.state='pending' ORDER BY r.created_at,r.id LIMIT 100`);
+  const resolveReport = db.prepare(`UPDATE researcher_reports SET state=?,reviewed_by=?,reviewed_at=? WHERE id=? AND state='pending' RETURNING subject_id AS subjectId`);
+  const hideProfile = db.prepare('UPDATE researcher_profiles SET discoverable=0 WHERE account_id=?');
+  const recordModeration = db.prepare('INSERT INTO researcher_moderation_events(report_id,reviewer_id,action,created_at) VALUES (?,?,?,?)');
+  const moderationEvents = db.prepare('SELECT report_id AS reportId,reviewer_id AS reviewerId,action,created_at AS createdAt FROM researcher_moderation_events ORDER BY id DESC LIMIT 100');
 
   function block(owner, peer) {
     clearPair.run(owner, peer, peer, owner);
@@ -78,6 +113,30 @@ export function networkStore(db, now, transact, revokeShares) {
     discover: (owner, search) => discover.all(owner, owner, owner, owner, owner, search, search, search),
     incoming: (owner) => incoming.all(owner, owner, owner, owner),
     blocked: (owner) => blocked.all(owner),
+    reports: () => reportQueue.all(),
+    moderationEvents: () => moderationEvents.all(),
+    report(owner, subject, reason) {
+      if (owner === subject || !['spam','impersonation','harassment','other'].includes(reason)) return false;
+      return transact(db, () => {
+        const timestamp=now(), cutoff=timestamp-86_400_000;
+        if (!reportableProfile.get(subject) || pendingReport.get(owner,subject) || recentReports.get(owner,cutoff).total>=5) return false;
+        return insertReport.run(owner,subject,reason,timestamp).changes===1;
+      });
+    },
+    reviewReport(reviewer, reportId, decision) {
+      if (!Number.isSafeInteger(reportId) || !['actioned','dismissed'].includes(decision)) return false;
+      return transact(db, () => {
+        const timestamp=now();
+        const result=resolveReport.get(decision,reviewer,timestamp,reportId);
+        if (!result) return false;
+        if (decision==='actioned') {
+          hideProfile.run(result.subjectId);
+          unpublish.run(result.subjectId,result.subjectId);
+        }
+        recordModeration.run(reportId,reviewer,decision,timestamp);
+        return true;
+      });
+    },
     save(owner, { name, interests, orcid, discoverable }) {
       return transact(db, () => {
         save.run(owner, name, interests, orcid, Number(discoverable));

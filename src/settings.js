@@ -113,6 +113,7 @@ export function settingsPage(store, lang, account, token) {
       ${store.billing.canReview(account.id) ? `<a href="/control-center/billing?lang=${lang}">${lang === 'ar' ? 'سجلات الفوترة التجريبية' : 'Sandbox billing records'}</a>` : ''}
       ${store.licensing.isOperator(account.id) && store.mfa.enabled(account.id) ? `<a href="/control-center?lang=${lang}">${t('licensing')}</a>` : ''}
       ${store.messages.isModerator(account.id) ? `<a href="/workspace/settings/message-moderation?lang=${lang}">${t('moderation')}</a>` : ''}
+      ${store.messages.isModerator(account.id) ? `<a href="/workspace/settings/network-moderation?lang=${lang}">${lang==='ar'?'مراجعة بلاغات الشبكة':'Network report review'}</a>` : ''}
       <h2>${lang==='ar'?'الملف الشخصي والمظهر':'Profile and appearance'}</h2>
       <form class="workspace-form" method="post" action="/workspace/settings?lang=${lang}">
         <label>${lang==='ar'?'اسم العرض':'Display name'}<input name="display-name" maxlength="80" value="${escapeHtml(profile.displayName)}" autocomplete="name"></label>

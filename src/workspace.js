@@ -43,6 +43,7 @@ export function resolveWorkspaceRoute(pathname) {
   if (pathname === '/workspace/assistant') return { kind: 'assistant' };
   if (pathname === '/workspace/education') return { kind: 'education' };
   if (pathname === '/workspace/settings/message-moderation') return { kind: 'settings-message-moderation' };
+  if (pathname === '/workspace/settings/network-moderation') return { kind: 'network-moderation' };
   if (pathname === operationsPaths.support) return { kind: 'control-operations', role: 'support' };
   if (pathname === operationsPaths.security) return { kind: 'control-operations', role: 'security' };
   if (pathname === operationsPaths.administration) return { kind: 'control-admin' };
@@ -325,7 +326,7 @@ export function createWorkspaceHandler(store, providers, version, reportRenderer
       await handleAnalytics({ request, reply, lang, stillSignedIn });
       return;
     }
-    if (kind === 'network' || kind === 'collaboration') {
+    if (kind === 'network' || kind === 'collaboration' || kind === 'network-moderation') {
       handleNetwork({ request, reply, redirect, route, lang, account, form });
       return;
     }

@@ -16,7 +16,8 @@ test('keeps research profiles private until opt-in and honors collaboration and 
   });
   const [a, b, c] = accounts;
   const project = store.createProject(a.id, { title: 'Private project', description: '' });
-  const app = createApp(store);
+  const logged = [];
+  const app = createApp(store, { log: (event) => logged.push(event) });
   app.listen(0, '127.0.0.1');
   await new Promise((resolve) => app.once('listening', resolve));
   const origin = 'http://127.0.0.1:' + app.address().port;
@@ -50,6 +51,26 @@ test('keeps research profiles private until opt-in and honors collaboration and 
     assert.equal((await post('network', a, { intent: 'follow', peer: b.id })).status, 422);
     assert.equal((await post('network', b, { intent: 'unblock', peer: a.id })).status, 303);
     assert.match(await (await get('network', a)).text(), /Researcher B/);
+
+    assert.match(await (await get('network', a)).text(), /Report profile/);
+    assert.equal((await post('network', a, { intent: 'report', peer: b.id, reason: 'harassment' })).status, 303);
+    assert.equal((await post('network', a, { intent: 'report', peer: b.id, reason: 'harassment' })).status, 422);
+    assert.equal((await fetch(origin + '/workspace/settings/network-moderation?lang=en', { headers: { cookie: a.cookie } })).status, 403);
+    store.messages.setModerator(c.id, true);
+    assert.equal(store.messages.isModerator(c.id), true);
+    const moderationPage = await fetch(origin + '/workspace/settings/network-moderation?lang=en', { headers: { cookie: c.cookie } });
+    assert.equal(moderationPage.status, 200, JSON.stringify(logged.find((event) => event.event === 'http.error')));
+    assert.match(await moderationPage.text(), /Pending researcher profile reports[\s\S]*Researcher B[\s\S]*Harassment/);
+    const [report] = store.network.reports();
+    assert.equal((await fetch(origin + '/workspace/settings/network-moderation?lang=en', {
+      method: 'POST', redirect: 'manual', headers: { origin, cookie: c.cookie },
+      body: new URLSearchParams({ 'report-id': String(report.id), intent: 'actioned' }),
+    })).status, 303);
+    assert.equal(store.network.profile(b.id).discoverable, 0);
+    assert.equal(store.network.reports().length, 0);
+    assert.deepEqual(store.network.moderationEvents().map(({ reviewerId, action }) => ({ reviewerId, action })),
+      [{ reviewerId: c.id, action: 'actioned' }]);
+    assert.equal((await post('network', a, { intent: 'report', peer: b.id, reason: 'invalid' })).status, 422);
   } finally {
     await new Promise((resolve, reject) => app.close((error) => error ? reject(error) : resolve()));
   }
