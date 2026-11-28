@@ -320,3 +320,8 @@
 - Reconciled the 219-criterion matrix with existing direct evidence for scoped manuscript deletion (NRI-02), all L-READY categories and reviewed-source links (NRI-06), and invitation decline/replay denial (NRI-10). The module matrix is 13 Verified / 7 Partial, with 188/219 criteria verified. Remaining: 7 evidence items, 18 implementation gaps, 6 external blockers.
 - Focused HTTP/unit tests passed 11/11. A fresh full local run passed 76, skipped 2 optional renderer-dependent tests, and failed 0. The stored full-render run for this source state passed 78/78; hosted CI installs the real report runtime and will verify the actual bilingual exports again.
 - The repo remains public, publication is authorized, and PR #19 remains draft and unmerged. NRI-18 accessibility remains unverified.
+# 2026-11-28 · NRI-03 closure
+
+- Added separate, owner-scoped library folders and document assignment; folders remain distinct from named collections and are covered by account-isolation tests.
+- Added bilingual copyright and authorization guidance to document upload.
+- Focused regression: `node --test test/library.test.js test/documents.test.js` — 10/10 passed. NRI-03 is now 15/15; acceptance is 190/219 (86.8%), 14 Verified / 6 Partial. Full regression remains for the next milestone.

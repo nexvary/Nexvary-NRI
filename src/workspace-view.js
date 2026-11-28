@@ -36,7 +36,7 @@ const labels = {
   version: ['Version', 'الإصدار'],
   download: ['Download file', 'تنزيل الملف'],
   bytes: ['bytes', 'بايت'],
-  fileLimit: ['PDF and DOCX up to 8 MiB. UTF-8 TXT up to 256 KiB.', 'الحد الأقصى 8 ميبيبايت لملفات PDF وDOCX و256 كيبيبايت لملف TXT بترميز UTF-8.'],
+  fileLimit: ['PDF and DOCX up to 8 MiB. UTF-8 TXT up to 256 KiB. Upload only material you own or are authorized to store; check the applicable license and copyright terms.', 'الحد الأقصى 8 ميبيبايت لملفات PDF وDOCX و256 كيبيبايت لملف TXT بترميز UTF-8. ارفع المواد التي تملكها أو تملك إذنًا بتخزينها فقط، وتحقق من شروط الترخيص وحقوق النشر المنطبقة.'],
   preview: ['Preview text', 'معاينة النص'],
   invalidDocx: ['This DOCX is malformed or uses unsupported content.', 'ملف DOCX تالف أو يتضمن محتوى غير مدعوم.'],
   docxUnavailable: ['DOCX processing is temporarily unavailable.', 'معالجة ملفات DOCX غير متاحة مؤقتًا.'],

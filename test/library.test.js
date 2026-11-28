@@ -99,6 +99,7 @@ test('library collections and reading marks remain owner-scoped and tied to PDF 
   t.after(() => new Promise((resolve) => app.close(resolve)));
   const origin = 'http://127.0.0.1:' + app.address().port;
   const index = '/workspace/library/collections?lang=en';
+  const folders = '/workspace/library/folders?lang=en';
   const reading = '/workspace/projects/' + project + '/documents/' + document + '/reading?lang=en';
   const request = (user, path, fields, source = origin) => fetch(origin + path, {
     redirect: 'manual', headers: { cookie: user.cookie, ...(fields ? { origin: source } : {}) },
@@ -108,11 +109,23 @@ test('library collections and reading marks remain owner-scoped and tied to PDF 
   assert.equal(created.status, 303);
   const location = created.headers.get('location');
   const collection = new URL(origin + location).searchParams.get('collection');
+  assert.match(await (await request(owner, folders)).text(), /Library folders/);
+  const madeFolder = await request(owner, folders, { intent: 'create', name: 'Evidence files' });
+  assert.equal(madeFolder.status, 303);
+  const folderLocation = madeFolder.headers.get('location');
+  const listedFolders = await request(owner, folders);
+  assert.match(await listedFolders.text(), /Evidence files/);
+  const folderId = store.organization.folders(owner.id)[0].id;
+  assert.equal((await request(other, folders, { intent: 'remove', folder: folderId })).status, 404);
   assert.equal((await request(other, location)).status, 404);
   assert.equal((await request(other, index, { intent: 'remove', collection })).status, 404);
   assert.equal((await request(other, reading)).status, 404);
   assert.equal((await request(owner, reading, { intent: 'link', collection }, 'https://foreign.test')).status, 403);
   assert.equal((await request(owner, reading, { intent: 'link', collection })).status, 303);
+  assert.equal((await request(owner, reading, { intent: 'folder-link', folder: folderId })).status, 303);
+  assert.match(await (await request(owner, reading)).text(), /Remove from folder/);
+  assert.equal(store.organization.reading(owner.id, project, document, 0).folders[0].linked, 1);
+  assert.equal(store.organization.reading(owner.id, project, document, 0).collections[0].linked, 1);
   assert.match(await (await request(owner, location)).text(), /Methods\.pdf/);
   const mark = { intent: 'add-mark', kind: 'annotation', page: 2, version: 1, text: '<script>Review methods</script>' };
   assert.equal((await request(owner, reading, { ...mark, version: 9 })).status, 422);
@@ -129,6 +142,8 @@ test('library collections and reading marks remain owner-scoped and tied to PDF 
   assert.equal((await request(other, reading + '&version=1&page=2')).status, 404);
   assert.match(html, /Bookmark · v1/);
   assert.match(html, /&lt;script&gt;Review methods&lt;\/script&gt;/);
+  assert.equal((await request(owner, folders, { intent: 'remove', folder: folderId })).status, 303);
+  assert.equal(store.organization.list(owner.id, 0).length, 1, 'folder organization remains separate from collections');
   assert.equal((await request(owner, location, { intent: 'remove', collection })).status, 303);
   assert.ok(store.documents.get(owner.id, project, document));
   assert.equal(store.organization.reading(owner.id, project, document, 0).marks.length, 2);

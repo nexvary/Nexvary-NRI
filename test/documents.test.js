@@ -78,6 +78,8 @@ function documentsPath(project = firstProject) {
 test('uploads two real PDF versions and returns each original as a private attachment', async () => {
   const page = await request(`/workspace/projects/${firstProject}?lang=en`);
   assert.match(await page.text(), /Private PDFs/);
+  assert.match(await (await request(documentsPath() + '?lang=en')).text(), /only material you own or are authorized to store/);
+  assert.match(await (await request(documentsPath() + '?lang=ar')).text(), /ارفع المواد التي تملكها/);
   const empty = await request(documentsPath() + '?lang=ar');
   assert.match(await empty.text(), /لم تُضف ملفات PDF/);
   const created = await request(documentsPath() + '?lang=ar', { body: fileForm(firstPdf, 'دراسة.pdf') });
