@@ -60,7 +60,7 @@ test('keeps research profiles private until opt-in and honors collaboration and 
     assert.equal(store.messages.isModerator(c.id), true);
     const moderationPage = await fetch(origin + '/workspace/settings/network-moderation?lang=en', { headers: { cookie: c.cookie } });
     assert.equal(moderationPage.status, 200, JSON.stringify(logged.find((event) => event.event === 'http.error')));
-    assert.match(await moderationPage.text(), /Pending researcher profile reports[\s\S]*Researcher B[\s\S]*Harassment/);
+    assert.match(await moderationPage.text(), /Pending network reports[\s\S]*Researcher B[\s\S]*Harassment/);
     const [report] = store.network.reports();
     assert.equal((await fetch(origin + '/workspace/settings/network-moderation?lang=en', {
       method: 'POST', redirect: 'manual', headers: { origin, cookie: c.cookie },
