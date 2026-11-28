@@ -46,6 +46,7 @@ export function createApp(store = openWorkspaceStore(), {
   tls = undefined,
   log = undefined,
   enforceEntitlements = Boolean(tls),
+  lifecycleIntervalMs = 60_000,
 } = {}) {
   const origin = tls ? new URL(tls.origin) : undefined;
   if (origin && (origin.protocol !== 'https:' || origin.origin !== tls.origin)) {
@@ -226,6 +227,18 @@ export function createApp(store = openWorkspaceStore(), {
     ? createTlsServer({ ...requestOptions, cert:tls.cert, key:tls.key, minVersion:'TLSv1.2' }, onRequest)
     : createServer(requestOptions,onRequest);
   app.maxHeadersCount = 60;
+  const reconcileLifecycle = () => {
+    try {
+      const result=store.licensing.reconcileExpirations();
+      if(result.accounts||result.organizations)logEvent('subscription.expiry.reconciled',result);
+    } catch {
+      logEvent('subscription.expiry.reconciliation.error');
+    }
+  };
+  reconcileLifecycle();
+  const lifecycleTimer=setInterval(reconcileLifecycle,lifecycleIntervalMs);
+  lifecycleTimer.unref();
+  app.once('close',()=>clearInterval(lifecycleTimer));
   app.once('close', () => store.close());
   return app;
 }
